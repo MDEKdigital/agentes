@@ -141,7 +141,7 @@ export default function InboxPage() {
   };
 
   return (
-    <div className="flex h-[calc(100vh-56px)] -m-6 overflow-hidden">
+    <div className="flex h-screen -m-6 overflow-hidden">
       {/* Coluna esquerda — lista */}
       <div className="flex w-[280px] shrink-0 flex-col border-r border-border bg-card">
         {/* Busca */}

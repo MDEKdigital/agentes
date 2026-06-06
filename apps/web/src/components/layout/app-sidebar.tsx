@@ -1,10 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { Inbox, Bot, Radio, Users, Settings, Zap } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { Inbox, Bot, Radio, Users, Settings, Zap, LogOut } from "lucide-react";
 import { OrgSwitcher } from "./org-switcher";
+import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const navigation = [
   { name: "Inbox", href: "/inbox", icon: Inbox },
@@ -14,11 +22,24 @@ const navigation = [
   { name: "Configurações", href: "/settings", icon: Settings },
 ];
 
-export function AppSidebar() {
+interface AppSidebarProps {
+  email: string;
+}
+
+export function AppSidebar({ email }: AppSidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
+  const initials = email.slice(0, 2).toUpperCase();
+
+  const handleLogout = async () => {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.push("/login");
+    router.refresh();
+  };
 
   return (
-    <aside className="group/sidebar relative flex h-screen w-16 flex-col overflow-hidden border-r border-border bg-card transition-all duration-200 ease-in-out hover:w-60 shrink-0">
+    <aside className="group/sidebar relative flex h-screen w-16 shrink-0 flex-col overflow-hidden border-r border-border bg-card transition-all duration-200 ease-in-out hover:w-60">
       {/* Logo */}
       <div className="flex h-14 items-center border-b border-border px-4">
         <div className="flex items-center gap-3 overflow-hidden">
@@ -33,9 +54,7 @@ export function AppSidebar() {
 
       {/* Org switcher */}
       <div className="border-b border-border px-2 py-2">
-        <div className="overflow-hidden">
-          <OrgSwitcher collapsed={true} />
-        </div>
+        <OrgSwitcher />
       </div>
 
       {/* Nav */}
@@ -62,24 +81,50 @@ export function AppSidebar() {
               <span className="whitespace-nowrap opacity-0 transition-opacity duration-150 group-hover/sidebar:opacity-100">
                 {item.name}
               </span>
-
-              {/* Tooltip quando recolhido */}
-              <div className="pointer-events-none absolute left-full ml-2 hidden whitespace-nowrap rounded-md bg-elevated px-2 py-1 text-xs font-medium text-foreground shadow-lg group-hover/sidebar:hidden group-[]/sidebar:block">
-                {item.name}
-              </div>
             </Link>
           );
         })}
       </nav>
 
-      {/* Footer */}
+      {/* Footer — usuário */}
       <div className="border-t border-border p-2">
-        <div className="flex h-8 items-center gap-2 overflow-hidden rounded-md px-2.5">
-          <div className="status-dot h-2 w-2 shrink-0 rounded-full bg-green-500" />
-          <span className="whitespace-nowrap text-xs text-muted-foreground opacity-0 transition-opacity duration-150 group-hover/sidebar:opacity-100">
-            Sistema online
-          </span>
-        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="flex h-10 w-full items-center gap-3 overflow-hidden rounded-md px-2 transition-colors hover:bg-accent focus-visible:outline-none">
+              {/* Avatar */}
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/20 text-xs font-semibold text-blue-electric-300">
+                {initials}
+              </div>
+              {/* Info — aparece quando expandido */}
+              <div className="flex min-w-0 flex-1 flex-col items-start opacity-0 transition-opacity duration-150 group-hover/sidebar:opacity-100">
+                <span className="w-full truncate text-xs font-medium text-foreground">
+                  {email}
+                </span>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <span className="relative flex h-1.5 w-1.5">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-500 opacity-75" />
+                    <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-green-500" />
+                  </span>
+                  <span className="text-[10px] text-muted-foreground">Online</span>
+                </div>
+              </div>
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent side="right" align="end" className="w-52 border-border bg-popover">
+            <div className="px-2 py-2">
+              <p className="text-xs font-semibold text-foreground">{initials}</p>
+              <p className="truncate text-xs text-muted-foreground">{email}</p>
+            </div>
+            <DropdownMenuSeparator className="bg-border" />
+            <DropdownMenuItem
+              onClick={handleLogout}
+              className="gap-2 text-sm text-destructive focus:text-destructive focus:bg-destructive/10"
+            >
+              <LogOut className="h-3.5 w-3.5" />
+              Sair
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </aside>
   );
