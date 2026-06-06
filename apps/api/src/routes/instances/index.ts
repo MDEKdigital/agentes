@@ -14,6 +14,10 @@ import {
   getInstanceQrCode,
   deleteInstance as deleteEvolutionInstance,
   logoutInstance,
+  fetchProfile,
+  updateProfileName,
+  updateProfileStatus,
+  updateProfilePicture,
 } from "../../services/evolution.service";
 import { authMiddleware } from "../../middleware/auth";
 
@@ -96,6 +100,70 @@ export default async function instanceRoutes(app: FastifyInstance) {
       }
 
       return { ...instance, status: newStatus, live: status };
+    }
+  );
+
+  // Get WhatsApp profile
+  app.get<{ Params: { instanceId: string } }>(
+    "/instances/:instanceId/profile",
+    async (request, reply) => {
+      const db = getAdminClient();
+      const instance = await getInstanceById(db, request.params.instanceId);
+
+      const membership = request.user.memberships.find(
+        (m) => m.organization_id === instance.organization_id
+      );
+      if (!membership) return reply.status(403).send({ error: "Access denied" });
+
+      if (!instance.phone_number || instance.status !== "connected") {
+        return { name: null, status: null, picture: null };
+      }
+
+      try {
+        const profile = await fetchProfile(instance.instance_name, instance.phone_number) as Record<string, string>;
+        return {
+          name: profile.name ?? null,
+          status: profile.status ?? null,
+          picture: profile.picture ?? null,
+        };
+      } catch {
+        return { name: null, status: null, picture: null };
+      }
+    }
+  );
+
+  // Update WhatsApp profile
+  app.patch<{ Params: { instanceId: string } }>(
+    "/instances/:instanceId/profile",
+    async (request, reply) => {
+      const db = getAdminClient();
+      const instance = await getInstanceById(db, request.params.instanceId);
+
+      const membership = request.user.memberships.find(
+        (m) => m.organization_id === instance.organization_id && m.role !== "agent"
+      );
+      if (!membership) return reply.status(403).send({ error: "Admin access required" });
+
+      const body = request.body as {
+        name?: string;
+        status?: string;
+        picture?: string;
+      };
+
+      const tasks: Promise<unknown>[] = [];
+
+      if (body.name !== undefined) {
+        tasks.push(updateProfileName(instance.instance_name, body.name));
+      }
+      if (body.status !== undefined) {
+        tasks.push(updateProfileStatus(instance.instance_name, body.status));
+      }
+      if (body.picture !== undefined) {
+        tasks.push(updateProfilePicture(instance.instance_name, body.picture));
+      }
+
+      await Promise.all(tasks);
+      return { ok: true };
     }
   );
 
