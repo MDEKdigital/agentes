@@ -58,8 +58,21 @@ export default async function knowledgeFaqRoutes(app: FastifyInstance) {
       }
 
       const db = getAdminClient();
-      const faq = await updateFaq(db, request.params.faqId, parseResult.data);
-      return faq;
+      const { data: faq } = await db
+        .from("knowledge_faqs")
+        .select("organization_id")
+        .eq("id", request.params.faqId)
+        .single();
+
+      if (!faq) return reply.status(404).send({ error: "FAQ not found" });
+
+      const membership = request.user.memberships.find(
+        (m) => m.organization_id === faq.organization_id && m.role !== "agent"
+      );
+      if (!membership) return reply.status(403).send({ error: "Admin access required" });
+
+      const updated = await updateFaq(db, request.params.faqId, parseResult.data);
+      return updated;
     }
   );
 
@@ -68,6 +81,19 @@ export default async function knowledgeFaqRoutes(app: FastifyInstance) {
     "/faqs/:faqId",
     async (request, reply) => {
       const db = getAdminClient();
+      const { data: faq } = await db
+        .from("knowledge_faqs")
+        .select("organization_id")
+        .eq("id", request.params.faqId)
+        .single();
+
+      if (!faq) return reply.status(404).send({ error: "FAQ not found" });
+
+      const membership = request.user.memberships.find(
+        (m) => m.organization_id === faq.organization_id && m.role !== "agent"
+      );
+      if (!membership) return reply.status(403).send({ error: "Admin access required" });
+
       await deleteFaq(db, request.params.faqId);
       return reply.status(204).send();
     }

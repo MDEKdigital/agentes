@@ -58,10 +58,16 @@ export default function SettingsPage() {
   const handleSaveName = async () => {
     if (!currentOrg || !name) return;
     setSaving(true);
-    const supabase = createClient();
-    await supabase.from("organizations").update({ name }).eq("id", currentOrg.id);
-    await refetch();
-    setSaving(false);
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.from("organizations").update({ name }).eq("id", currentOrg.id);
+      if (error) throw error;
+      await refetch();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Erro ao salvar nome");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleSaveApiKey = async (provider: LLMProvider) => {
@@ -95,6 +101,7 @@ export default function SettingsPage() {
       alert(err instanceof Error ? err.message : "Erro ao remover chave");
     } finally {
       setSavingKey(null);
+      fetchApiKeys().catch(() => {}); // sync with server truth regardless of success/failure
     }
   };
 

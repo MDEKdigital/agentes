@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useOrganization } from "@/providers/organization-provider";
 import { createClient } from "@/lib/supabase/client";
@@ -37,6 +37,8 @@ export default function InboxPage() {
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
+  // Guard against stale responses from superseded fetches
+  const fetchCounterRef = useRef(0);
 
   const selectedId = searchParams.get("id");
 
@@ -45,6 +47,7 @@ export default function InboxPage() {
       setLoading(false);
       return;
     }
+    const myCount = ++fetchCounterRef.current;
     setLoading(true);
     const supabase = createClient();
 
@@ -59,6 +62,10 @@ export default function InboxPage() {
     }
 
     const { data, error: queryError } = await query;
+
+    // A newer fetch was started — discard this stale result
+    if (fetchCounterRef.current !== myCount) return;
+
     if (queryError) {
       setError("Erro ao carregar conversas. Tente novamente.");
       setLoading(false);
@@ -74,8 +81,7 @@ export default function InboxPage() {
   }, [fetchConversations]);
 
   // Pass fetchConversations directly (stable useCallback ref) instead of
-  // inline arrows (() => fetchConversations()) which create new references
-  // on every render and cause the realtime channel to be recreated
+  // inline arrows which create new references on every render
   useRealtime({
     table: "conversations",
     filter: currentOrg ? `organization_id=eq.${currentOrg.id}` : undefined,
@@ -98,53 +104,32 @@ export default function InboxPage() {
       })
     : conversations;
 
-  if (loading) return <div className="p-6">Carregando...</div>;
-
-  if (error) {
+  // Render loading/error inline so the sidebar controls stay mounted
+  const listContent = () => {
+    if (loading) {
+      return <div className="p-4 text-sm text-muted-foreground">Carregando...</div>;
+    }
+    if (error) {
+      return (
+        <div className="flex flex-col items-center gap-2 p-6 text-center">
+          <p className="text-sm text-destructive">{error}</p>
+          <button
+            onClick={fetchConversations}
+            className="text-xs text-muted-foreground underline"
+          >
+            Tentar novamente
+          </button>
+        </div>
+      );
+    }
     return (
-      <div className="flex h-[calc(100vh-8rem)] -m-6">
-        <div className="flex w-80 flex-col border-r">
-          <div className="space-y-2 border-b p-3">
-            <div className="relative">
-              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-8"
-              />
-            </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="Filtrar status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
-                <SelectItem value="open">Abertos</SelectItem>
-                <SelectItem value="waiting">Aguardando</SelectItem>
-                <SelectItem value="resolved">Resolvidos</SelectItem>
-                <SelectItem value="closed">Fechados</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex flex-1 items-center justify-center p-4">
-            <div className="text-center">
-              <p className="text-sm text-destructive">{error}</p>
-              <button
-                onClick={fetchConversations}
-                className="mt-2 text-xs text-muted-foreground underline"
-              >
-                Tentar novamente
-              </button>
-            </div>
-          </div>
-        </div>
-        <div className="flex flex-1 items-center justify-center text-muted-foreground">
-          <p>Selecione uma conversa</p>
-        </div>
-      </div>
+      <ConversationList
+        conversations={filtered}
+        selectedId={selectedId}
+        onSelect={handleSelect}
+      />
     );
-  }
+  };
 
   return (
     <div className="flex h-[calc(100vh-8rem)] -m-6">
@@ -173,11 +158,7 @@ export default function InboxPage() {
           </Select>
         </div>
         <div className="flex-1 overflow-y-auto">
-          <ConversationList
-            conversations={filtered}
-            selectedId={selectedId}
-            onSelect={handleSelect}
-          />
+          {listContent()}
         </div>
       </div>
 

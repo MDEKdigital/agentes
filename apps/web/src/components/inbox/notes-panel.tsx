@@ -51,12 +51,13 @@ export function NotesPanel({ conversationId, organizationId }: NotesPanelProps) 
       if (error) throw error;
 
       setNewNote("");
-      await fetchNotes();
     } catch (err) {
       alert(err instanceof Error ? err.message : "Erro ao salvar nota");
     } finally {
       setSaving(false);
     }
+    // Best-effort refresh outside try so its failure doesn't mask the insert result
+    fetchNotes().catch(() => {});
   };
 
   return (
