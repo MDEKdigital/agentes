@@ -69,3 +69,29 @@ export async function logoutInstance(instanceName: string) {
     method: "DELETE",
   });
 }
+
+export async function fetchProfile(instanceName: string, number: string) {
+  const cleaned = number.replace(/\D/g, "");
+  return evolutionFetch(`/chat/fetchProfile/${instanceName}?number=${cleaned}`);
+}
+
+export async function updateProfileName(instanceName: string, name: string) {
+  return evolutionFetch(`/chat/updateProfileName/${instanceName}`, {
+    method: "POST",
+    body: JSON.stringify({ name }),
+  });
+}
+
+export async function updateProfileStatus(instanceName: string, status: string) {
+  return evolutionFetch(`/chat/updateProfileStatus/${instanceName}`, {
+    method: "POST",
+    body: JSON.stringify({ status }),
+  });
+}
+
+export async function updateProfilePicture(instanceName: string, pictureBase64: string) {
+  return evolutionFetch(`/chat/updateProfilePicture/${instanceName}`, {
+    method: "POST",
+    body: JSON.stringify({ picture: pictureBase64 }),
+  });
+}
