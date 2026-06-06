@@ -31,13 +31,21 @@ export default function TeamPage() {
   const [loading, setLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
-    if (!currentOrg) return;
+    if (!currentOrg) {
+      setLoading(false);
+      return;
+    }
     const supabase = createClient();
 
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    setCurrentUserId(user!.id);
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+
+    setCurrentUserId(user.id);
 
     const [membersResult, invitationsResult] = await Promise.all([
       supabase
@@ -57,7 +65,7 @@ export default function TeamPage() {
     setMembers(membersList);
     setInvitations((invitationsResult.data || []) as Invitation[]);
 
-    const myMembership = membersList.find((m) => m.user_id === user!.id);
+    const myMembership = membersList.find((m) => m.user_id === user.id);
     setCurrentUserRole(myMembership?.role || "agent");
 
     setLoading(false);

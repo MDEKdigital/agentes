@@ -34,22 +34,29 @@ export function NotesPanel({ conversationId, organizationId }: NotesPanelProps) 
   const handleAdd = async () => {
     if (!newNote.trim()) return;
     setSaving(true);
+    try {
+      const supabase = createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
 
-    const supabase = createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+      const { error } = await supabase.from("conversation_notes").insert({
+        conversation_id: conversationId,
+        organization_id: organizationId,
+        user_id: user.id,
+        content: newNote.trim(),
+      });
 
-    await supabase.from("conversation_notes").insert({
-      conversation_id: conversationId,
-      organization_id: organizationId,
-      user_id: user!.id,
-      content: newNote.trim(),
-    });
+      if (error) throw error;
 
-    setNewNote("");
-    setSaving(false);
-    fetchNotes();
+      setNewNote("");
+      await fetchNotes();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Erro ao salvar nota");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (

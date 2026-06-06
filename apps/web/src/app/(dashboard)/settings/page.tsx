@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useOrganization } from "@/providers/organization-provider";
 import { createClient } from "@/lib/supabase/client";
+import { apiFetch } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,7 +15,7 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Eye, EyeOff, Save } from "lucide-react";
+import { Eye, EyeOff, Save, Trash2 } from "lucide-react";
 import type { LLMProvider } from "@aula-agente/shared";
 
 const PROVIDERS: { id: LLMProvider; name: string; placeholder: string }[] = [
@@ -27,23 +28,25 @@ export default function SettingsPage() {
   const { currentOrg, refetch } = useOrganization();
   const [name, setName] = useState("");
   const [saving, setSaving] = useState(false);
-  const [apiKeys, setApiKeys] = useState<Record<string, string>>({});
+  const [configuredProviders, setConfiguredProviders] = useState<Record<string, boolean>>({});
+  const [keyInputs, setKeyInputs] = useState<Record<string, string>>({});
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
   const [savingKey, setSavingKey] = useState<string | null>(null);
 
   const fetchApiKeys = useCallback(async () => {
     if (!currentOrg) return;
-    const supabase = createClient();
-    const { data } = await supabase
-      .from("organization_secrets")
-      .select("provider, encrypted_key")
-      .eq("organization_id", currentOrg.id);
-
-    const keys: Record<string, string> = {};
-    (data || []).forEach((s: { provider: string; encrypted_key: string }) => {
-      keys[s.provider] = s.encrypted_key;
-    });
-    setApiKeys(keys);
+    try {
+      const data: { provider: string; has_key: boolean }[] = await apiFetch(
+        `/organizations/${currentOrg.id}/secrets`
+      );
+      const configured: Record<string, boolean> = {};
+      (data || []).forEach((s) => {
+        configured[s.provider] = s.has_key;
+      });
+      setConfiguredProviders(configured);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Erro ao carregar chaves configuradas");
+    }
   }, [currentOrg]);
 
   useEffect(() => {
@@ -63,24 +66,36 @@ export default function SettingsPage() {
 
   const handleSaveApiKey = async (provider: LLMProvider) => {
     if (!currentOrg) return;
+    const newKey = keyInputs[provider]?.trim();
+    if (!newKey) return;
     setSavingKey(provider);
-    const supabase = createClient();
-    const key = apiKeys[provider];
-
-    if (!key) {
-      await supabase
-        .from("organization_secrets")
-        .delete()
-        .eq("organization_id", currentOrg.id)
-        .eq("provider", provider);
-    } else {
-      await supabase.from("organization_secrets").upsert(
-        { organization_id: currentOrg.id, provider, encrypted_key: key },
-        { onConflict: "organization_id,provider" }
-      );
+    try {
+      await apiFetch(`/organizations/${currentOrg.id}/secrets/${provider}`, {
+        method: "PUT",
+        body: JSON.stringify({ key: newKey }),
+      });
+      setConfiguredProviders((prev) => ({ ...prev, [provider]: true }));
+      setKeyInputs((prev) => ({ ...prev, [provider]: "" }));
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Erro ao salvar chave");
+    } finally {
+      setSavingKey(null);
     }
+  };
 
-    setSavingKey(null);
+  const handleRemoveApiKey = async (provider: LLMProvider) => {
+    if (!currentOrg || !confirm(`Remover chave de API do ${provider}?`)) return;
+    setSavingKey(provider);
+    try {
+      await apiFetch(`/organizations/${currentOrg.id}/secrets/${provider}`, {
+        method: "DELETE",
+      });
+      setConfiguredProviders((prev) => ({ ...prev, [provider]: false }));
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Erro ao remover chave");
+    } finally {
+      setSavingKey(null);
+    }
   };
 
   if (!currentOrg) return <div>Carregando...</div>;
@@ -128,16 +143,27 @@ export default function SettingsPage() {
         <CardContent className="space-y-4">
           {PROVIDERS.map((provider) => (
             <div key={provider.id} className="space-y-2">
-              <Label>{provider.name}</Label>
+              <Label className="flex items-center gap-2">
+                {provider.name}
+                {configuredProviders[provider.id] && (
+                  <Badge variant="secondary" className="text-xs font-normal">
+                    Configurado
+                  </Badge>
+                )}
+              </Label>
               <div className="flex gap-2">
                 <div className="relative flex-1">
                   <Input
                     type={showKeys[provider.id] ? "text" : "password"}
-                    value={apiKeys[provider.id] || ""}
+                    value={keyInputs[provider.id] || ""}
                     onChange={(e) =>
-                      setApiKeys((prev) => ({ ...prev, [provider.id]: e.target.value }))
+                      setKeyInputs((prev) => ({ ...prev, [provider.id]: e.target.value }))
                     }
-                    placeholder={provider.placeholder}
+                    placeholder={
+                      configuredProviders[provider.id]
+                        ? "Nova chave para substituir..."
+                        : provider.placeholder
+                    }
                   />
                   <button
                     type="button"
@@ -159,10 +185,21 @@ export default function SettingsPage() {
                 <Button
                   variant="outline"
                   onClick={() => handleSaveApiKey(provider.id)}
-                  disabled={savingKey === provider.id}
+                  disabled={savingKey === provider.id || !keyInputs[provider.id]?.trim()}
                 >
                   {savingKey === provider.id ? "Salvando..." : "Salvar"}
                 </Button>
+                {configuredProviders[provider.id] && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleRemoveApiKey(provider.id)}
+                    disabled={savingKey === provider.id}
+                    className="text-destructive hover:text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                )}
               </div>
             </div>
           ))}

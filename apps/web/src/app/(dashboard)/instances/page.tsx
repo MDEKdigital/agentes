@@ -32,10 +32,18 @@ export default function InstancesPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
 
   const fetchInstances = useCallback(async () => {
-    if (!currentOrg) return;
-    const data = await apiFetch(`/organizations/${currentOrg.id}/instances`);
-    setInstances(data || []);
-    setLoading(false);
+    if (!currentOrg) {
+      setLoading(false);
+      return;
+    }
+    try {
+      const data = await apiFetch(`/organizations/${currentOrg.id}/instances`);
+      setInstances(data || []);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Erro ao carregar instâncias");
+    } finally {
+      setLoading(false);
+    }
   }, [currentOrg]);
 
   useEffect(() => {

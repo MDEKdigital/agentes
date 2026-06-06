@@ -2,6 +2,8 @@
 
 import { useState, useRef } from "react";
 import { useOrganization } from "@/providers/organization-provider";
+import { createClient } from "@/lib/supabase/client";
+import { apiFetch } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -20,6 +22,10 @@ const statusColors: Record<string, "default" | "secondary" | "destructive"> = {
   error: "destructive",
 };
 
+// Raw fetch is required for multipart upload — apiFetch injects
+// Content-Type: application/json which breaks the multipart boundary
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+
 export function DocumentUpload({ agentId, documents, onRefresh }: DocumentUploadProps) {
   const { currentOrg } = useOrganization();
   const [uploading, setUploading] = useState(false);
@@ -35,13 +41,11 @@ export function DocumentUpload({ agentId, documents, onRefresh }: DocumentUpload
       formData.append("file", file);
       formData.append("title", file.name);
 
-      const { createClient } = await import("@/lib/supabase/client");
       const supabase = createClient();
       const {
         data: { session },
       } = await supabase.auth.getSession();
 
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
       const response = await fetch(
         `${API_URL}/organizations/${currentOrg.id}/agents/${agentId}/documents`,
         {
@@ -67,18 +71,12 @@ export function DocumentUpload({ agentId, documents, onRefresh }: DocumentUpload
 
   const handleDelete = async (docId: string) => {
     if (!confirm("Excluir documento?")) return;
-    const { createClient } = await import("@/lib/supabase/client");
-    const supabase = createClient();
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
-    await fetch(`${API_URL}/documents/${docId}`, {
-      method: "DELETE",
-      headers: { Authorization: `Bearer ${session?.access_token}` },
-    });
-    onRefresh();
+    try {
+      await apiFetch(`/documents/${docId}`, { method: "DELETE" });
+      onRefresh();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Erro ao excluir documento");
+    }
   };
 
   return (

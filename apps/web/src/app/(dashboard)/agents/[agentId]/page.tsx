@@ -35,7 +35,11 @@ export default function EditAgentPage() {
   const handleDelete = async () => {
     if (!confirm("Tem certeza que deseja excluir este agente?")) return;
     const supabase = createClient();
-    await supabase.from("agents").delete().eq("id", agentId);
+    const { error } = await supabase.from("agents").delete().eq("id", agentId);
+    if (error) {
+      alert(error.message);
+      return;
+    }
     router.push("/agents");
   };
 

@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { createClient } from "@/lib/supabase/client";
+import { apiFetch } from "@/lib/api";
 import type { ConversationStatus } from "@aula-agente/shared";
 
 interface SidePanelProps {
@@ -29,9 +29,15 @@ interface SidePanelProps {
 
 export function SidePanel({ conversation, onUpdate }: SidePanelProps) {
   const handleStatusChange = async (status: string) => {
-    const supabase = createClient();
-    await supabase.from("conversations").update({ status }).eq("id", conversation.id);
-    onUpdate();
+    try {
+      await apiFetch(`/conversations/${conversation.id}/status`, {
+        method: "PATCH",
+        body: JSON.stringify({ status }),
+      });
+      onUpdate();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Erro ao atualizar status");
+    }
   };
 
   return (
