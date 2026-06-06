@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { createInstanceSchema, updateInstanceSchema } from "@aula-agente/shared";
+import { createInstanceSchema, updateInstanceSchema, updateProfileSchema } from "@aula-agente/shared";
 import { getAdminClient } from "@aula-agente/database";
 import {
   getInstancesByOrganization,
@@ -144,12 +144,12 @@ export default async function instanceRoutes(app: FastifyInstance) {
       );
       if (!membership) return reply.status(403).send({ error: "Admin access required" });
 
-      const body = request.body as {
-        name?: string;
-        status?: string;
-        picture?: string;
-      };
+      const parseResult = updateProfileSchema.safeParse(request.body);
+      if (!parseResult.success) {
+        return reply.status(400).send({ error: parseResult.error.issues });
+      }
 
+      const body = parseResult.data;
       const tasks: Promise<unknown>[] = [];
 
       if (body.name !== undefined) {

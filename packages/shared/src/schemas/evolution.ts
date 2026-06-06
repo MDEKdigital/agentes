@@ -8,6 +8,12 @@ export const updateInstanceSchema = z.object({
   active_agent_id: z.string().uuid().nullable().optional(),
 });
 
+export const updateProfileSchema = z.object({
+  name: z.string().min(1).max(25).optional(),
+  status: z.string().max(139).optional(),
+  picture: z.string().optional(),
+});
+
 export const evolutionWebhookPayloadSchema = z.object({
   event: z.string(),
   instance: z.string(),
