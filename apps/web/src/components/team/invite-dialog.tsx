@@ -41,10 +41,7 @@ export function InviteDialog({ onInvited }: InviteDialogProps) {
 
     try {
       const supabase = createClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
+      const { data: { user } } = await supabase.auth.getUser();
       const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
       const { error: insertError } = await supabase.from("organization_invitations").insert({
@@ -57,7 +54,6 @@ export function InviteDialog({ onInvited }: InviteDialogProps) {
       });
 
       if (insertError) throw insertError;
-
       setEmail("");
       setRole("agent");
       setOpen(false);
@@ -72,29 +68,34 @@ export function InviteDialog({ onInvited }: InviteDialogProps) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button>
+        <Button className="bg-amber-fire-500 text-[#0F1219] font-semibold hover:bg-amber-fire-400">
           <UserPlus className="mr-2 h-4 w-4" />
-          Convidar
+          Convidar Membro
         </Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="bg-card border-border">
         <DialogHeader>
-          <DialogTitle>Convidar Membro</DialogTitle>
+          <DialogTitle className="text-foreground">Convidar Membro</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
-          <div className="space-y-2">
-            <Label>Email</Label>
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Email
+            </Label>
             <Input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="email@exemplo.com"
+              className="bg-muted border-border"
             />
           </div>
-          <div className="space-y-2">
-            <Label>Funcao</Label>
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Função
+            </Label>
             <Select value={role} onValueChange={setRole}>
-              <SelectTrigger>
+              <SelectTrigger className="bg-muted border-border">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -104,7 +105,11 @@ export function InviteDialog({ onInvited }: InviteDialogProps) {
             </Select>
           </div>
           {error && <p className="text-sm text-destructive">{error}</p>}
-          <Button onClick={handleSubmit} disabled={loading || !email} className="w-full">
+          <Button
+            onClick={handleSubmit}
+            disabled={loading || !email}
+            className="w-full bg-amber-fire-500 text-[#0F1219] font-semibold hover:bg-amber-fire-400"
+          >
             {loading ? "Enviando..." : "Enviar Convite"}
           </Button>
         </div>

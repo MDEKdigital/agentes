@@ -2,7 +2,6 @@
 
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { User } from "lucide-react";
 
 interface ConversationItem {
@@ -12,13 +11,8 @@ interface ConversationItem {
   last_message_at: string;
   tags: string[];
   assigned_to: string | null;
-  contacts: {
-    phone: string;
-    name: string | null;
-  };
-  agents: {
-    name: string;
-  };
+  contacts: { phone: string; name: string | null };
+  agents: { name: string };
 }
 
 interface ConversationListProps {
@@ -27,54 +21,86 @@ interface ConversationListProps {
   onSelect: (id: string) => void;
 }
 
-const statusColors: Record<string, string> = {
+const statusDot: Record<string, string> = {
   open: "bg-green-500",
-  waiting: "bg-yellow-500",
-  resolved: "bg-blue-500",
-  closed: "bg-gray-500",
+  waiting: "bg-amber-fire-500",
+  resolved: "bg-blue-electric-400",
+  closed: "bg-muted-foreground",
 };
 
+function formatTime(iso: string) {
+  return new Date(iso).toLocaleTimeString("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 export function ConversationList({ conversations, selectedId, onSelect }: ConversationListProps) {
+  if (conversations.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-2 py-12 text-center">
+        <p className="text-xs text-muted-foreground">Nenhuma conversa encontrada</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex flex-col">
-      {conversations.map((conv) => (
-        <button
-          key={conv.id}
-          onClick={() => onSelect(conv.id)}
-          className={cn(
-            "flex items-center gap-3 border-b px-4 py-3 text-left transition-colors hover:bg-accent/50",
-            selectedId === conv.id && "bg-accent"
-          )}
-        >
-          <Avatar className="h-10 w-10">
-            <AvatarFallback>
-              {conv.contacts.name?.[0]?.toUpperCase() || <User className="h-4 w-4" />}
-            </AvatarFallback>
-          </Avatar>
-          <div className="flex-1 overflow-hidden">
-            <div className="flex items-center justify-between">
-              <p className="truncate text-sm font-medium">
-                {conv.contacts.name || conv.contacts.phone}
-              </p>
-              <span className="text-xs text-muted-foreground">
-                {new Date(conv.last_message_at).toLocaleTimeString("pt-BR", {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              </span>
+    <div className="flex flex-col py-1">
+      {conversations.map((conv) => {
+        const isActive = selectedId === conv.id;
+        const displayName = conv.contacts.name || conv.contacts.phone;
+        const initial = displayName?.[0]?.toUpperCase() || "?";
+
+        return (
+          <button
+            key={conv.id}
+            onClick={() => onSelect(conv.id)}
+            className={cn(
+              "relative flex items-center gap-3 px-3 py-3 text-left transition-all",
+              isActive
+                ? "border-l-[3px] border-blue-electric-400 bg-blue-electric-500/10 pl-[9px]"
+                : "border-l-[3px] border-transparent hover:bg-elevated"
+            )}
+          >
+            {/* Avatar */}
+            <Avatar className="h-9 w-9 shrink-0">
+              <AvatarFallback className="bg-primary/10 text-blue-electric-300 text-xs font-semibold">
+                {conv.contacts.name ? initial : <User className="h-3.5 w-3.5" />}
+              </AvatarFallback>
+            </Avatar>
+
+            {/* Info */}
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between gap-1">
+                <p className={cn(
+                  "truncate text-xs font-medium",
+                  isActive ? "text-blue-electric-300" : "text-foreground"
+                )}>
+                  {displayName}
+                </p>
+                <span className="shrink-0 text-[10px] text-muted-foreground">
+                  {formatTime(conv.last_message_at)}
+                </span>
+              </div>
+
+              <div className="mt-0.5 flex items-center gap-1.5">
+                <span className={cn(
+                  "h-1.5 w-1.5 shrink-0 rounded-full",
+                  statusDot[conv.status] ?? "bg-muted-foreground"
+                )} />
+                <span className="truncate text-[11px] text-muted-foreground">
+                  {conv.agents?.name}
+                </span>
+                {conv.is_human_takeover && (
+                  <span className="shrink-0 rounded px-1 py-px text-[10px] font-medium bg-blue-electric-500/10 text-blue-electric-300 border border-blue-electric-500/20">
+                    Humano
+                  </span>
+                )}
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <div className={cn("h-2 w-2 rounded-full", statusColors[conv.status])} />
-              <span className="text-xs text-muted-foreground">{conv.agents?.name}</span>
-              {conv.is_human_takeover && (
-                <Badge variant="outline" className="h-4 px-1 text-[10px]">
-                  Humano
-                </Badge>
-              )}
-            </div>
-          </div>
-        </button>
-      ))}
+          </button>
+        );
+      })}
     </div>
   );
 }

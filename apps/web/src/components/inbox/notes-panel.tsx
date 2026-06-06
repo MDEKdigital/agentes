@@ -36,9 +36,7 @@ export function NotesPanel({ conversationId, organizationId }: NotesPanelProps) 
     setSaving(true);
     try {
       const supabase = createClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
       const { error } = await supabase.from("conversation_notes").insert({
@@ -49,14 +47,12 @@ export function NotesPanel({ conversationId, organizationId }: NotesPanelProps) 
       });
 
       if (error) throw error;
-
       setNewNote("");
     } catch (err) {
       alert(err instanceof Error ? err.message : "Erro ao salvar nota");
     } finally {
       setSaving(false);
     }
-    // Best-effort refresh outside try so its failure doesn't mask the insert result
     fetchNotes().catch(() => {});
   };
 
@@ -68,20 +64,26 @@ export function NotesPanel({ conversationId, organizationId }: NotesPanelProps) 
           onChange={(e) => setNewNote(e.target.value)}
           placeholder="Nota interna..."
           rows={2}
-          className="text-xs"
+          className="text-xs bg-muted border-border resize-none"
         />
-        <Button size="icon" onClick={handleAdd} disabled={saving || !newNote.trim()}>
-          <Plus className="h-4 w-4" />
+        <Button
+          size="icon"
+          onClick={handleAdd}
+          disabled={saving || !newNote.trim()}
+          className="h-8 w-8 shrink-0 bg-primary hover:bg-blue-electric-400"
+        >
+          <Plus className="h-3.5 w-3.5" />
         </Button>
       </div>
+
       <div className="space-y-2">
         {notes.map((note) => (
           <div
             key={note.id}
-            className="rounded-md bg-yellow-50 p-2 text-xs dark:bg-yellow-900/20"
+            className="rounded-lg border border-amber-fire-500/20 bg-amber-fire-500/5 p-2.5"
           >
-            <p>{note.content}</p>
-            <p className="mt-1 text-muted-foreground">
+            <p className="text-xs text-foreground leading-relaxed">{note.content}</p>
+            <p className="mt-1.5 text-[10px] text-muted-foreground">
               {new Date(note.created_at).toLocaleString("pt-BR")}
             </p>
           </div>

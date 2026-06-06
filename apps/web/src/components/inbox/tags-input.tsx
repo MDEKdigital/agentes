@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { X } from "lucide-react";
 
@@ -33,14 +32,20 @@ export function TagsInput({ conversationId, tags, onUpdate }: TagsInputProps) {
 
   return (
     <div className="space-y-2">
-      <div className="flex flex-wrap gap-1">
+      <div className="flex flex-wrap gap-1.5">
         {tags.map((tag) => (
-          <Badge key={tag} variant="secondary" className="gap-1">
+          <span
+            key={tag}
+            className="flex items-center gap-1 rounded-md border border-border bg-elevated px-2 py-0.5 text-[11px] font-medium text-foreground"
+          >
             {tag}
-            <button onClick={() => handleRemove(tag)}>
-              <X className="h-3 w-3" />
+            <button
+              onClick={() => handleRemove(tag)}
+              className="text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <X className="h-2.5 w-2.5" />
             </button>
-          </Badge>
+          </span>
         ))}
       </div>
       <Input
@@ -48,7 +53,7 @@ export function TagsInput({ conversationId, tags, onUpdate }: TagsInputProps) {
         onChange={(e) => setInput(e.target.value)}
         onKeyDown={(e) => e.key === "Enter" && handleAdd()}
         placeholder="Adicionar tag..."
-        className="h-8 text-xs"
+        className="h-7 bg-muted border-border text-xs placeholder:text-muted-foreground"
       />
     </div>
   );

@@ -3,7 +3,6 @@
 import { TakeoverBar } from "./takeover-bar";
 import { TagsInput } from "./tags-input";
 import { NotesPanel } from "./notes-panel";
-import { Separator } from "@/components/ui/separator";
 import {
   Select,
   SelectContent,
@@ -12,6 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { apiFetch } from "@/lib/api";
+import { Phone, User } from "lucide-react";
 import type { ConversationStatus } from "@aula-agente/shared";
 
 interface SidePanelProps {
@@ -25,6 +25,14 @@ interface SidePanelProps {
     contacts: { phone: string; name: string | null };
   };
   onUpdate: () => void;
+}
+
+function SectionHeader({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+      {children}
+    </p>
+  );
 }
 
 export function SidePanel({ conversation, onUpdate }: SidePanelProps) {
@@ -41,19 +49,33 @@ export function SidePanel({ conversation, onUpdate }: SidePanelProps) {
   };
 
   return (
-    <div className="w-72 space-y-4 overflow-y-auto border-l p-4">
-      <div>
-        <h3 className="text-sm font-semibold">Contato</h3>
-        <p className="text-sm">{conversation.contacts.name || "Sem nome"}</p>
-        <p className="text-xs text-muted-foreground">{conversation.contacts.phone}</p>
+    <div className="flex w-[280px] shrink-0 flex-col overflow-y-auto border-l border-border bg-card">
+      {/* Contato */}
+      <div className="border-b border-border p-4">
+        <SectionHeader>Contato</SectionHeader>
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10">
+            <User className="h-4 w-4 text-blue-electric-300" />
+          </div>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium text-foreground">
+              {conversation.contacts.name || "Sem nome"}
+            </p>
+            <div className="flex items-center gap-1 mt-0.5">
+              <Phone className="h-2.5 w-2.5 text-muted-foreground" />
+              <p className="font-mono text-[11px] text-muted-foreground">
+                {conversation.contacts.phone}
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <Separator />
-
-      <div>
-        <h3 className="mb-2 text-sm font-semibold">Status</h3>
+      {/* Status */}
+      <div className="border-b border-border p-4">
+        <SectionHeader>Status</SectionHeader>
         <Select value={conversation.status} onValueChange={handleStatusChange}>
-          <SelectTrigger>
+          <SelectTrigger className="h-8 text-xs bg-muted border-border">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -65,10 +87,9 @@ export function SidePanel({ conversation, onUpdate }: SidePanelProps) {
         </Select>
       </div>
 
-      <Separator />
-
-      <div>
-        <h3 className="mb-2 text-sm font-semibold">Atendimento</h3>
+      {/* Atendimento */}
+      <div className="border-b border-border p-4">
+        <SectionHeader>Atendimento</SectionHeader>
         <TakeoverBar
           conversationId={conversation.id}
           isHumanTakeover={conversation.is_human_takeover}
@@ -78,10 +99,9 @@ export function SidePanel({ conversation, onUpdate }: SidePanelProps) {
         />
       </div>
 
-      <Separator />
-
-      <div>
-        <h3 className="mb-2 text-sm font-semibold">Tags</h3>
+      {/* Tags */}
+      <div className="border-b border-border p-4">
+        <SectionHeader>Tags</SectionHeader>
         <TagsInput
           conversationId={conversation.id}
           tags={conversation.tags}
@@ -89,10 +109,9 @@ export function SidePanel({ conversation, onUpdate }: SidePanelProps) {
         />
       </div>
 
-      <Separator />
-
-      <div>
-        <h3 className="mb-2 text-sm font-semibold">Notas Internas</h3>
+      {/* Notas */}
+      <div className="p-4">
+        <SectionHeader>Notas Internas</SectionHeader>
         <NotesPanel
           conversationId={conversation.id}
           organizationId={conversation.organization_id}

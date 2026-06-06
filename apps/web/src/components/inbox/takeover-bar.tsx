@@ -11,6 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { UserCheck, Bot } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface TakeoverBarProps {
   conversationId: string;
@@ -43,10 +44,7 @@ export function TakeoverBar({
 
   const handleTakeover = async () => {
     const supabase = createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
+    const { data: { user } } = await supabase.auth.getUser();
     await supabase
       .from("conversations")
       .update({
@@ -55,7 +53,6 @@ export function TakeoverBar({
         assigned_to: !isHumanTakeover ? user?.id : null,
       })
       .eq("id", conversationId);
-
     onUpdate();
   };
 
@@ -69,31 +66,44 @@ export function TakeoverBar({
   };
 
   return (
-    <div className="flex items-center gap-3 rounded-md border bg-muted/50 p-3">
+    <div className="space-y-2">
+      {/* Banner de takeover ativo */}
+      {isHumanTakeover && (
+        <div className="rounded-lg border border-amber-fire-500/30 bg-amber-fire-500/10 px-3 py-2">
+          <p className="text-[11px] font-medium text-amber-fire-400">
+            Atendimento humano ativo
+          </p>
+        </div>
+      )}
+
       <Button
-        variant={isHumanTakeover ? "default" : "outline"}
+        variant={isHumanTakeover ? "outline" : "default"}
         size="sm"
         onClick={handleTakeover}
+        className={cn(
+          "w-full text-xs",
+          !isHumanTakeover && "bg-primary hover:bg-blue-electric-400"
+        )}
       >
         {isHumanTakeover ? (
           <>
-            <Bot className="mr-2 h-4 w-4" />
+            <Bot className="mr-1.5 h-3.5 w-3.5" />
             Devolver ao Agente
           </>
         ) : (
           <>
-            <UserCheck className="mr-2 h-4 w-4" />
+            <UserCheck className="mr-1.5 h-3.5 w-3.5" />
             Assumir Conversa
           </>
         )}
       </Button>
 
       <Select value={assignedTo || "none"} onValueChange={handleAssign}>
-        <SelectTrigger className="w-48">
+        <SelectTrigger className="h-8 text-xs bg-muted border-border">
           <SelectValue placeholder="Atribuir a..." />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="none">Ninguem</SelectItem>
+          <SelectItem value="none">Ninguém</SelectItem>
           {members.map((m) => (
             <SelectItem key={m.user_id} value={m.user_id}>
               {m.user_id.slice(0, 8)}... ({m.role})

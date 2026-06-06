@@ -5,19 +5,19 @@ import Link from "next/link";
 import { useOrganization } from "@/providers/organization-provider";
 import { createClient } from "@/lib/supabase/client";
 import { AgentCard } from "@/components/agents/agent-card";
-import { Button } from "@/components/ui/button";
 import { Plus, Bot } from "lucide-react";
 import type { Agent } from "@aula-agente/shared";
 
 export default function AgentsPage() {
-  const { currentOrg } = useOrganization();
+  const { currentOrg, loading: orgLoading } = useOrganization();
   const [agents, setAgents] = useState<Agent[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [agentsLoading, setAgentsLoading] = useState(false);
 
   useEffect(() => {
     if (!currentOrg) return;
 
     const fetchAgents = async () => {
+      setAgentsLoading(true);
       const supabase = createClient();
       const { data } = await supabase
         .from("agents")
@@ -26,36 +26,73 @@ export default function AgentsPage() {
         .order("created_at", { ascending: false });
 
       setAgents((data as Agent[]) || []);
-      setLoading(false);
+      setAgentsLoading(false);
     };
 
     fetchAgents();
   }, [currentOrg]);
 
-  if (loading) return <div>Carregando...</div>;
+  if (orgLoading || agentsLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="h-7 w-24 animate-pulse rounded-lg bg-muted" />
+          <div className="h-9 w-36 animate-pulse rounded-lg bg-muted" />
+        </div>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="rounded-xl border border-border bg-card p-5 space-y-4">
+              <div className="flex items-start justify-between">
+                <div className="h-10 w-10 animate-pulse rounded-lg bg-muted" />
+                <div className="h-4 w-16 animate-pulse rounded bg-muted" />
+              </div>
+              <div className="space-y-2">
+                <div className="h-4 animate-pulse rounded bg-muted w-3/4" />
+                <div className="h-3 animate-pulse rounded bg-muted w-full" />
+                <div className="h-3 animate-pulse rounded bg-muted w-2/3" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Agentes</h1>
+        <div>
+          <h1 className="text-xl font-semibold text-foreground">Agentes</h1>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {agents.length} {agents.length === 1 ? "agente configurado" : "agentes configurados"}
+          </p>
+        </div>
         <Link href="/agents/new">
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
+          <button className="flex items-center gap-2 rounded-lg bg-amber-fire-500 px-4 py-2 text-sm font-semibold text-[#0F1219] transition-colors hover:bg-amber-fire-400">
+            <Plus className="h-4 w-4" />
             Novo Agente
-          </Button>
+          </button>
         </Link>
       </div>
 
+      {/* Grid */}
       {agents.length === 0 ? (
-        <div className="rounded-lg border border-dashed p-8 text-center">
-          <Bot className="mx-auto h-12 w-12 text-muted-foreground" />
-          <h3 className="mt-4 text-lg font-semibold">Nenhum agente</h3>
-          <p className="text-muted-foreground">Crie seu primeiro agente para comecar</p>
+        <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-dashed border-border py-16 text-center">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-muted">
+            <Bot className="h-7 w-7 text-muted-foreground" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-foreground">Nenhum agente</h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Crie seu primeiro agente para começar a atender
+            </p>
+          </div>
           <Link href="/agents/new">
-            <Button className="mt-4">
-              <Plus className="mr-2 h-4 w-4" />
+            <button className="flex items-center gap-2 rounded-lg bg-amber-fire-500 px-4 py-2 text-sm font-semibold text-[#0F1219] transition-colors hover:bg-amber-fire-400">
+              <Plus className="h-4 w-4" />
               Criar Agente
-            </Button>
+            </button>
           </Link>
         </div>
       ) : (
@@ -63,6 +100,15 @@ export default function AgentsPage() {
           {agents.map((agent) => (
             <AgentCard key={agent.id} agent={agent} />
           ))}
+          {/* Card de novo agente */}
+          <Link href="/agents/new">
+            <div className="flex h-full min-h-[160px] flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border transition-all hover:border-primary/40 hover:bg-primary/5 cursor-pointer">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-dashed border-border">
+                <Plus className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <p className="text-sm font-medium text-muted-foreground">Novo Agente</p>
+            </div>
+          </Link>
         </div>
       )}
     </div>

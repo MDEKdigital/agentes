@@ -7,8 +7,9 @@ import { apiFetch } from "@/lib/api";
 import { MessageBubble } from "./message-bubble";
 import { SidePanel } from "./side-panel";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Send } from "lucide-react";
+import { cn } from "@/lib/utils";
 import type { Message } from "@aula-agente/shared";
 
 interface ChatPanelProps {
@@ -90,39 +91,74 @@ export function ChatPanel({ conversationId }: ChatPanelProps) {
     }
   };
 
+  const displayName = conversation?.contacts?.name || conversation?.contacts?.phone || "Conversa";
+
   return (
-    <div className="flex h-full w-full">
-      <div className="flex flex-1 flex-col">
-        <div className="border-b px-4 py-3">
-          <p className="font-medium">
-            {conversation?.contacts?.name || conversation?.contacts?.phone || "Conversa"}
-          </p>
-          <p className="text-xs text-muted-foreground">{conversation?.contacts?.phone}</p>
+    <div className="flex h-full w-full overflow-hidden">
+      {/* Área principal do chat */}
+      <div className="flex flex-1 flex-col overflow-hidden">
+        {/* Header */}
+        <div className="flex h-14 shrink-0 items-center justify-between border-b border-border px-5">
+          <div>
+            <p className="text-sm font-semibold text-foreground">{displayName}</p>
+            {conversation?.contacts?.name && (
+              <p className="font-mono text-[11px] text-muted-foreground">
+                {conversation.contacts.phone}
+              </p>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className={cn(
+              "rounded px-2 py-0.5 text-[11px] font-medium capitalize",
+              conversation?.status === "open" && "bg-green-500/10 text-green-400",
+              conversation?.status === "waiting" && "bg-amber-fire-500/10 text-amber-fire-400",
+              conversation?.status === "resolved" && "bg-blue-electric-500/10 text-blue-electric-300",
+              conversation?.status === "closed" && "bg-muted text-muted-foreground",
+            )}>
+              {conversation?.status}
+            </span>
+          </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto space-y-3 p-4">
+        {/* Mensagens */}
+        <div className="flex-1 overflow-y-auto space-y-3 px-5 py-4">
+          {messages.length === 0 && (
+            <div className="flex h-full items-center justify-center">
+              <p className="text-xs text-muted-foreground">Nenhuma mensagem ainda</p>
+            </div>
+          )}
           {messages.map((msg) => (
             <MessageBubble key={msg.id} message={msg} />
           ))}
           <div ref={bottomRef} />
         </div>
 
-        <div className="border-t p-4">
-          <div className="flex gap-2">
-            <Input
+        {/* Input */}
+        <div className="shrink-0 border-t border-border bg-card/50 px-4 py-3">
+          <div className="flex items-end gap-2">
+            <Textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Digite uma mensagem..."
+              placeholder="Digite uma mensagem... (Enter para enviar)"
               disabled={sending}
+              rows={1}
+              className="min-h-[36px] max-h-[120px] resize-none bg-muted border-border text-sm placeholder:text-muted-foreground focus:border-primary/50"
             />
-            <Button onClick={handleSend} disabled={sending || !input.trim()} size="icon">
-              <Send className="h-4 w-4" />
+            <Button
+              onClick={handleSend}
+              disabled={sending || !input.trim()}
+              size="icon"
+              className="h-9 w-9 shrink-0 bg-amber-fire-500 text-[#0F1219] hover:bg-amber-fire-400"
+            >
+              <Send className="h-3.5 w-3.5" />
             </Button>
           </div>
         </div>
       </div>
 
+      {/* Painel lateral */}
       {conversation && (
         <SidePanel conversation={conversation} onUpdate={fetchConversation} />
       )}

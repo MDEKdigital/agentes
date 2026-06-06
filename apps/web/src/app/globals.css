@@ -4,58 +4,48 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
-    --radius: 0.5rem;
-    --chart-1: 12 76% 61%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
-  }
+    /* MDEK Digital — Dark Mode padrão */
+    --background: 220 25% 8%;
+    --foreground: 210 40% 96%;
+    --card: 222 28% 14%;
+    --card-foreground: 210 40% 96%;
+    --popover: 228 30% 19%;
+    --popover-foreground: 210 40% 96%;
+    --primary: 221 83% 53%;
+    --primary-foreground: 210 40% 96%;
+    --secondary: 228 30% 19%;
+    --secondary-foreground: 210 40% 96%;
+    --muted: 228 30% 19%;
+    --muted-foreground: 215 20% 57%;
+    --accent: 228 30% 22%;
+    --accent-foreground: 213 97% 68%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 210 40% 96%;
+    --border: 222 28% 18%;
+    --input: 228 30% 19%;
+    --ring: 221 83% 53%;
+    --radius: 0.75rem;
 
-  .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
+    /* Tokens MDEK */
+    --bg-base: 220 25% 8%;
+    --bg-surface: 222 28% 14%;
+    --bg-elevated: 228 30% 19%;
+    --bg-subtle: 226 30% 23%;
+
+    --blue-300: 213 97% 68%;
+    --blue-400: 217 91% 60%;
+    --blue-500: 221 83% 53%;
+    --blue-glow: rgba(37, 99, 235, 0.15);
+
+    --amber-400: 43 96% 56%;
+    --amber-500: 38 92% 50%;
+    --amber-glow: rgba(245, 158, 11, 0.12);
+
+    --success: 160 84% 39%;
+    --error: 0 84% 60%;
+
+    --sidebar-width: 64px;
+    --sidebar-width-expanded: 240px;
   }
 }
 
@@ -63,7 +53,96 @@
   * {
     @apply border-border;
   }
+
+  html {
+    color-scheme: dark;
+  }
+
   body {
     @apply bg-background text-foreground;
+    background-color: hsl(var(--bg-base));
+    font-feature-settings: "rlig" 1, "calt" 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
+
+  /* Scrollbar customizada */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground));
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  /* Glow effects */
+  .glow-blue {
+    box-shadow: 0 0 0 1px var(--blue-glow), 0 0 16px var(--blue-glow);
+  }
+  .glow-amber {
+    box-shadow: 0 0 0 1px var(--amber-glow), 0 0 16px var(--amber-glow);
+  }
+
+  /* Pulse dot para status */
+  .status-dot {
+    @apply relative inline-flex h-2 w-2 rounded-full;
+  }
+  .status-dot::before {
+    content: '';
+    @apply absolute inset-0 rounded-full animate-ping opacity-75;
+    background: inherit;
+  }
+
+  /* Sidebar transition */
+  .sidebar-collapsed {
+    width: var(--sidebar-width);
+  }
+  .sidebar-expanded {
+    width: var(--sidebar-width-expanded);
+  }
+}
+
+/* Animações */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shimmer {
+  from { background-position: -200% 0; }
+  to { background-position: 200% 0; }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.3s ease-out forwards;
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    hsl(var(--bg-elevated)) 25%,
+    hsl(var(--bg-subtle)) 50%,
+    hsl(var(--bg-elevated)) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
 }

@@ -2,9 +2,8 @@
 
 import Link from "next/link";
 import type { Agent } from "@aula-agente/shared";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Bot } from "lucide-react";
+import { Bot, ChevronRight } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface AgentCardProps {
   agent: Agent;
@@ -13,27 +12,53 @@ interface AgentCardProps {
 export function AgentCard({ agent }: AgentCardProps) {
   return (
     <Link href={`/agents/${agent.id}`}>
-      <Card className="transition-colors hover:bg-accent/50">
-        <CardHeader className="flex flex-row items-center gap-3 pb-2">
+      <div className={cn(
+        "group relative flex flex-col gap-4 rounded-xl border border-border bg-card p-5",
+        "transition-all duration-150 hover:border-primary/30 hover:shadow-[0_0_0_1px_hsl(var(--primary)/0.15)]"
+      )}>
+        {/* Header */}
+        <div className="flex items-start justify-between">
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-            <Bot className="h-5 w-5 text-primary" />
+            <Bot className="h-5 w-5 text-blue-electric-400" />
           </div>
-          <div className="flex-1">
-            <CardTitle className="text-base">{agent.name}</CardTitle>
-            <p className="text-sm text-muted-foreground">{agent.description || "Sem descricao"}</p>
+
+          <div className="flex items-center gap-1.5">
+            {agent.is_active ? (
+              <span className="flex items-center gap-1.5">
+                <span className="relative flex h-2 w-2">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-500 opacity-75" />
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-green-500" />
+                </span>
+                <span className="text-[11px] font-medium text-green-400">Ativo</span>
+              </span>
+            ) : (
+              <span className="flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-muted-foreground" />
+                <span className="text-[11px] font-medium text-muted-foreground">Inativo</span>
+              </span>
+            )}
           </div>
-          <Badge variant={agent.is_active ? "default" : "secondary"}>
-            {agent.is_active ? "Ativo" : "Inativo"}
-          </Badge>
-        </CardHeader>
-        <CardContent>
-          <div className="flex gap-4 text-xs text-muted-foreground">
-            <span>Modelo: {agent.model}</span>
-            <span>Provider: {agent.provider}</span>
-            <span>Temp: {agent.temperature}</span>
+        </div>
+
+        {/* Info */}
+        <div className="flex-1">
+          <p className="font-semibold text-foreground">{agent.name}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground line-clamp-2">
+            {agent.description || "Sem descrição"}
+          </p>
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-between border-t border-border pt-3">
+          <div className="flex items-center gap-2">
+            <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
+              {agent.model}
+            </span>
+            <span className="text-[11px] text-muted-foreground capitalize">{agent.provider}</span>
           </div>
-        </CardContent>
-      </Card>
+          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+        </div>
+      </div>
     </Link>
   );
 }

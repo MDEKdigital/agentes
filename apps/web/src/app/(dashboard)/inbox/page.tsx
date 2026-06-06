@@ -7,15 +7,9 @@ import { createClient } from "@/lib/supabase/client";
 import { useRealtime } from "@/lib/realtime";
 import { ConversationList } from "@/components/inbox/conversation-list";
 import { ChatPanel } from "@/components/inbox/chat-panel";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Search } from "lucide-react";
+import { Search, MessageSquare } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface ConversationRow {
   id: string;
@@ -28,6 +22,14 @@ interface ConversationRow {
   agents: { name: string };
 }
 
+const STATUS_TABS = [
+  { value: "all", label: "Todas" },
+  { value: "open", label: "Abertas" },
+  { value: "waiting", label: "Aguardando" },
+  { value: "resolved", label: "Resolvidas" },
+  { value: "closed", label: "Fechadas" },
+];
+
 export default function InboxPage() {
   const { currentOrg } = useOrganization();
   const router = useRouter();
@@ -37,7 +39,6 @@ export default function InboxPage() {
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
-  // Guard against stale responses from superseded fetches
   const fetchCounterRef = useRef(0);
 
   const selectedId = searchParams.get("id");
@@ -63,7 +64,6 @@ export default function InboxPage() {
 
     const { data, error: queryError } = await query;
 
-    // A newer fetch was started — discard this stale result
     if (fetchCounterRef.current !== myCount) return;
 
     if (queryError) {
@@ -80,8 +80,6 @@ export default function InboxPage() {
     fetchConversations();
   }, [fetchConversations]);
 
-  // Pass fetchConversations directly (stable useCallback ref) instead of
-  // inline arrows which create new references on every render
   useRealtime({
     table: "conversations",
     filter: currentOrg ? `organization_id=eq.${currentOrg.id}` : undefined,
@@ -104,10 +102,21 @@ export default function InboxPage() {
       })
     : conversations;
 
-  // Render loading/error inline so the sidebar controls stay mounted
   const listContent = () => {
     if (loading) {
-      return <div className="p-4 text-sm text-muted-foreground">Carregando...</div>;
+      return (
+        <div className="space-y-px p-2">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="flex items-center gap-3 rounded-lg px-3 py-3">
+              <div className="h-9 w-9 animate-pulse rounded-full bg-muted" />
+              <div className="flex-1 space-y-1.5">
+                <div className="h-3 animate-pulse rounded bg-muted w-2/3" />
+                <div className="h-2.5 animate-pulse rounded bg-muted w-1/2" />
+              </div>
+            </div>
+          ))}
+        </div>
+      );
     }
     if (error) {
       return (
@@ -115,7 +124,7 @@ export default function InboxPage() {
           <p className="text-sm text-destructive">{error}</p>
           <button
             onClick={fetchConversations}
-            className="text-xs text-muted-foreground underline"
+            className="text-xs text-blue-electric-300 underline hover:text-blue-electric-400"
           >
             Tentar novamente
           </button>
@@ -132,42 +141,57 @@ export default function InboxPage() {
   };
 
   return (
-    <div className="flex h-[calc(100vh-8rem)] -m-6">
-      <div className="flex w-80 flex-col border-r">
-        <div className="space-y-2 border-b p-3">
+    <div className="flex h-[calc(100vh-56px)] -m-6 overflow-hidden">
+      {/* Coluna esquerda — lista */}
+      <div className="flex w-[280px] shrink-0 flex-col border-r border-border bg-card">
+        {/* Busca */}
+        <div className="border-b border-border p-3">
           <div className="relative">
-            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
             <Input
-              placeholder="Buscar..."
+              placeholder="Buscar conversa..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-8"
+              className="h-8 pl-8 text-xs bg-muted border-transparent focus:border-primary/50"
             />
           </div>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger>
-              <SelectValue placeholder="Filtrar status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos</SelectItem>
-              <SelectItem value="open">Abertos</SelectItem>
-              <SelectItem value="waiting">Aguardando</SelectItem>
-              <SelectItem value="resolved">Resolvidos</SelectItem>
-              <SelectItem value="closed">Fechados</SelectItem>
-            </SelectContent>
-          </Select>
         </div>
-        <div className="flex-1 overflow-y-auto">
-          {listContent()}
+
+        {/* Tabs de status */}
+        <div className="flex border-b border-border px-2">
+          {STATUS_TABS.map((tab) => (
+            <button
+              key={tab.value}
+              onClick={() => setStatusFilter(tab.value)}
+              className={cn(
+                "flex-1 py-2.5 text-[11px] font-medium transition-colors",
+                statusFilter === tab.value
+                  ? "border-b-2 border-blue-electric-400 text-blue-electric-300"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
+
+        {/* Lista */}
+        <div className="flex-1 overflow-y-auto">{listContent()}</div>
       </div>
 
+      {/* Coluna direita — chat */}
       <div className="flex flex-1 overflow-hidden">
         {selectedId ? (
           <ChatPanel conversationId={selectedId} />
         ) : (
-          <div className="flex flex-1 items-center justify-center text-muted-foreground">
-            <p>Selecione uma conversa</p>
+          <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-muted">
+              <MessageSquare className="h-6 w-6 text-muted-foreground" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-foreground">Nenhuma conversa selecionada</p>
+              <p className="text-xs text-muted-foreground">Selecione uma conversa à esquerda</p>
+            </div>
           </div>
         )}
       </div>

@@ -1,0 +1,20 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e4]:
+    - generic [ref=e5]:
+      - heading "Entrar" [level=3] [ref=e6]
+      - paragraph [ref=e7]: Entre com seu email e senha
+    - generic [ref=e9]:
+      - generic [ref=e10]:
+        - text: Email
+        - textbox "Email" [ref=e11]
+      - generic [ref=e12]:
+        - text: Senha
+        - textbox "Senha" [ref=e13]
+      - button "Entrar" [ref=e14] [cursor=pointer]
+      - paragraph [ref=e15]:
+        - text: Nao tem conta?
+        - link "Criar conta" [ref=e16] [cursor=pointer]:
+          - /url: /register
+  - button "Open Next.js Dev Tools" [ref=e22] [cursor=pointer]:
+    - img [ref=e23]
+  - alert [ref=e26]

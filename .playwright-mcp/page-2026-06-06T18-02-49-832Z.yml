@@ -1,0 +1,30 @@
+- generic [ref=e2]:
+  - complementary [ref=e3]:
+    - navigation [ref=e5]:
+      - link "Inbox" [ref=e6] [cursor=pointer]:
+        - /url: /inbox
+        - img [ref=e7]
+        - text: Inbox
+      - link "Agentes" [ref=e10] [cursor=pointer]:
+        - /url: /agents
+        - img [ref=e11]
+        - text: Agentes
+      - link "Instancias" [ref=e14] [cursor=pointer]:
+        - /url: /instances
+        - img [ref=e15]
+        - text: Instancias
+      - link "Equipe" [ref=e21] [cursor=pointer]:
+        - /url: /team
+        - img [ref=e22]
+        - text: Equipe
+      - link "Configuracoes" [ref=e27] [cursor=pointer]:
+        - /url: /settings
+        - img [ref=e28]
+        - text: Configuracoes
+  - generic [ref=e31]:
+    - banner [ref=e32]:
+      - button "M mdekdigital.agentes@gmail.com" [ref=e33] [cursor=pointer]:
+        - generic [ref=e35]: M
+        - generic [ref=e36]: mdekdigital.agentes@gmail.com
+    - main [ref=e37]:
+      - generic [ref=e38]: Carregando...

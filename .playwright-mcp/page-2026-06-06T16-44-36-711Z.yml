@@ -1,0 +1,95 @@
+- generic:
+  - generic [active]:
+    - generic [ref=e3]:
+      - generic [ref=e4]:
+        - generic [ref=e5]:
+          - navigation [ref=e6]:
+            - button "previous" [disabled] [ref=e7]:
+              - img "previous" [ref=e8]
+            - generic [ref=e10]:
+              - generic [ref=e11]: 1/
+              - text: "1"
+            - button "next" [disabled] [ref=e12]:
+              - img "next" [ref=e13]
+          - img
+        - generic [ref=e15]:
+          - link "Next.js 15.5.19 (outdated) Webpack" [ref=e16] [cursor=pointer]:
+            - /url: https://nextjs.org/docs/messages/version-staleness
+            - img [ref=e17]
+            - generic "An outdated version detected (latest is 16.2.7), upgrade is highly recommended!" [ref=e19]: Next.js 15.5.19 (outdated)
+            - generic [ref=e20]: Webpack
+          - img
+      - generic [ref=e21]:
+        - dialog "Runtime Error" [ref=e22]:
+          - generic [ref=e25]:
+            - generic [ref=e26]:
+              - generic [ref=e27]:
+                - generic [ref=e29]: Runtime Error
+                - generic [ref=e30]:
+                  - button "Copy Error Info" [ref=e31] [cursor=pointer]:
+                    - img [ref=e32]
+                  - button "No related documentation found" [disabled] [ref=e34]:
+                    - img [ref=e35]
+                  - link "Learn more about enabling Node.js inspector for server code with Chrome DevTools" [ref=e37] [cursor=pointer]:
+                    - /url: https://nextjs.org/docs/app/building-your-application/configuring/debugging#server-side-code
+                    - img [ref=e38]
+              - paragraph [ref=e47]: Your project's URL and Key are required to create a Supabase client! Check your Supabase project's API settings to find these values https://supabase.com/dashboard/project/_/settings/api
+            - generic [ref=e48]:
+              - generic [ref=e49]:
+                - paragraph [ref=e51]:
+                  - img [ref=e53]
+                  - generic [ref=e57]: src\lib\supabase\middleware.ts (7:38) @ updateSession
+                  - button "Open in editor" [ref=e58] [cursor=pointer]:
+                    - img [ref=e60]
+                - generic [ref=e63]:
+                  - generic [ref=e64]: "5 | let supabaseResponse = NextResponse.next({ request });"
+                  - generic [ref=e65]: 6 |
+                  - generic [ref=e66]: "> 7 | const supabase = createServerClient("
+                  - generic [ref=e67]: "| ^"
+                  - generic [ref=e68]: 8 | process.env.NEXT_PUBLIC_SUPABASE_URL!,
+                  - generic [ref=e69]: 9 | process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+                  - generic [ref=e70]: "10 | {"
+              - generic [ref=e71]:
+                - generic [ref=e72]:
+                  - paragraph [ref=e73]:
+                    - text: Call Stack
+                    - generic [ref=e74]: "13"
+                  - button "Show 11 ignore-listed frame(s)" [ref=e75] [cursor=pointer]:
+                    - text: Show 11 ignore-listed frame(s)
+                    - img [ref=e76]
+                - generic [ref=e78]:
+                  - generic [ref=e79]:
+                    - text: updateSession
+                    - button "Open updateSession in editor" [ref=e80] [cursor=pointer]:
+                      - img [ref=e81]
+                  - text: src\lib\supabase\middleware.ts (7:38)
+                - generic [ref=e83]:
+                  - generic [ref=e84]:
+                    - text: middleware
+                    - button "Open middleware in editor" [ref=e85] [cursor=pointer]:
+                      - img [ref=e86]
+                  - text: src\middleware.ts (5:29)
+          - generic [ref=e88]:
+            - generic [ref=e89]: "1"
+            - generic [ref=e90]: "2"
+        - contentinfo [ref=e91]:
+          - region "Error feedback" [ref=e92]:
+            - paragraph [ref=e93]:
+              - link "Was this helpful?" [ref=e94] [cursor=pointer]:
+                - /url: https://nextjs.org/telemetry#error-feedback
+            - button "Mark as helpful" [ref=e95] [cursor=pointer]:
+              - img [ref=e96]
+            - button "Mark as not helpful" [ref=e99] [cursor=pointer]:
+              - img [ref=e100]
+    - generic [ref=e106] [cursor=pointer]:
+      - button "Open Next.js Dev Tools" [ref=e107]:
+        - img [ref=e108]
+      - generic [ref=e111]:
+        - button "Open issues overlay" [ref=e112]:
+          - generic [ref=e113]:
+            - generic [ref=e114]: "0"
+            - generic [ref=e115]: "1"
+          - generic [ref=e116]: Issue
+        - button "Collapse issues badge" [ref=e117]:
+          - img [ref=e118]
+  - alert [ref=e120]
