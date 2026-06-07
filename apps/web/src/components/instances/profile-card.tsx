@@ -20,6 +20,8 @@ interface Profile {
 }
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+const MAX_NAME_LENGTH = 25;
+const MAX_BIO_LENGTH = 139;
 
 function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -67,6 +69,14 @@ export function ProfileCard({ instanceId, instanceStatus }: ProfileCardProps) {
       .finally(() => setLoadingProfile(false));
   }, [instanceId, disabled]);
 
+  useEffect(() => {
+    return () => {
+      if (picturePreview?.startsWith("blob:")) {
+        URL.revokeObjectURL(picturePreview);
+      }
+    };
+  }, [picturePreview]);
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -78,6 +88,7 @@ export function ProfileCard({ instanceId, instanceStatus }: ProfileCardProps) {
 
     setPictureFile(file);
     setPicturePreview(URL.createObjectURL(file));
+    e.target.value = "";
   };
 
   const handleSave = async () => {
@@ -173,11 +184,11 @@ export function ProfileCard({ instanceId, instanceStatus }: ProfileCardProps) {
                 <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
                   Nome de exibição
                 </label>
-                <span className="text-xs text-muted-foreground">{name.length}/25</span>
+                <span className="text-xs text-muted-foreground">{name.length}/{MAX_NAME_LENGTH}</span>
               </div>
               <Input
                 value={name}
-                onChange={(e) => setName(e.target.value.slice(0, 25))}
+                onChange={(e) => setName(e.target.value.slice(0, MAX_NAME_LENGTH))}
                 placeholder="Nome do bot"
                 disabled={disabled || saving}
                 className="bg-muted border-border"
@@ -190,11 +201,11 @@ export function ProfileCard({ instanceId, instanceStatus }: ProfileCardProps) {
                 <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
                   Bio / Status
                 </label>
-                <span className="text-xs text-muted-foreground">{bio.length}/139</span>
+                <span className="text-xs text-muted-foreground">{bio.length}/{MAX_BIO_LENGTH}</span>
               </div>
               <textarea
                 value={bio}
-                onChange={(e) => setBio(e.target.value.slice(0, 139))}
+                onChange={(e) => setBio(e.target.value.slice(0, MAX_BIO_LENGTH))}
                 placeholder="Status de exibição no WhatsApp"
                 disabled={disabled || saving}
                 rows={2}
