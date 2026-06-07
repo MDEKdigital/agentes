@@ -92,6 +92,13 @@ export default async function knowledgeDocumentRoutes(app: FastifyInstance) {
       );
       if (!membership) return reply.status(403).send({ error: "Acesso de administrador necessário" });
 
+      // Remove file from storage before deleting DB record
+      const bucketPrefix = `${process.env.SUPABASE_URL}/storage/v1/object/public/knowledge-documents/`;
+      if (doc.file_url.startsWith(bucketPrefix)) {
+        const storagePath = doc.file_url.slice(bucketPrefix.length);
+        await db.storage.from("knowledge-documents").remove([storagePath]);
+      }
+
       await deleteDocument(db, doc.id);
       return reply.status(204).send();
     }

@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { useRouter, usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { Organization } from "@aula-agente/shared";
 
@@ -25,6 +26,8 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
   const [currentOrg, setCurrentOrg] = useState<Organization | null>(null);
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
+  const router = useRouter();
+  const pathname = usePathname();
 
   const fetchOrgs = useCallback(async () => {
     const {
@@ -46,10 +49,12 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
       const savedOrgId = localStorage.getItem("currentOrgId");
       const savedOrg = orgs.find((o) => o.id === savedOrgId);
       setCurrentOrg(savedOrg || orgs[0]);
+    } else if (pathname !== "/onboarding") {
+      router.replace("/onboarding");
     }
 
     setLoading(false);
-  }, [supabase]);
+  }, [supabase, router, pathname]);
 
   useEffect(() => {
     fetchOrgs();

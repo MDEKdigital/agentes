@@ -35,6 +35,9 @@ export async function createInstance(instanceName: string, webhookUrl: string) {
         webhookByEvents: false,
         webhookBase64: false,
         events: ["MESSAGES_UPSERT"],
+        headers: {
+          apikey: process.env.WEBHOOK_SECRET!,
+        },
       },
     }),
   });

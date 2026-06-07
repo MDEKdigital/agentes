@@ -1,0 +1,97 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { CheckCircle, XCircle, Loader2 } from "lucide-react";
+
+export default function AcceptInvitationPage() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const invitationId = searchParams.get("id");
+  const [status, setStatus] = useState<"loading" | "success" | "error" | "unauthenticated">("loading");
+  const [errorMessage, setErrorMessage] = useState("");
+
+  useEffect(() => {
+    if (!invitationId) {
+      setStatus("error");
+      setErrorMessage("Link de convite inválido.");
+      return;
+    }
+
+    const accept = async () => {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+
+      if (!user) {
+        setStatus("unauthenticated");
+        return;
+      }
+
+      const { error } = await supabase.rpc("accept_invitation", {
+        invitation_id: invitationId,
+      });
+
+      if (error) {
+        setStatus("error");
+        setErrorMessage(error.message || "Convite inválido ou expirado.");
+      } else {
+        setStatus("success");
+        setTimeout(() => router.push("/inbox"), 2000);
+      }
+    };
+
+    accept();
+  }, [invitationId, router]);
+
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-background p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader className="text-center">
+          <CardTitle>Aceitar Convite</CardTitle>
+          <CardDescription>Ingresse na organização</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col items-center gap-4 py-6">
+          {status === "loading" && (
+            <>
+              <Loader2 className="h-10 w-10 animate-spin text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">Processando convite...</p>
+            </>
+          )}
+          {status === "success" && (
+            <>
+              <CheckCircle className="h-10 w-10 text-green-500" />
+              <p className="text-sm font-medium">Convite aceito com sucesso!</p>
+              <p className="text-xs text-muted-foreground">Redirecionando para o painel...</p>
+            </>
+          )}
+          {status === "error" && (
+            <>
+              <XCircle className="h-10 w-10 text-destructive" />
+              <p className="text-sm font-medium text-destructive">{errorMessage}</p>
+              <Button variant="outline" onClick={() => router.push("/login")}>
+                Ir para o login
+              </Button>
+            </>
+          )}
+          {status === "unauthenticated" && (
+            <>
+              <p className="text-sm text-muted-foreground text-center">
+                Você precisa estar logado para aceitar este convite.
+              </p>
+              <Button
+                onClick={() =>
+                  router.push(`/login?next=/accept-invitation?id=${invitationId}`)
+                }
+              >
+                Fazer login
+              </Button>
+            </>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

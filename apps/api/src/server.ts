@@ -16,6 +16,7 @@ import knowledgeDocumentRoutes from "./routes/knowledge/documents";
 import knowledgeFaqRoutes from "./routes/knowledge/faqs";
 import secretsRoutes from "./routes/secrets/index";
 import conversationRoutes from "./routes/conversations/index";
+import organizationRoutes from "./routes/organizations/index";
 
 const server = Fastify({ logger: true });
 
@@ -35,6 +36,7 @@ server.register(knowledgeDocumentRoutes);
 server.register(knowledgeFaqRoutes);
 server.register(secretsRoutes);
 server.register(conversationRoutes);
+server.register(organizationRoutes);
 
 // Start
 const start = async () => {

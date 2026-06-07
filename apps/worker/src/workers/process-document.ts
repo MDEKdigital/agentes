@@ -1,22 +1,34 @@
 import { Worker } from "bullmq";
 import { QUEUE_NAMES } from "@aula-agente/shared";
 import type { ProcessDocumentJobData } from "@aula-agente/queue";
+import type { DocumentFileType } from "@aula-agente/shared";
 import { getConnectionOptions } from "../lib/redis";
 import { getAdminClient, getDocumentById, updateDocument, insertChunks } from "@aula-agente/database";
 import { resolveApiKey } from "../lib/vault";
 import { chunkText } from "../embeddings/chunker";
 import { generateEmbeddings } from "../embeddings/embedder";
+import pdfParse from "pdf-parse";
+import mammoth from "mammoth";
 
-async function extractTextFromUrl(url: string): Promise<string> {
+async function extractText(url: string, fileType: DocumentFileType): Promise<string> {
   const response = await fetch(url);
   if (!response.ok) {
-    throw new Error(`Failed to fetch document: ${response.status}`);
+    throw new Error(`Falha ao buscar documento: ${response.status}`);
   }
 
-  // For plain text/md/csv treat as text
-  // In production, use pdf-parse for PDFs, mammoth for DOCX
-  const text = await response.text();
-  return text;
+  if (fileType === "pdf") {
+    const buffer = Buffer.from(await response.arrayBuffer());
+    const data = await pdfParse(buffer);
+    return data.text;
+  }
+
+  if (fileType === "docx") {
+    const buffer = Buffer.from(await response.arrayBuffer());
+    const result = await mammoth.extractRawText({ buffer });
+    return result.value;
+  }
+
+  return response.text();
 }
 
 export function startProcessDocumentWorker() {
@@ -31,7 +43,7 @@ export function startProcessDocumentWorker() {
         const document = await getDocumentById(db, documentId);
 
         // Extract text
-        const text = await extractTextFromUrl(document.file_url);
+        const text = await extractText(document.file_url, document.file_type as DocumentFileType);
 
         if (!text.trim()) {
           await updateDocument(db, documentId, {

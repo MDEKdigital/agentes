@@ -1,4 +1,13 @@
 import "dotenv/config";
+
+const REQUIRED_ENV = ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "SECRET_ENCRYPTION_KEY"] as const;
+for (const key of REQUIRED_ENV) {
+  if (!process.env[key]) {
+    console.error(`[startup] Variável de ambiente obrigatória ausente: ${key}`);
+    process.exit(1);
+  }
+}
+
 import { startProcessMessageWorker } from "./workers/process-message";
 import { startSendMessageWorker } from "./workers/send-message";
 import { startProcessDocumentWorker } from "./workers/process-document";

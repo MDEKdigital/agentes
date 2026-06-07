@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { useOrganization } from "@/providers/organization-provider";
 import { createClient } from "@/lib/supabase/client";
 import { apiFetch } from "@/lib/api";
@@ -18,8 +19,10 @@ const PROVIDERS: { id: LLMProvider; name: string; placeholder: string; logo: str
 
 export default function SettingsPage() {
   const { currentOrg, refetch, loading: orgLoading } = useOrganization();
+  const router = useRouter();
   const [name, setName] = useState("");
   const [saving, setSaving] = useState(false);
+  const [deletingOrg, setDeletingOrg] = useState(false);
   const [configuredProviders, setConfiguredProviders] = useState<Record<string, boolean>>({});
   const [keyInputs, setKeyInputs] = useState<Record<string, string>>({});
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
@@ -76,6 +79,27 @@ export default function SettingsPage() {
       alert(err instanceof Error ? err.message : "Erro ao salvar chave");
     } finally {
       setSavingKey(null);
+    }
+  };
+
+  const handleDeleteOrg = async () => {
+    if (!currentOrg) return;
+    const confirmed = confirm(
+      `Tem certeza que deseja excluir a organização "${currentOrg.name}"? Esta ação é irreversível e apagará todos os dados, agentes e instâncias.`
+    );
+    if (!confirmed) return;
+    const secondConfirm = confirm(`Digite OK para confirmar a exclusão de "${currentOrg.name}".`);
+    if (!secondConfirm) return;
+
+    setDeletingOrg(true);
+    try {
+      await apiFetch(`/organizations/${currentOrg.id}`, { method: "DELETE" });
+      await refetch();
+      router.push("/onboarding");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Erro ao excluir organização");
+    } finally {
+      setDeletingOrg(false);
     }
   };
 
@@ -249,14 +273,28 @@ export default function SettingsPage() {
       </div>
 
       {/* Danger Zone */}
-      <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-6">
-        <div className="flex items-center gap-2 mb-3">
+      <div className="rounded-xl border border-destructive/20 bg-destructive/5 overflow-hidden">
+        <div className="flex items-center gap-2 border-b border-destructive/20 px-6 py-4">
           <AlertTriangle className="h-4 w-4 text-destructive" />
           <h2 className="text-sm font-semibold text-destructive">Zona de Perigo</h2>
         </div>
-        <p className="text-xs text-muted-foreground">
-          Ações irreversíveis. Proceda com cautela.
-        </p>
+        <div className="p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-foreground">Excluir organização</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Remove permanentemente todos os dados, agentes, instâncias e histórico de conversas.
+              </p>
+            </div>
+            <button
+              onClick={handleDeleteOrg}
+              disabled={deletingOrg}
+              className="shrink-0 rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-2 text-xs font-semibold text-destructive transition-colors hover:bg-destructive/20 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {deletingOrg ? "Excluindo..." : "Excluir organização"}
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
