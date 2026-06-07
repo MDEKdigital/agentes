@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
 import { useOrganization } from "@/providers/organization-provider";
 import { createClient } from "@/lib/supabase/client";
 import { apiFetch } from "@/lib/api";
@@ -19,7 +18,6 @@ const PROVIDERS: { id: LLMProvider; name: string; placeholder: string; logo: str
 
 export default function SettingsPage() {
   const { currentOrg, refetch, loading: orgLoading } = useOrganization();
-  const router = useRouter();
   const [name, setName] = useState("");
   const [saving, setSaving] = useState(false);
   const [deletingOrg, setDeletingOrg] = useState(false);
@@ -95,7 +93,8 @@ export default function SettingsPage() {
     try {
       await apiFetch(`/organizations/${currentOrg.id}`, { method: "DELETE" });
       await refetch();
-      router.push("/onboarding");
+      // Navigation is handled by the redirect effect in OrganizationProvider
+      // when organizations becomes empty — no explicit push needed here
     } catch (err) {
       alert(err instanceof Error ? err.message : "Erro ao excluir organização");
     } finally {

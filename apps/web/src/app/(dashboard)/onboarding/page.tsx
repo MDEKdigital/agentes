@@ -28,33 +28,13 @@ export default function OnboardingPage() {
     setLoading(true);
 
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) throw new Error("Não autenticado");
-
-      const { data: org, error: orgError } = await supabase
-        .from("organizations")
-        .insert({
-          name,
-          slug,
-          plan: "free",
-          settings: { max_documents: 100, max_agents: 5, max_instances: 3 },
-        })
-        .select()
-        .single();
+      const { data, error: orgError } = await supabase.rpc("create_organization", {
+        p_name: name,
+        p_slug: slug,
+      });
 
       if (orgError) throw orgError;
-
-      const { error: memberError } = await supabase
-        .from("organization_members")
-        .insert({
-          organization_id: org.id,
-          user_id: user.id,
-          role: "owner",
-        });
-
-      if (memberError) throw memberError;
+      if (!data || data.length === 0) throw new Error("Organização não criada");
 
       await refetch();
       router.push("/inbox");

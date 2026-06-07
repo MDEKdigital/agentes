@@ -27,9 +27,17 @@ export default async function organizationRoutes(app: FastifyInstance) {
         .eq("organization_id", organizationId);
 
       if (instances && instances.length > 0) {
-        await Promise.allSettled(
+        const results = await Promise.allSettled(
           instances.map((inst) => deleteInstance(inst.instance_name))
         );
+        results.forEach((result, i) => {
+          if (result.status === "rejected") {
+            request.log.error(
+              { instanceName: instances[i].instance_name, reason: result.reason },
+              "Falha ao excluir instância na Evolution API"
+            );
+          }
+        });
       }
 
       const { error } = await db.from("organizations").delete().eq("id", organizationId);

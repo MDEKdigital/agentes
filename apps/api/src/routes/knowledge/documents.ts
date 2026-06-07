@@ -96,7 +96,11 @@ export default async function knowledgeDocumentRoutes(app: FastifyInstance) {
       const bucketPrefix = `${process.env.SUPABASE_URL}/storage/v1/object/public/knowledge-documents/`;
       if (doc.file_url.startsWith(bucketPrefix)) {
         const storagePath = doc.file_url.slice(bucketPrefix.length);
-        await db.storage.from("knowledge-documents").remove([storagePath]);
+        const { error: storageError } = await db.storage.from("knowledge-documents").remove([storagePath]);
+        if (storageError) {
+          request.log.error({ storageError, storagePath }, "Falha ao remover arquivo do storage");
+          return reply.status(500).send({ error: "Erro ao remover arquivo do storage" });
+        }
       }
 
       await deleteDocument(db, doc.id);

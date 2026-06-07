@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { CheckCircle, XCircle, Loader2 } from "lucide-react";
 
-export default function AcceptInvitationPage() {
+function AcceptInvitationContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const invitationId = searchParams.get("id");
@@ -21,12 +21,15 @@ export default function AcceptInvitationPage() {
       return;
     }
 
+    let cancelled = false;
+    let timerId: ReturnType<typeof setTimeout> | null = null;
+
     const accept = async () => {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
 
       if (!user) {
-        setStatus("unauthenticated");
+        if (!cancelled) setStatus("unauthenticated");
         return;
       }
 
@@ -34,16 +37,22 @@ export default function AcceptInvitationPage() {
         invitation_id: invitationId,
       });
 
+      if (cancelled) return;
+
       if (error) {
         setStatus("error");
         setErrorMessage(error.message || "Convite inválido ou expirado.");
       } else {
         setStatus("success");
-        setTimeout(() => router.push("/inbox"), 2000);
+        timerId = setTimeout(() => router.push("/inbox"), 2000);
       }
     };
 
     accept();
+    return () => {
+      cancelled = true;
+      if (timerId !== null) clearTimeout(timerId);
+    };
   }, [invitationId, router]);
 
   return (
@@ -93,5 +102,13 @@ export default function AcceptInvitationPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function AcceptInvitationPage() {
+  return (
+    <Suspense>
+      <AcceptInvitationContent />
+    </Suspense>
   );
 }

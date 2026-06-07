@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { Suspense, useEffect, useState, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useOrganization } from "@/providers/organization-provider";
 import { createClient } from "@/lib/supabase/client";
@@ -8,7 +8,7 @@ import { useRealtime } from "@/lib/realtime";
 import { ConversationList } from "@/components/inbox/conversation-list";
 import { ChatPanel } from "@/components/inbox/chat-panel";
 import { Input } from "@/components/ui/input";
-import { Search, MessageSquare } from "lucide-react";
+import { Search, MessageSquare, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface ConversationRow {
@@ -30,7 +30,7 @@ const STATUS_TABS = [
   { value: "closed", label: "Fechadas" },
 ];
 
-export default function InboxPage() {
+function InboxContent() {
   const { currentOrg } = useOrganization();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -196,5 +196,19 @@ export default function InboxPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function InboxPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex h-full items-center justify-center">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      }
+    >
+      <InboxContent />
+    </Suspense>
   );
 }

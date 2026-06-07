@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { Organization } from "@aula-agente/shared";
@@ -25,15 +25,19 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [currentOrg, setCurrentOrg] = useState<Organization | null>(null);
   const [loading, setLoading] = useState(true);
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
   const pathname = usePathname();
 
   const fetchOrgs = useCallback(async () => {
+    setLoading(true);
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
 
     const { data: memberships } = await supabase
       .from("organization_members")
@@ -49,16 +53,24 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
       const savedOrgId = localStorage.getItem("currentOrgId");
       const savedOrg = orgs.find((o) => o.id === savedOrgId);
       setCurrentOrg(savedOrg || orgs[0]);
-    } else if (pathname !== "/onboarding") {
-      router.replace("/onboarding");
+    } else {
+      setOrganizations([]);
+      setCurrentOrg(null);
     }
 
     setLoading(false);
-  }, [supabase, router, pathname]);
+  }, [supabase]);
 
   useEffect(() => {
     fetchOrgs();
   }, [fetchOrgs]);
+
+  // Redirect logic is isolated here so pathname changes don't re-trigger fetchOrgs
+  useEffect(() => {
+    if (!loading && organizations.length === 0 && pathname !== "/onboarding") {
+      router.replace("/onboarding");
+    }
+  }, [loading, organizations.length, pathname, router]);
 
   const handleSetCurrentOrg = (org: Organization) => {
     setCurrentOrg(org);
