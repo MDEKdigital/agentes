@@ -1,5 +1,6 @@
 import { getAdminClient } from "@aula-agente/database";
 import type { LLMProvider } from "@aula-agente/shared";
+import { decrypt } from "./crypto";
 
 // Cache for resolved keys (TTL: 5 minutes)
 const keyCache = new Map<string, { key: string; expiresAt: number }>();
@@ -33,11 +34,12 @@ export async function resolveApiKey(
     .maybeSingle();
 
   if (!error && data?.encrypted_key) {
+    const key = decrypt(data.encrypted_key);
     keyCache.set(cacheKey, {
-      key: data.encrypted_key,
+      key,
       expiresAt: Date.now() + CACHE_TTL_MS,
     });
-    return data.encrypted_key;
+    return key;
   }
 
   // Fallback to global env var

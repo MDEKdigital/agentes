@@ -1,6 +1,9 @@
 import type { FastifyInstance } from "fastify";
 import { getAdminClient } from "@aula-agente/database";
 import { authMiddleware } from "../../middleware/auth";
+import { encrypt } from "../../lib/crypto";
+
+const ALLOWED_PROVIDERS = ["openai", "anthropic", "google"] as const;
 
 export default async function secretsRoutes(app: FastifyInstance) {
   app.addHook("preHandler", authMiddleware);
@@ -40,6 +43,10 @@ export default async function secretsRoutes(app: FastifyInstance) {
         return reply.status(400).send({ error: "key is required" });
       }
 
+      if (!ALLOWED_PROVIDERS.includes(provider as (typeof ALLOWED_PROVIDERS)[number])) {
+        return reply.status(400).send({ error: `Provider inválido. Permitidos: ${ALLOWED_PROVIDERS.join(", ")}` });
+      }
+
       const membership = request.user.memberships.find(
         (m) => m.organization_id === organizationId
       );
@@ -49,7 +56,7 @@ export default async function secretsRoutes(app: FastifyInstance) {
 
       const db = getAdminClient();
       const { error } = await db.from("organization_secrets").upsert(
-        { organization_id: organizationId, provider, encrypted_key: key.trim() },
+        { organization_id: organizationId, provider, encrypted_key: encrypt(key.trim()) },
         { onConflict: "organization_id,provider" }
       );
 

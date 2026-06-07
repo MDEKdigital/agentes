@@ -1,5 +1,13 @@
 import "dotenv/config";
 import Fastify from "fastify";
+
+const REQUIRED_ENV = ["WEBHOOK_SECRET", "PUBLIC_API_URL", "SECRET_ENCRYPTION_KEY"] as const;
+for (const key of REQUIRED_ENV) {
+  if (!process.env[key]) {
+    console.error(`[startup] Missing required environment variable: ${key}`);
+    process.exit(1);
+  }
+}
 import cors from "@fastify/cors";
 import evolutionWebhookRoutes from "./routes/webhooks/evolution";
 import messageSendRoutes from "./routes/messages/send";

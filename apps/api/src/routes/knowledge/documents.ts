@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import multipart from "@fastify/multipart";
-import { getAdminClient, getDocumentsByAgent, getDocumentById, deleteDocument } from "@aula-agente/database";
+import { getAdminClient, getDocumentsByAgent, getDocumentById, deleteDocument, getAgentById } from "@aula-agente/database";
 import { authMiddleware } from "../../middleware/auth";
 import { uploadDocument } from "../../services/knowledge.service";
 import type { DocumentFileType } from "@aula-agente/shared";
@@ -20,6 +20,16 @@ export default async function knowledgeDocumentRoutes(app: FastifyInstance) {
       if (!membership) return reply.status(403).send({ error: "Access denied" });
 
       const db = getAdminClient();
+      let agent;
+      try {
+        agent = await getAgentById(db, agentId);
+      } catch {
+        return reply.status(404).send({ error: "Agente não encontrado" });
+      }
+      if (agent.organization_id !== organizationId) {
+        return reply.status(403).send({ error: "Access denied" });
+      }
+
       const documents = await getDocumentsByAgent(db, agentId);
       return documents;
     }
@@ -34,6 +44,17 @@ export default async function knowledgeDocumentRoutes(app: FastifyInstance) {
         (m) => m.organization_id === organizationId && m.role !== "agent"
       );
       if (!membership) return reply.status(403).send({ error: "Admin access required" });
+
+      const db = getAdminClient();
+      let agent;
+      try {
+        agent = await getAgentById(db, agentId);
+      } catch {
+        return reply.status(404).send({ error: "Agente não encontrado" });
+      }
+      if (agent.organization_id !== organizationId) {
+        return reply.status(403).send({ error: "Access denied" });
+      }
 
       const data = await request.file();
       if (!data) {

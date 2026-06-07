@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { createFaqSchema, updateFaqSchema } from "@aula-agente/shared";
-import { getAdminClient, getFaqsByAgent, createFaq, updateFaq, deleteFaq } from "@aula-agente/database";
+import { getAdminClient, getFaqsByAgent, createFaq, updateFaq, deleteFaq, getAgentById } from "@aula-agente/database";
 import { authMiddleware } from "../../middleware/auth";
 
 export default async function knowledgeFaqRoutes(app: FastifyInstance) {
@@ -17,6 +17,16 @@ export default async function knowledgeFaqRoutes(app: FastifyInstance) {
       if (!membership) return reply.status(403).send({ error: "Access denied" });
 
       const db = getAdminClient();
+      let agent;
+      try {
+        agent = await getAgentById(db, agentId);
+      } catch {
+        return reply.status(404).send({ error: "Agente não encontrado" });
+      }
+      if (agent.organization_id !== organizationId) {
+        return reply.status(403).send({ error: "Access denied" });
+      }
+
       const faqs = await getFaqsByAgent(db, agentId);
       return faqs;
     }

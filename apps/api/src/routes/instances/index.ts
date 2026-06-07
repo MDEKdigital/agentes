@@ -57,8 +57,7 @@ export default async function instanceRoutes(app: FastifyInstance) {
       }
 
       const { instance_name } = parseResult.data;
-      const apiPort = process.env.API_PORT || "3001";
-      const webhookUrl = `${request.protocol}://${request.hostname}:${apiPort}/webhooks/evolution`;
+      const webhookUrl = `${process.env.PUBLIC_API_URL}/webhooks/evolution`;
 
       // Create in Evolution API
       const evolutionResult = await createEvolutionInstance(instance_name, webhookUrl) as Record<string, Record<string, string>>;
@@ -81,7 +80,14 @@ export default async function instanceRoutes(app: FastifyInstance) {
     "/instances/:instanceId/status",
     async (request, reply) => {
       const db = getAdminClient();
-      const instance = await getInstanceById(db, request.params.instanceId);
+      let instance;
+      try {
+        instance = await getInstanceById(db, request.params.instanceId);
+      } catch (err: unknown) {
+        const code = (err as { code?: string })?.code;
+        if (code === "PGRST116") return reply.status(404).send({ error: "Instância não encontrada" });
+        throw err;
+      }
 
       const membership = request.user.memberships.find(
         (m) => m.organization_id === instance.organization_id
@@ -133,7 +139,8 @@ export default async function instanceRoutes(app: FastifyInstance) {
           status: profile.status ?? null,
           picture: profile.picture ?? null,
         };
-      } catch {
+      } catch (err) {
+        request.log.warn({ err }, "fetchProfile failed — returning empty profile");
         return { name: null, status: null, picture: null };
       }
     }
@@ -199,7 +206,14 @@ export default async function instanceRoutes(app: FastifyInstance) {
     "/instances/:instanceId/qrcode",
     async (request, reply) => {
       const db = getAdminClient();
-      const instance = await getInstanceById(db, request.params.instanceId);
+      let instance;
+      try {
+        instance = await getInstanceById(db, request.params.instanceId);
+      } catch (err: unknown) {
+        const code = (err as { code?: string })?.code;
+        if (code === "PGRST116") return reply.status(404).send({ error: "Instância não encontrada" });
+        throw err;
+      }
 
       const membership = request.user.memberships.find(
         (m) => m.organization_id === instance.organization_id
@@ -216,7 +230,14 @@ export default async function instanceRoutes(app: FastifyInstance) {
     "/instances/:instanceId",
     async (request, reply) => {
       const db = getAdminClient();
-      const instance = await getInstanceById(db, request.params.instanceId);
+      let instance;
+      try {
+        instance = await getInstanceById(db, request.params.instanceId);
+      } catch (err: unknown) {
+        const code = (err as { code?: string })?.code;
+        if (code === "PGRST116") return reply.status(404).send({ error: "Instância não encontrada" });
+        throw err;
+      }
 
       const membership = request.user.memberships.find(
         (m) => m.organization_id === instance.organization_id && m.role !== "agent"
@@ -238,7 +259,14 @@ export default async function instanceRoutes(app: FastifyInstance) {
     "/instances/:instanceId",
     async (request, reply) => {
       const db = getAdminClient();
-      const instance = await getInstanceById(db, request.params.instanceId);
+      let instance;
+      try {
+        instance = await getInstanceById(db, request.params.instanceId);
+      } catch (err: unknown) {
+        const code = (err as { code?: string })?.code;
+        if (code === "PGRST116") return reply.status(404).send({ error: "Instância não encontrada" });
+        throw err;
+      }
 
       const membership = request.user.memberships.find(
         (m) => m.organization_id === instance.organization_id && m.role === "owner"
@@ -262,14 +290,25 @@ export default async function instanceRoutes(app: FastifyInstance) {
     "/instances/:instanceId/logout",
     async (request, reply) => {
       const db = getAdminClient();
-      const instance = await getInstanceById(db, request.params.instanceId);
+      let instance;
+      try {
+        instance = await getInstanceById(db, request.params.instanceId);
+      } catch (err: unknown) {
+        const code = (err as { code?: string })?.code;
+        if (code === "PGRST116") return reply.status(404).send({ error: "Instância não encontrada" });
+        throw err;
+      }
 
       const membership = request.user.memberships.find(
         (m) => m.organization_id === instance.organization_id && m.role !== "agent"
       );
       if (!membership) return reply.status(403).send({ error: "Admin access required" });
 
-      await logoutInstance(instance.instance_name);
+      try {
+        await logoutInstance(instance.instance_name);
+      } catch (err) {
+        request.log.warn({ err }, "logoutInstance failed on Evolution API");
+      }
       await updateInstance(db, instance.id, { status: "disconnected" });
 
       return { ok: true };
