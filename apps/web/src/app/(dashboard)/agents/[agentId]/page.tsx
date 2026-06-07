@@ -44,7 +44,7 @@ export default function EditAgentPage() {
   };
 
   if (loading) return <div>Carregando...</div>;
-  if (!agent) return <div>Agente nao encontrado</div>;
+  if (!agent) return <div>Agente não encontrado</div>;
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -63,7 +63,7 @@ export default function EditAgentPage() {
       <AgentForm
         defaultValues={agent}
         onSubmit={handleSubmit}
-        submitLabel="Salvar Alteracoes"
+        submitLabel="Salvar Alterações"
       />
     </div>
   );

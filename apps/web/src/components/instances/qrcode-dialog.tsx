@@ -69,7 +69,7 @@ export function QrCodeDialog({ instanceId }: QrCodeDialogProps) {
             />
           ) : (
             <p className="text-muted-foreground">
-              Instancia ja conectada ou QR code indisponivel
+              Instância já conectada ou QR code indisponível
             </p>
           )}
         </div>

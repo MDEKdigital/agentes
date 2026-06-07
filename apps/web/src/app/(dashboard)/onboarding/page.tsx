@@ -31,7 +31,7 @@ export default function OnboardingPage() {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
+      if (!user) throw new Error("Não autenticado");
 
       const { data: org, error: orgError } = await supabase
         .from("organizations")
@@ -59,7 +59,7 @@ export default function OnboardingPage() {
       await refetch();
       router.push("/inbox");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Erro ao criar organizacao");
+      setError(err instanceof Error ? err.message : "Erro ao criar organização");
     } finally {
       setLoading(false);
     }
@@ -69,13 +69,13 @@ export default function OnboardingPage() {
     <div className="flex min-h-[60vh] items-center justify-center">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle>Criar organizacao</CardTitle>
-          <CardDescription>Configure sua primeira organizacao para comecar</CardDescription>
+          <CardTitle>Criar organização</CardTitle>
+          <CardDescription>Configure sua primeira organização para começar</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="name">Nome da organizacao</Label>
+              <Label htmlFor="name">Nome da organização</Label>
               <Input
                 id="name"
                 value={name}
@@ -87,7 +87,7 @@ export default function OnboardingPage() {
             </div>
             {error && <p className="text-sm text-destructive">{error}</p>}
             <Button type="submit" className="w-full" disabled={loading || !name}>
-              {loading ? "Criando..." : "Criar organizacao"}
+              {loading ? "Criando..." : "Criar organização"}
             </Button>
           </form>
         </CardContent>

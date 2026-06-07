@@ -50,7 +50,7 @@ export function AgentForm({ defaultValues, onSubmit, submitLabel }: AgentFormPro
     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Informacoes Basicas</CardTitle>
+          <CardTitle>Informações Básicas</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
@@ -62,7 +62,7 @@ export function AgentForm({ defaultValues, onSubmit, submitLabel }: AgentFormPro
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="description">Descricao</Label>
+            <Label htmlFor="description">Descrição</Label>
             <Input
               id="description"
               {...form.register("description")}
@@ -75,7 +75,7 @@ export function AgentForm({ defaultValues, onSubmit, submitLabel }: AgentFormPro
             <Textarea
               id="system_prompt"
               {...form.register("system_prompt")}
-              placeholder="Voce e um assistente de suporte..."
+              placeholder="Você é um assistente de suporte..."
               rows={8}
             />
             {form.formState.errors.system_prompt && (

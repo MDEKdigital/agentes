@@ -38,12 +38,12 @@ export default async function conversationRoutes(app: FastifyInstance) {
         .eq("id", conversationId)
         .single();
 
-      if (!conv) return reply.status(404).send({ error: "Conversation not found" });
+      if (!conv) return reply.status(404).send({ error: "Conversa não encontrada" });
 
       const membership = request.user.memberships.find(
         (m) => m.organization_id === conv.organization_id
       );
-      if (!membership) return reply.status(403).send({ error: "Access denied" });
+      if (!membership) return reply.status(403).send({ error: "Acesso negado" });
 
       const { error } = await db
         .from("conversations")

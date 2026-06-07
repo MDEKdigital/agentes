@@ -17,7 +17,7 @@ export default async function knowledgeDocumentRoutes(app: FastifyInstance) {
       const membership = request.user.memberships.find(
         (m) => m.organization_id === organizationId
       );
-      if (!membership) return reply.status(403).send({ error: "Access denied" });
+      if (!membership) return reply.status(403).send({ error: "Acesso negado" });
 
       const db = getAdminClient();
       let agent;
@@ -27,7 +27,7 @@ export default async function knowledgeDocumentRoutes(app: FastifyInstance) {
         return reply.status(404).send({ error: "Agente não encontrado" });
       }
       if (agent.organization_id !== organizationId) {
-        return reply.status(403).send({ error: "Access denied" });
+        return reply.status(403).send({ error: "Acesso negado" });
       }
 
       const documents = await getDocumentsByAgent(db, agentId);
@@ -43,7 +43,7 @@ export default async function knowledgeDocumentRoutes(app: FastifyInstance) {
       const membership = request.user.memberships.find(
         (m) => m.organization_id === organizationId && m.role !== "agent"
       );
-      if (!membership) return reply.status(403).send({ error: "Admin access required" });
+      if (!membership) return reply.status(403).send({ error: "Acesso de administrador necessário" });
 
       const db = getAdminClient();
       let agent;
@@ -53,12 +53,12 @@ export default async function knowledgeDocumentRoutes(app: FastifyInstance) {
         return reply.status(404).send({ error: "Agente não encontrado" });
       }
       if (agent.organization_id !== organizationId) {
-        return reply.status(403).send({ error: "Access denied" });
+        return reply.status(403).send({ error: "Acesso negado" });
       }
 
       const data = await request.file();
       if (!data) {
-        return reply.status(400).send({ error: "No file uploaded" });
+        return reply.status(400).send({ error: "Nenhum arquivo enviado" });
       }
 
       const fileBuffer = await data.toBuffer();
@@ -90,7 +90,7 @@ export default async function knowledgeDocumentRoutes(app: FastifyInstance) {
       const membership = request.user.memberships.find(
         (m) => m.organization_id === doc.organization_id && m.role !== "agent"
       );
-      if (!membership) return reply.status(403).send({ error: "Admin access required" });
+      if (!membership) return reply.status(403).send({ error: "Acesso de administrador necessário" });
 
       await deleteDocument(db, doc.id);
       return reply.status(204).send();

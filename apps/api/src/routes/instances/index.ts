@@ -33,7 +33,7 @@ export default async function instanceRoutes(app: FastifyInstance) {
       const membership = request.user.memberships.find(
         (m) => m.organization_id === organizationId
       );
-      if (!membership) return reply.status(403).send({ error: "Access denied" });
+      if (!membership) return reply.status(403).send({ error: "Acesso negado" });
 
       const db = getAdminClient();
       const instances = await getInstancesByOrganization(db, organizationId);
@@ -49,7 +49,7 @@ export default async function instanceRoutes(app: FastifyInstance) {
       const membership = request.user.memberships.find(
         (m) => m.organization_id === organizationId && m.role !== "agent"
       );
-      if (!membership) return reply.status(403).send({ error: "Admin access required" });
+      if (!membership) return reply.status(403).send({ error: "Acesso de administrador necessário" });
 
       const parseResult = createInstanceSchema.safeParse(request.body);
       if (!parseResult.success) {
@@ -92,7 +92,7 @@ export default async function instanceRoutes(app: FastifyInstance) {
       const membership = request.user.memberships.find(
         (m) => m.organization_id === instance.organization_id
       );
-      if (!membership) return reply.status(403).send({ error: "Access denied" });
+      if (!membership) return reply.status(403).send({ error: "Acesso negado" });
 
       const status = await getInstanceStatus(instance.instance_name) as Record<string, Record<string, string>>;
 
@@ -126,7 +126,7 @@ export default async function instanceRoutes(app: FastifyInstance) {
       const membership = request.user.memberships.find(
         (m) => m.organization_id === instance.organization_id
       );
-      if (!membership) return reply.status(403).send({ error: "Access denied" });
+      if (!membership) return reply.status(403).send({ error: "Acesso negado" });
 
       if (!instance.phone_number || instance.status !== "connected") {
         return { name: null, status: null, picture: null };
@@ -163,7 +163,7 @@ export default async function instanceRoutes(app: FastifyInstance) {
       const membership = request.user.memberships.find(
         (m) => m.organization_id === instance.organization_id && m.role !== "agent"
       );
-      if (!membership) return reply.status(403).send({ error: "Admin access required" });
+      if (!membership) return reply.status(403).send({ error: "Acesso de administrador necessário" });
 
       if (instance.status !== "connected") {
         return reply.status(422).send({ error: "Instância não está conectada" });
@@ -218,7 +218,7 @@ export default async function instanceRoutes(app: FastifyInstance) {
       const membership = request.user.memberships.find(
         (m) => m.organization_id === instance.organization_id
       );
-      if (!membership) return reply.status(403).send({ error: "Access denied" });
+      if (!membership) return reply.status(403).send({ error: "Acesso negado" });
 
       const qrData = await getInstanceQrCode(instance.instance_name);
       return qrData;
@@ -242,7 +242,7 @@ export default async function instanceRoutes(app: FastifyInstance) {
       const membership = request.user.memberships.find(
         (m) => m.organization_id === instance.organization_id && m.role !== "agent"
       );
-      if (!membership) return reply.status(403).send({ error: "Admin access required" });
+      if (!membership) return reply.status(403).send({ error: "Acesso de administrador necessário" });
 
       const parseResult = updateInstanceSchema.safeParse(request.body);
       if (!parseResult.success) {
@@ -271,7 +271,7 @@ export default async function instanceRoutes(app: FastifyInstance) {
       const membership = request.user.memberships.find(
         (m) => m.organization_id === instance.organization_id && m.role === "owner"
       );
-      if (!membership) return reply.status(403).send({ error: "Owner access required" });
+      if (!membership) return reply.status(403).send({ error: "Acesso de proprietário necessário" });
 
       // Delete from Evolution API
       try {
@@ -302,7 +302,7 @@ export default async function instanceRoutes(app: FastifyInstance) {
       const membership = request.user.memberships.find(
         (m) => m.organization_id === instance.organization_id && m.role !== "agent"
       );
-      if (!membership) return reply.status(403).send({ error: "Admin access required" });
+      if (!membership) return reply.status(403).send({ error: "Acesso de administrador necessário" });
 
       try {
         await logoutInstance(instance.instance_name);

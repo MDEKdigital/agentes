@@ -20,7 +20,7 @@ export default async function messageSendRoutes(app: FastifyInstance) {
       // Get conversation
       const conversation = await getConversationById(db, conversation_id);
       if (!conversation) {
-        return reply.status(404).send({ error: "Conversation not found" });
+        return reply.status(404).send({ error: "Conversa não encontrada" });
       }
 
       // Check user has access to this org
@@ -28,7 +28,7 @@ export default async function messageSendRoutes(app: FastifyInstance) {
         (m) => m.organization_id === conversation.organization_id
       );
       if (!membership) {
-        return reply.status(403).send({ error: "Access denied" });
+        return reply.status(403).send({ error: "Acesso negado" });
       }
 
       // Save human agent message
@@ -41,7 +41,7 @@ export default async function messageSendRoutes(app: FastifyInstance) {
       });
 
       if (!message) {
-        return reply.status(500).send({ error: "Failed to save message" });
+        return reply.status(500).send({ error: "Falha ao salvar mensagem" });
       }
 
       // Get instance for sending

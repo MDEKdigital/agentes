@@ -36,7 +36,7 @@ export function AuthForm({ mode }: AuthFormProps) {
       router.push("/inbox");
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred");
+      setError(err instanceof Error ? err.message : "Ocorreu um erro");
     } finally {
       setLoading(false);
     }
@@ -49,7 +49,7 @@ export function AuthForm({ mode }: AuthFormProps) {
         <CardDescription>
           {mode === "login"
             ? "Entre com seu email e senha"
-            : "Crie sua conta para comecar"}
+            : "Crie sua conta para começar"}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -81,9 +81,9 @@ export function AuthForm({ mode }: AuthFormProps) {
           </Button>
           <p className="text-center text-sm text-muted-foreground">
             {mode === "login" ? (
-              <>Nao tem conta? <a href="/register" className="underline">Criar conta</a></>
+              <>Não tem conta? <a href="/register" className="underline">Criar conta</a></>
             ) : (
-              <>Ja tem conta? <a href="/login" className="underline">Entrar</a></>
+              <>Já tem conta? <a href="/login" className="underline">Entrar</a></>
             )}
           </p>
         </form>

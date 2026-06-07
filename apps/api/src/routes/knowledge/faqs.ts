@@ -14,7 +14,7 @@ export default async function knowledgeFaqRoutes(app: FastifyInstance) {
       const membership = request.user.memberships.find(
         (m) => m.organization_id === organizationId
       );
-      if (!membership) return reply.status(403).send({ error: "Access denied" });
+      if (!membership) return reply.status(403).send({ error: "Acesso negado" });
 
       const db = getAdminClient();
       let agent;
@@ -24,7 +24,7 @@ export default async function knowledgeFaqRoutes(app: FastifyInstance) {
         return reply.status(404).send({ error: "Agente não encontrado" });
       }
       if (agent.organization_id !== organizationId) {
-        return reply.status(403).send({ error: "Access denied" });
+        return reply.status(403).send({ error: "Acesso negado" });
       }
 
       const faqs = await getFaqsByAgent(db, agentId);
@@ -40,7 +40,7 @@ export default async function knowledgeFaqRoutes(app: FastifyInstance) {
       const membership = request.user.memberships.find(
         (m) => m.organization_id === organizationId && m.role !== "agent"
       );
-      if (!membership) return reply.status(403).send({ error: "Admin access required" });
+      if (!membership) return reply.status(403).send({ error: "Acesso de administrador necessário" });
 
       const parseResult = createFaqSchema.safeParse(request.body);
       if (!parseResult.success) {
@@ -74,12 +74,12 @@ export default async function knowledgeFaqRoutes(app: FastifyInstance) {
         .eq("id", request.params.faqId)
         .single();
 
-      if (!faq) return reply.status(404).send({ error: "FAQ not found" });
+      if (!faq) return reply.status(404).send({ error: "FAQ não encontrada" });
 
       const membership = request.user.memberships.find(
         (m) => m.organization_id === faq.organization_id && m.role !== "agent"
       );
-      if (!membership) return reply.status(403).send({ error: "Admin access required" });
+      if (!membership) return reply.status(403).send({ error: "Acesso de administrador necessário" });
 
       const updated = await updateFaq(db, request.params.faqId, parseResult.data);
       return updated;
@@ -97,12 +97,12 @@ export default async function knowledgeFaqRoutes(app: FastifyInstance) {
         .eq("id", request.params.faqId)
         .single();
 
-      if (!faq) return reply.status(404).send({ error: "FAQ not found" });
+      if (!faq) return reply.status(404).send({ error: "FAQ não encontrada" });
 
       const membership = request.user.memberships.find(
         (m) => m.organization_id === faq.organization_id && m.role !== "agent"
       );
-      if (!membership) return reply.status(403).send({ error: "Admin access required" });
+      if (!membership) return reply.status(403).send({ error: "Acesso de administrador necessário" });
 
       await deleteFaq(db, request.params.faqId);
       return reply.status(204).send();

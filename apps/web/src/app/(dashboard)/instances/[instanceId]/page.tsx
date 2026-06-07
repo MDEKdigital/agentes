@@ -65,19 +65,19 @@ export default function InstanceDetailPage() {
   };
 
   const handleLogout = async () => {
-    if (!confirm("Desconectar instancia?")) return;
+    if (!confirm("Desconectar instância?")) return;
     await apiFetch(`/instances/${instanceId}/logout`, { method: "POST" });
     setInstance((prev) => (prev ? { ...prev, status: "disconnected" as InstanceStatusType} : null));
   };
 
   const handleDelete = async () => {
-    if (!confirm("Excluir instancia permanentemente?")) return;
+    if (!confirm("Excluir instância permanentemente?")) return;
     await apiFetch(`/instances/${instanceId}`, { method: "DELETE" });
     router.push("/instances");
   };
 
   if (loading) return <div>Carregando...</div>;
-  if (!instance) return <div>Instancia nao encontrada</div>;
+  if (!instance) return <div>Instância não encontrada</div>;
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -97,14 +97,14 @@ export default function InstanceDetailPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Conexao</CardTitle>
+          <CardTitle>Conexão</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium">Telefone</p>
               <p className="text-sm text-muted-foreground">
-                {instance.phone_number || "Nao conectado"}
+                {instance.phone_number || "Não conectado"}
               </p>
             </div>
             <div className="flex gap-2">
@@ -142,7 +142,7 @@ export default function InstanceDetailPage() {
             </SelectContent>
           </Select>
           <p className="mt-2 text-xs text-muted-foreground">
-            O agente vinculado atendera as mensagens recebidas nesta instancia
+            O agente vinculado atenderá as mensagens recebidas nesta instância
           </p>
         </CardContent>
       </Card>
@@ -152,7 +152,7 @@ export default function InstanceDetailPage() {
       <div className="flex justify-end">
         <Button variant="destructive" onClick={handleDelete}>
           <Trash2 className="mr-2 h-4 w-4" />
-          Excluir Instancia
+          Excluir Instância
         </Button>
       </div>
     </div>

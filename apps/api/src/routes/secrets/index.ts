@@ -17,7 +17,7 @@ export default async function secretsRoutes(app: FastifyInstance) {
         (m) => m.organization_id === organizationId
       );
       if (!membership || !["owner", "admin"].includes(membership.role)) {
-        return reply.status(403).send({ error: "Access denied" });
+        return reply.status(403).send({ error: "Acesso negado" });
       }
 
       const db = getAdminClient();
@@ -40,7 +40,7 @@ export default async function secretsRoutes(app: FastifyInstance) {
       const { key } = request.body;
 
       if (!key || typeof key !== "string" || !key.trim()) {
-        return reply.status(400).send({ error: "key is required" });
+        return reply.status(400).send({ error: "A chave é obrigatória" });
       }
 
       if (!ALLOWED_PROVIDERS.includes(provider as (typeof ALLOWED_PROVIDERS)[number])) {
@@ -51,7 +51,7 @@ export default async function secretsRoutes(app: FastifyInstance) {
         (m) => m.organization_id === organizationId
       );
       if (!membership || !["owner", "admin"].includes(membership.role)) {
-        return reply.status(403).send({ error: "Access denied" });
+        return reply.status(403).send({ error: "Acesso negado" });
       }
 
       const db = getAdminClient();
@@ -74,7 +74,7 @@ export default async function secretsRoutes(app: FastifyInstance) {
         (m) => m.organization_id === organizationId
       );
       if (!membership || !["owner", "admin"].includes(membership.role)) {
-        return reply.status(403).send({ error: "Access denied" });
+        return reply.status(403).send({ error: "Acesso negado" });
       }
 
       const db = getAdminClient();

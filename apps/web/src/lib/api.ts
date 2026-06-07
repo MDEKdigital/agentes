@@ -29,7 +29,7 @@ export async function apiFetch(path: string, options: RequestInit = {}) {
   }
 
   if (!response.ok) {
-    const body = await response.json().catch(() => ({ error: "Request failed" }));
+    const body = await response.json().catch(() => ({ error: "Requisição falhou" }));
     const message = Array.isArray(body.error)
       ? body.error.map((i: { message?: string }) => i.message ?? JSON.stringify(i)).join("; ")
       : body.error || `Erro na API: ${response.status}`;

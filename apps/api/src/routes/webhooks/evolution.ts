@@ -22,10 +22,10 @@ function extractMessageContent(data: Record<string, unknown>): { content: string
         mediaType: "image",
       };
     case "audioMessage":
-      return { content: "[audio]", mediaType: "audio" };
+      return { content: "[áudio]", mediaType: "audio" };
     case "videoMessage":
       return {
-        content: (message.videoMessage as Record<string, string>)?.caption || "[video]",
+        content: (message.videoMessage as Record<string, string>)?.caption || "[vídeo]",
         mediaType: "video",
       };
     case "documentMessage":
@@ -38,7 +38,7 @@ function extractMessageContent(data: Record<string, unknown>): { content: string
     case "locationMessage": {
       const loc = message.locationMessage as Record<string, number> | undefined;
       return {
-        content: `[location: ${loc?.degreesLatitude}, ${loc?.degreesLongitude}]`,
+        content: `[localização: ${loc?.degreesLatitude}, ${loc?.degreesLongitude}]`,
         mediaType: "location",
       };
     }
@@ -55,7 +55,7 @@ export default async function evolutionWebhookRoutes(app: FastifyInstance) {
 
       if (!parseResult.success) {
         request.log.warn({ errors: parseResult.error.issues }, "Invalid webhook payload");
-        return reply.status(400).send({ error: "Invalid payload" });
+        return reply.status(400).send({ error: "Payload inválido" });
       }
 
       const payload = parseResult.data;
