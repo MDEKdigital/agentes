@@ -41,15 +41,15 @@ export async function createInstance(instanceName: string, webhookUrl: string) {
 }
 
 export async function getInstanceStatus(instanceName: string) {
-  return evolutionFetch(`/instance/connectionState/${instanceName}`);
+  return evolutionFetch(`/instance/connectionState/${encodeURIComponent(instanceName)}`);
 }
 
 export async function getInstanceQrCode(instanceName: string) {
-  return evolutionFetch(`/instance/connect/${instanceName}`);
+  return evolutionFetch(`/instance/connect/${encodeURIComponent(instanceName)}`);
 }
 
 export async function sendText(instanceName: string, payload: SendTextPayload) {
-  return evolutionFetch(`/message/sendText/${instanceName}`, {
+  return evolutionFetch(`/message/sendText/${encodeURIComponent(instanceName)}`, {
     method: "POST",
     body: JSON.stringify({
       number: payload.number,
@@ -59,38 +59,38 @@ export async function sendText(instanceName: string, payload: SendTextPayload) {
 }
 
 export async function deleteInstance(instanceName: string) {
-  return evolutionFetch(`/instance/delete/${instanceName}`, {
+  return evolutionFetch(`/instance/delete/${encodeURIComponent(instanceName)}`, {
     method: "DELETE",
   });
 }
 
 export async function logoutInstance(instanceName: string) {
-  return evolutionFetch(`/instance/logout/${instanceName}`, {
+  return evolutionFetch(`/instance/logout/${encodeURIComponent(instanceName)}`, {
     method: "DELETE",
   });
 }
 
 export async function fetchProfile(instanceName: string, number: string) {
   const cleaned = number.replace(/\D/g, "");
-  return evolutionFetch(`/chat/fetchProfile/${instanceName}?number=${cleaned}`);
+  return evolutionFetch(`/chat/fetchProfile/${encodeURIComponent(instanceName)}?number=${cleaned}`);
 }
 
 export async function updateProfileName(instanceName: string, name: string) {
-  return evolutionFetch(`/chat/updateProfileName/${instanceName}`, {
+  return evolutionFetch(`/chat/updateProfileName/${encodeURIComponent(instanceName)}`, {
     method: "POST",
     body: JSON.stringify({ name }),
   });
 }
 
 export async function updateProfileStatus(instanceName: string, status: string) {
-  return evolutionFetch(`/chat/updateProfileStatus/${instanceName}`, {
+  return evolutionFetch(`/chat/updateProfileStatus/${encodeURIComponent(instanceName)}`, {
     method: "POST",
     body: JSON.stringify({ status }),
   });
 }
 
 export async function updateProfilePicture(instanceName: string, pictureBase64: string) {
-  return evolutionFetch(`/chat/updateProfilePicture/${instanceName}`, {
+  return evolutionFetch(`/chat/updateProfilePicture/${encodeURIComponent(instanceName)}`, {
     method: "POST",
     body: JSON.stringify({ picture: pictureBase64 }),
   });

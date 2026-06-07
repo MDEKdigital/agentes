@@ -108,7 +108,14 @@ export default async function instanceRoutes(app: FastifyInstance) {
     "/instances/:instanceId/profile",
     async (request, reply) => {
       const db = getAdminClient();
-      const instance = await getInstanceById(db, request.params.instanceId);
+      let instance;
+      try {
+        instance = await getInstanceById(db, request.params.instanceId);
+      } catch (err: unknown) {
+        const code = (err as { code?: string })?.code;
+        if (code === "PGRST116") return reply.status(404).send({ error: "Instância não encontrada" });
+        throw err;
+      }
 
       const membership = request.user.memberships.find(
         (m) => m.organization_id === instance.organization_id
@@ -137,12 +144,23 @@ export default async function instanceRoutes(app: FastifyInstance) {
     "/instances/:instanceId/profile",
     async (request, reply) => {
       const db = getAdminClient();
-      const instance = await getInstanceById(db, request.params.instanceId);
+      let instance;
+      try {
+        instance = await getInstanceById(db, request.params.instanceId);
+      } catch (err: unknown) {
+        const code = (err as { code?: string })?.code;
+        if (code === "PGRST116") return reply.status(404).send({ error: "Instância não encontrada" });
+        throw err;
+      }
 
       const membership = request.user.memberships.find(
         (m) => m.organization_id === instance.organization_id && m.role !== "agent"
       );
       if (!membership) return reply.status(403).send({ error: "Admin access required" });
+
+      if (instance.status !== "connected") {
+        return reply.status(422).send({ error: "Instância não está conectada" });
+      }
 
       const parseResult = updateProfileSchema.safeParse(request.body);
       if (!parseResult.success) {
@@ -162,7 +180,16 @@ export default async function instanceRoutes(app: FastifyInstance) {
         tasks.push(updateProfilePicture(instance.instance_name, body.picture));
       }
 
-      await Promise.all(tasks);
+      if (tasks.length === 0) {
+        return reply.status(400).send({ error: "Nenhum campo para atualizar" });
+      }
+
+      const results = await Promise.allSettled(tasks);
+      const failed = results.filter((r) => r.status === "rejected");
+      if (failed.length > 0) {
+        return reply.status(500).send({ error: "Erro ao atualizar um ou mais campos do perfil na Evolution API" });
+      }
+
       return { ok: true };
     }
   );

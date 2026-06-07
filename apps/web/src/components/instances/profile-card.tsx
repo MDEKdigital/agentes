@@ -3,7 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Camera, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -26,7 +28,7 @@ const MAX_BIO_LENGTH = 139;
 function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
+    reader.onload = () => resolve((reader.result as string).split(",")[1]);
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
@@ -63,8 +65,8 @@ export function ProfileCard({ instanceId, instanceStatus }: ProfileCardProps) {
         setBio(data.status ?? "");
         setPicturePreview(data.picture ?? null);
       })
-      .catch(() => {
-        // silently show empty fields
+      .catch((err: unknown) => {
+        toast.error(err instanceof Error ? err.message : "Erro ao carregar perfil do WhatsApp");
       })
       .finally(() => setLoadingProfile(false));
   }, [instanceId, disabled]);
@@ -105,7 +107,7 @@ export function ProfileCard({ instanceId, instanceStatus }: ProfileCardProps) {
         body: JSON.stringify(body),
       });
 
-      setOriginal({ name: name || null, status: bio || null, picture: picturePreview });
+      setOriginal({ name: name !== "" ? name : null, status: bio !== "" ? bio : null, picture: picturePreview });
       setPictureFile(null);
       toast.success("Perfil atualizado com sucesso");
     } catch (err) {
@@ -203,30 +205,26 @@ export function ProfileCard({ instanceId, instanceStatus }: ProfileCardProps) {
                 </label>
                 <span className="text-xs text-muted-foreground">{bio.length}/{MAX_BIO_LENGTH}</span>
               </div>
-              <textarea
+              <Textarea
                 value={bio}
                 onChange={(e) => setBio(e.target.value.slice(0, MAX_BIO_LENGTH))}
                 placeholder="Status de exibição no WhatsApp"
                 disabled={disabled || saving}
                 rows={2}
-                className={cn(
-                  "w-full resize-none rounded-md border border-border bg-muted px-3 py-2 text-sm",
-                  "placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring",
-                  "disabled:cursor-not-allowed disabled:opacity-50"
-                )}
+                className="resize-none bg-muted border-border"
               />
             </div>
 
             {/* Save button */}
             <div className="flex justify-end">
-              <button
+              <Button
+                variant="amber"
                 onClick={handleSave}
                 disabled={!isDirty || saving || disabled}
-                className="flex items-center gap-2 rounded-lg bg-amber-fire-500 px-4 py-2 text-sm font-semibold text-[#0F1219] transition-colors hover:bg-amber-fire-400 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {saving && <Loader2 className="h-4 w-4 animate-spin" />}
                 {saving ? "Salvando..." : "Salvar Perfil"}
-              </button>
+              </Button>
             </div>
           </div>
         )}
