@@ -18,6 +18,7 @@ import {
 import { ArrowLeft, Trash2, LogOut } from "lucide-react";
 import Link from "next/link";
 import type { Agent, EvolutionInstance, InstanceStatus as InstanceStatusType } from "@aula-agente/shared";
+import { ProfileCard } from "@/components/instances/profile-card";
 
 export default function InstanceDetailPage() {
   const { instanceId } = useParams<{ instanceId: string }>();
@@ -145,6 +146,8 @@ export default function InstanceDetailPage() {
           </p>
         </CardContent>
       </Card>
+
+      <ProfileCard instanceId={instanceId} instanceStatus={instance.status} />
 
       <div className="flex justify-end">
         <Button variant="destructive" onClick={handleDelete}>
