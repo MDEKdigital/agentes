@@ -39,12 +39,14 @@ const TOGGLES: { key: keyof Omit<InstanceSettings, "msg_call">; label: string; d
 export function SettingsContent({ instanceId }: { instanceId: string }) {
   const [settings, setSettings] = useState<InstanceSettings>(DEFAULTS);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
+    setLoadError(false);
     apiFetch(`/instances/${instanceId}/settings`)
       .then((data) => setSettings({ ...DEFAULTS, ...(data as Partial<InstanceSettings>) }))
-      .catch(() => {})
+      .catch(() => setLoadError(true))
       .finally(() => setLoading(false));
   }, [instanceId]);
 
@@ -66,6 +68,14 @@ export function SettingsContent({ instanceId }: { instanceId: string }) {
     return (
       <div className="flex justify-center py-8">
         <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="py-6 text-center text-sm text-destructive">
+        Erro ao carregar configurações. Recarregue a página antes de salvar.
       </div>
     );
   }

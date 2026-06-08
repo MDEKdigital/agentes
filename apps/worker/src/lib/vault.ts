@@ -35,6 +35,11 @@ export async function resolveApiKey(
 
   if (!error && data?.encrypted_key) {
     const key = decrypt(data.encrypted_key);
+    if (!key) {
+      throw new Error(
+        `Decrypted key is empty for provider "${provider}" in organization "${organizationId}"`
+      );
+    }
     keyCache.set(cacheKey, {
       key,
       expiresAt: Date.now() + CACHE_TTL_MS,

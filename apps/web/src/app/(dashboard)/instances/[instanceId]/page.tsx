@@ -95,27 +95,39 @@ export default function InstanceDetailPage() {
   };
 
   const handleAssignAgent = async (agentId: string) => {
-    await apiFetch(`/instances/${instanceId}`, {
-      method: "PATCH",
-      body: JSON.stringify({
-        active_agent_id: agentId === "none" ? null : agentId,
-      }),
-    });
-    setInstance((prev) =>
-      prev ? { ...prev, active_agent_id: agentId === "none" ? null : agentId } : null
-    );
+    try {
+      await apiFetch(`/instances/${instanceId}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          active_agent_id: agentId === "none" ? null : agentId,
+        }),
+      });
+      setInstance((prev) =>
+        prev ? { ...prev, active_agent_id: agentId === "none" ? null : agentId } : null
+      );
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Erro ao vincular agente");
+    }
   };
 
   const handleLogout = async () => {
     if (!confirm("Desconectar instância?")) return;
-    await apiFetch(`/instances/${instanceId}/logout`, { method: "POST" });
-    setInstance((prev) => (prev ? { ...prev, status: "disconnected" as InstanceStatusType } : null));
+    try {
+      await apiFetch(`/instances/${instanceId}/logout`, { method: "POST" });
+      setInstance((prev) => (prev ? { ...prev, status: "disconnected" as InstanceStatusType } : null));
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Erro ao desconectar instância");
+    }
   };
 
   const handleDelete = async () => {
     if (!confirm("Excluir instância permanentemente?")) return;
-    await apiFetch(`/instances/${instanceId}`, { method: "DELETE" });
-    router.push("/instances");
+    try {
+      await apiFetch(`/instances/${instanceId}`, { method: "DELETE" });
+      router.push("/instances");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Erro ao excluir instância");
+    }
   };
 
   if (loading) return <div>Carregando...</div>;

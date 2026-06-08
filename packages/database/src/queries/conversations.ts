@@ -83,7 +83,8 @@ export async function getExpiredTakeovers(client: SupabaseClient, timeoutMs: num
     .from("conversations")
     .select("*")
     .eq("is_human_takeover", true)
-    .lt("human_takeover_at", cutoff);
+    .lt("human_takeover_at", cutoff)
+    .limit(200);
   if (error) throw error;
   return data as Conversation[];
 }

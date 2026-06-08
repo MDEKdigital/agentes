@@ -92,7 +92,7 @@ function AcceptInvitationContent() {
               </p>
               <Button
                 onClick={() =>
-                  router.push(`/login?next=/accept-invitation?id=${invitationId}`)
+                  router.push(`/login?next=${encodeURIComponent(`/accept-invitation?id=${invitationId}`)}`)
                 }
               >
                 Fazer login

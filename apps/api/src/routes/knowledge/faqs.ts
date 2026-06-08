@@ -27,7 +27,7 @@ export default async function knowledgeFaqRoutes(app: FastifyInstance) {
         return reply.status(403).send({ error: "Acesso negado" });
       }
 
-      const faqs = await getFaqsByAgent(db, agentId);
+      const faqs = await getFaqsByAgent(db, agentId, organizationId);
       return faqs;
     }
   );
@@ -48,6 +48,18 @@ export default async function knowledgeFaqRoutes(app: FastifyInstance) {
       }
 
       const db = getAdminClient();
+
+      // Validate agent belongs to this organization
+      let agent;
+      try {
+        agent = await getAgentById(db, parseResult.data.agent_id);
+      } catch {
+        return reply.status(404).send({ error: "Agente não encontrado" });
+      }
+      if (agent.organization_id !== organizationId) {
+        return reply.status(403).send({ error: "Acesso negado" });
+      }
+
       const faq = await createFaq(db, {
         ...parseResult.data,
         organization_id: organizationId,

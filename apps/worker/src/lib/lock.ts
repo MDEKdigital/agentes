@@ -34,5 +34,14 @@ export async function releaseConversationLock(conversationId: string, lockValue:
     end
   `;
 
-  await redis.call("EVAL", luaScript, "1", lockKey, lockValue);
+  try {
+    await redis.call("EVAL", luaScript, "1", lockKey, lockValue);
+  } catch (err) {
+    console.error(`[lock] EVAL failed for ${lockKey}, attempting direct del:`, err);
+    try {
+      await redis.del(lockKey);
+    } catch (delErr) {
+      console.error(`[lock] Failed to release lock ${lockKey}:`, delErr);
+    }
+  }
 }

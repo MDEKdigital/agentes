@@ -33,6 +33,9 @@ export function startSendMessageWorker() {
 
       const db = getAdminClient();
       const instance = await getInstanceById(db, instanceId);
+      if (!instance) {
+        throw new Error(`Instance ${instanceId} not found — cannot send message`);
+      }
 
       await sendEvolutionText(instance.instance_name, phone, content);
 

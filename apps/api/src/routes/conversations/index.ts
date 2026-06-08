@@ -51,7 +51,7 @@ export default async function conversationRoutes(app: FastifyInstance) {
         .eq("id", conversationId)
         .eq("organization_id", conv.organization_id);
 
-      if (error) return reply.status(500).send({ error: error.message });
+      if (error) return reply.status(500).send({ error: "Falha ao atualizar status da conversa" });
       return reply.status(204).send();
     }
   );

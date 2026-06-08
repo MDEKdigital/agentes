@@ -70,13 +70,19 @@ export default async function evolutionWebhookRoutes(app: FastifyInstance) {
       const phone = payload.data.key.remoteJid.replace("@s.whatsapp.net", "");
       const contactName = payload.data.pushName || null;
 
-      // Look up instance
+      // Look up instance — distinguish "not found" from transient DB errors
       let instance;
       try {
         instance = await getInstanceByInstanceId(getAdminClient(), instanceId);
-      } catch {
-        request.log.warn({ instanceId }, "Unknown Evolution instance");
-        return reply.status(200).send({ ok: true, skipped: "unknown_instance" });
+      } catch (err) {
+        const pgErr = err as { code?: string };
+        if (pgErr?.code === "PGRST116") {
+          request.log.warn({ instanceId }, "Unknown Evolution instance");
+          return reply.status(200).send({ ok: true, skipped: "unknown_instance" });
+        }
+        // Transient DB error — return 500 so Evolution retries
+        request.log.error({ err, instanceId }, "DB error looking up instance");
+        return reply.status(500).send({ error: "Internal server error" });
       }
 
       // Check if instance has an active agent
@@ -88,48 +94,53 @@ export default async function evolutionWebhookRoutes(app: FastifyInstance) {
       const organizationId = instance.organization_id;
       const agentId = instance.active_agent_id;
 
-      // Ensure conversation exists
-      const { conversation } = await ensureConversation({
-        organizationId,
-        agentId,
-        instanceId: instance.id,
-        phone,
-        contactName,
-        contactPhotoUrl: null,
-      });
+      try {
+        // Ensure conversation exists
+        const { conversation } = await ensureConversation({
+          organizationId,
+          agentId,
+          instanceId: instance.id,
+          phone,
+          contactName,
+          contactPhotoUrl: null,
+        });
 
-      // Extract message content
-      const { content, mediaType } = extractMessageContent(payload.data as Record<string, unknown>);
+        // Extract message content
+        const { content, mediaType } = extractMessageContent(payload.data as Record<string, unknown>);
 
-      // Save message (with idempotency)
-      const message = await saveMessage({
-        conversationId: conversation.id,
-        organizationId,
-        evolutionMessageId,
-        role: "contact",
-        content,
-        mediaType,
-      });
+        // Save message (with idempotency)
+        const message = await saveMessage({
+          conversationId: conversation.id,
+          organizationId,
+          evolutionMessageId,
+          role: "contact",
+          content,
+          mediaType,
+        });
 
-      // If message was already processed (duplicate webhook), skip
-      if (!message) {
-        return reply.status(200).send({ ok: true, skipped: "duplicate" });
+        // If message was already processed (duplicate webhook), skip
+        if (!message) {
+          return reply.status(200).send({ ok: true, skipped: "duplicate" });
+        }
+
+        // If human takeover is active, don't enqueue for LLM processing
+        if (conversation.is_human_takeover) {
+          return reply.status(200).send({ ok: true, skipped: "human_takeover" });
+        }
+
+        // Enqueue for LLM processing
+        await enqueueProcessMessage({
+          conversationId: conversation.id,
+          messageId: message.id,
+          agentId,
+          organizationId,
+        });
+
+        return reply.status(200).send({ ok: true, messageId: message.id });
+      } catch (err) {
+        request.log.error({ err, instanceId }, "Failed to process webhook message");
+        return reply.status(500).send({ error: "Internal server error" });
       }
-
-      // If human takeover is active, don't enqueue for LLM processing
-      if (conversation.is_human_takeover) {
-        return reply.status(200).send({ ok: true, skipped: "human_takeover" });
-      }
-
-      // Enqueue for LLM processing
-      await enqueueProcessMessage({
-        conversationId: conversation.id,
-        messageId: message.id,
-        agentId,
-        organizationId,
-      });
-
-      return reply.status(200).send({ ok: true, messageId: message.id });
     },
   });
 }

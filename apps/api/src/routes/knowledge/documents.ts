@@ -30,7 +30,7 @@ export default async function knowledgeDocumentRoutes(app: FastifyInstance) {
         return reply.status(403).send({ error: "Acesso negado" });
       }
 
-      const documents = await getDocumentsByAgent(db, agentId);
+      const documents = await getDocumentsByAgent(db, agentId, organizationId);
       return documents;
     }
   );
@@ -85,12 +85,19 @@ export default async function knowledgeDocumentRoutes(app: FastifyInstance) {
     "/documents/:documentId",
     async (request, reply) => {
       const db = getAdminClient();
-      const doc = await getDocumentById(db, request.params.documentId);
+
+      let doc;
+      try {
+        doc = await getDocumentById(db, request.params.documentId);
+      } catch {
+        return reply.status(404).send({ error: "Documento não encontrado" });
+      }
 
       const membership = request.user.memberships.find(
         (m) => m.organization_id === doc.organization_id && m.role !== "agent"
       );
-      if (!membership) return reply.status(403).send({ error: "Acesso de administrador necessário" });
+      // Return 404 (not 403) to avoid revealing document existence to unauthorized users
+      if (!membership) return reply.status(404).send({ error: "Documento não encontrado" });
 
       // Remove file from storage before deleting DB record
       const bucketPrefix = `${process.env.SUPABASE_URL}/storage/v1/object/public/knowledge-documents/`;

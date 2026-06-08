@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react";
+import { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { Organization } from "@aula-agente/shared";
@@ -28,12 +28,19 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
   const pathname = usePathname();
+  // Generation counter to discard stale concurrent fetches
+  const fetchGen = useRef(0);
 
   const fetchOrgs = useCallback(async () => {
+    const gen = ++fetchGen.current;
     setLoading(true);
+
     const {
       data: { user },
     } = await supabase.auth.getUser();
+
+    if (gen !== fetchGen.current) return;
+
     if (!user) {
       setLoading(false);
       return;
@@ -44,13 +51,20 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
       .select("organization_id, role, organizations(*)")
       .eq("user_id", user.id);
 
+    if (gen !== fetchGen.current) return;
+
     if (memberships && memberships.length > 0) {
       const orgs = memberships
         .map((m) => m.organizations as unknown as Organization)
         .filter(Boolean);
       setOrganizations(orgs);
 
-      const savedOrgId = localStorage.getItem("currentOrgId");
+      let savedOrgId: string | null = null;
+      try {
+        savedOrgId = localStorage.getItem("currentOrgId");
+      } catch {
+        // localStorage unavailable in SSR or browsers with storage blocked
+      }
       const savedOrg = orgs.find((o) => o.id === savedOrgId);
       setCurrentOrg(savedOrg || orgs[0]);
     } else {
@@ -74,7 +88,11 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
 
   const handleSetCurrentOrg = (org: Organization) => {
     setCurrentOrg(org);
-    localStorage.setItem("currentOrgId", org.id);
+    try {
+      localStorage.setItem("currentOrgId", org.id);
+    } catch {
+      // localStorage unavailable
+    }
   };
 
   return (

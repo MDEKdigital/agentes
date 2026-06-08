@@ -56,7 +56,11 @@ export async function createOrganization(
     user_id: userId,
     role: "owner",
   });
-  if (memberError) throw memberError;
+  if (memberError) {
+    // Best-effort rollback: delete the org we just created to avoid an ownerless org
+    await client.from("organizations").delete().eq("id", orgData.id);
+    throw memberError;
+  }
 
   return orgData as Organization;
 }

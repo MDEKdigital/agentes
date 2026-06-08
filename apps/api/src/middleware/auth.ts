@@ -34,7 +34,7 @@ export async function authMiddleware(request: FastifyRequest, reply: FastifyRepl
 
   request.user = {
     id: user.id,
-    email: user.email!,
+    email: user.email ?? "",
     memberships: memberships || [],
   };
 }

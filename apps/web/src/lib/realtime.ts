@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 
@@ -21,6 +21,16 @@ export function useRealtime<T extends Record<string, unknown>>({
   onDelete,
   enabled = true,
 }: UseRealtimeOptions<T>) {
+  // Store callbacks in refs so the subscription effect never needs to re-run
+  // when the caller passes new inline arrow functions on each render.
+  const onInsertRef = useRef(onInsert);
+  const onUpdateRef = useRef(onUpdate);
+  const onDeleteRef = useRef(onDelete);
+
+  useEffect(() => { onInsertRef.current = onInsert; }, [onInsert]);
+  useEffect(() => { onUpdateRef.current = onUpdate; }, [onUpdate]);
+  useEffect(() => { onDeleteRef.current = onDelete; }, [onDelete]);
+
   useEffect(() => {
     if (!enabled) return;
 
@@ -40,14 +50,14 @@ export function useRealtime<T extends Record<string, unknown>>({
       .channel(`realtime:${table}:${filter || "all"}`)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .on("postgres_changes" as any, channelConfig, (payload: RealtimePostgresChangesPayload<T>) => {
-        if (payload.eventType === "INSERT" && onInsert) {
-          onInsert(payload.new as T);
+        if (payload.eventType === "INSERT" && onInsertRef.current) {
+          onInsertRef.current(payload.new as T);
         }
-        if (payload.eventType === "UPDATE" && onUpdate) {
-          onUpdate(payload.new as T);
+        if (payload.eventType === "UPDATE" && onUpdateRef.current) {
+          onUpdateRef.current(payload.new as T);
         }
-        if (payload.eventType === "DELETE" && onDelete) {
-          onDelete(payload.old as T);
+        if (payload.eventType === "DELETE" && onDeleteRef.current) {
+          onDeleteRef.current(payload.old as T);
         }
       })
       .subscribe();
@@ -55,5 +65,5 @@ export function useRealtime<T extends Record<string, unknown>>({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [table, filter, event, onInsert, onUpdate, onDelete, enabled]);
+  }, [table, filter, event, enabled]); // callbacks excluded — accessed via refs
 }

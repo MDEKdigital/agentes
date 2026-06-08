@@ -2,7 +2,7 @@ import { tool } from "ai";
 import { z } from "zod";
 import { getAdminClient, getFaqsByAgent } from "@aula-agente/database";
 
-export function createSearchFaqTool(agentId: string) {
+export function createSearchFaqTool(agentId: string, organizationId: string) {
   return tool({
     description: "Search the FAQ database for common questions and answers. Use this when the user asks a question that might have a standard answer.",
     parameters: z.object({
@@ -10,7 +10,7 @@ export function createSearchFaqTool(agentId: string) {
     }),
     execute: async ({ query }) => {
       const db = getAdminClient();
-      const faqs = await getFaqsByAgent(db, agentId);
+      const faqs = await getFaqsByAgent(db, agentId, organizationId);
 
       if (faqs.length === 0) {
         return "No FAQs configured for this agent.";

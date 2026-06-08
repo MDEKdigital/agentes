@@ -4,11 +4,14 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
 export async function apiFetch(path: string, options: RequestInit = {}) {
   const supabase = createClient();
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
 
-  if (!session) {
+  // getUser() verifies the JWT server-side; getSession() alone only reads local cache
+  const [{ data: { user } }, { data: { session } }] = await Promise.all([
+    supabase.auth.getUser(),
+    supabase.auth.getSession(),
+  ]);
+
+  if (!user || !session) {
     throw new Error("Sessão expirada. Faça login novamente.");
   }
 

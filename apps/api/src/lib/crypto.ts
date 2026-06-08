@@ -21,7 +21,10 @@ export function encrypt(plaintext: string): string {
 }
 
 export function decrypt(value: string): string {
-  if (!value.startsWith(PREFIX)) return value; // legacy plaintext
+  if (!value.startsWith(PREFIX)) {
+    console.warn("[crypto] decrypt: value missing enc:v1: prefix — returning as plaintext. Verify all secrets are encrypted.");
+    return value;
+  }
   const [ivHex, tagHex, dataHex] = value.slice(PREFIX.length).split(":");
   const key = getKey();
   const decipher = createDecipheriv(ALGORITHM, key, Buffer.from(ivHex, "hex"));

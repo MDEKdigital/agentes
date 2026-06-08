@@ -46,9 +46,15 @@ export default async function messageSendRoutes(app: FastifyInstance) {
 
       // Get instance for sending
       const instance = await getInstanceById(db, conversation.evolution_instance_id);
+      if (!instance) {
+        return reply.status(404).send({ error: "Instância WhatsApp não encontrada" });
+      }
 
       // Get contact phone from conversation
-      const contact = (conversation as Record<string, unknown>).contacts as { phone: string };
+      const contact = (conversation as Record<string, unknown>).contacts as { phone: string } | null;
+      if (!contact?.phone) {
+        return reply.status(422).send({ error: "Conversa sem número de telefone do contato" });
+      }
 
       // Enqueue send
       await enqueueSendMessage({

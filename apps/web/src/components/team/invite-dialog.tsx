@@ -42,13 +42,14 @@ export function InviteDialog({ onInvited }: InviteDialogProps) {
     try {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Sessão expirada. Faça login novamente.");
       const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
       const { error: insertError } = await supabase.from("organization_invitations").insert({
         organization_id: currentOrg.id,
         email,
         role,
-        invited_by: user!.id,
+        invited_by: user.id,
         status: "pending",
         expires_at: expiresAt,
       });

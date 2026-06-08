@@ -97,6 +97,9 @@ export function startProcessMessageWorker() {
 
         // Get contact phone
         const contact = conversation.contacts as { phone: string } | null;
+        if (!contact?.phone) {
+          throw new Error(`Contact phone not found for conversation ${conversationId}`);
+        }
 
         // Enqueue send message
         const sendQueue = getSendMessageQueue();
@@ -104,7 +107,7 @@ export function startProcessMessageWorker() {
           conversationId,
           messageId: responseMessage.id,
           instanceId: instance.id,
-          phone: contact?.phone || "",
+          phone: contact.phone,
           content: result.text,
           organizationId,
         });

@@ -19,7 +19,7 @@ export function buildToolsForAgent(params: RegistryParams) {
   }
 
   if (toolsConfig.search_faq) {
-    tools.searchFaq = createSearchFaqTool(agentId);
+    tools.searchFaq = createSearchFaqTool(agentId, organizationId);
   }
 
   return tools;

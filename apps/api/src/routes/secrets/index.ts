@@ -60,7 +60,7 @@ export default async function secretsRoutes(app: FastifyInstance) {
         { onConflict: "organization_id,provider" }
       );
 
-      if (error) return reply.status(500).send({ error: error.message });
+      if (error) return reply.status(500).send({ error: "Erro interno ao processar chave" });
       return reply.status(204).send();
     }
   );
@@ -84,7 +84,7 @@ export default async function secretsRoutes(app: FastifyInstance) {
         .eq("organization_id", organizationId)
         .eq("provider", provider);
 
-      if (error) return reply.status(500).send({ error: error.message });
+      if (error) return reply.status(500).send({ error: "Erro interno ao processar chave" });
       return reply.status(204).send();
     }
   );

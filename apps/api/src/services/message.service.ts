@@ -24,16 +24,25 @@ export async function saveMessage(params: SaveMessageParams) {
     }
   }
 
-  const message = await createMessage(db, {
-    conversation_id: params.conversationId,
-    organization_id: params.organizationId,
-    evolution_message_id: params.evolutionMessageId,
-    role: params.role,
-    content: params.content,
-    media_url: params.mediaUrl || null,
-    media_type: params.mediaType || null,
-    metadata: params.metadata || null,
-  });
+  let message;
+  try {
+    message = await createMessage(db, {
+      conversation_id: params.conversationId,
+      organization_id: params.organizationId,
+      evolution_message_id: params.evolutionMessageId,
+      role: params.role,
+      content: params.content,
+      media_url: params.mediaUrl || null,
+      media_type: params.mediaType || null,
+      metadata: params.metadata || null,
+    });
+  } catch (err: unknown) {
+    // Race condition: another concurrent webhook inserted same evolution_message_id first
+    if (params.evolutionMessageId && (err as { code?: string }).code === "23505") {
+      return null;
+    }
+    throw err;
+  }
 
   // Update conversation last_message_at
   await updateConversation(db, params.conversationId, {

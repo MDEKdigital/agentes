@@ -18,7 +18,7 @@ async function evolutionFetch(path: string, options: RequestInit = {}) {
 
   if (!response.ok) {
     const body = await response.text();
-    throw new Error(`Evolution API error ${response.status}: ${body}`);
+    throw new Error(`Evolution API error ${response.status}: ${body.slice(0, 200)}`);
   }
 
   return response.json();

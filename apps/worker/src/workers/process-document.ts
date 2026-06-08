@@ -65,6 +65,12 @@ export function startProcessDocumentWorker() {
           apiKey
         );
 
+        if (embeddings.length !== chunks.length) {
+          throw new Error(
+            `Embedding count mismatch: got ${embeddings.length} for ${chunks.length} chunks`
+          );
+        }
+
         // Insert chunks with embeddings
         await insertChunks(
           db,

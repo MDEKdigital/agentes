@@ -37,7 +37,7 @@ server.register(cors, {
 });
 
 // Health check
-server.get("/health", async () => {
+server.get("/health", { logLevel: "silent" }, async () => {
   return { status: "ok", timestamp: new Date().toISOString() };
 });
 

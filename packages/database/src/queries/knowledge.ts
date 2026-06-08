@@ -1,11 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { KnowledgeDocument, KnowledgeFaq } from "@aula-agente/shared";
 
-export async function getDocumentsByAgent(client: SupabaseClient, agentId: string) {
+export async function getDocumentsByAgent(client: SupabaseClient, agentId: string, organizationId: string) {
   const { data, error } = await client
     .from("knowledge_documents")
     .select("*")
     .eq("agent_id", agentId)
+    .eq("organization_id", organizationId)
     .order("created_at", { ascending: false });
   if (error) throw error;
   return data as KnowledgeDocument[];
@@ -50,7 +51,8 @@ export async function updateDocument(
 }
 
 export async function deleteDocument(client: SupabaseClient, id: string) {
-  await client.from("knowledge_chunks").delete().eq("document_id", id);
+  const { error: chunksError } = await client.from("knowledge_chunks").delete().eq("document_id", id);
+  if (chunksError) throw chunksError;
   const { error } = await client.from("knowledge_documents").delete().eq("id", id);
   if (error) throw error;
 }
@@ -87,11 +89,12 @@ export async function searchKnowledgeChunks(
   return data as Array<{ id: string; content: string; similarity: number }>;
 }
 
-export async function getFaqsByAgent(client: SupabaseClient, agentId: string) {
+export async function getFaqsByAgent(client: SupabaseClient, agentId: string, organizationId: string) {
   const { data, error } = await client
     .from("knowledge_faqs")
     .select("*")
     .eq("agent_id", agentId)
+    .eq("organization_id", organizationId)
     .eq("is_active", true)
     .order("created_at", { ascending: false });
   if (error) throw error;

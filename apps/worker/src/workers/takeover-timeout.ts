@@ -13,11 +13,15 @@ export function startTakeoverTimeoutWorker() {
       const expired = await getExpiredTakeovers(db, HUMAN_TAKEOVER_TIMEOUT_MS);
 
       for (const conversation of expired) {
-        await updateConversation(db, conversation.id, {
-          is_human_takeover: false,
-          human_takeover_at: null,
-        });
-        console.log(`Auto-released takeover for conversation ${conversation.id}`);
+        try {
+          await updateConversation(db, conversation.id, {
+            is_human_takeover: false,
+            human_takeover_at: null,
+          });
+          console.log(`Auto-released takeover for conversation ${conversation.id}`);
+        } catch (err) {
+          console.error(`Failed to release takeover for conversation ${conversation.id}:`, err);
+        }
       }
 
       if (expired.length > 0) {
