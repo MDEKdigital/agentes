@@ -15,9 +15,15 @@ import {
   deleteInstance as deleteEvolutionInstance,
   logoutInstance,
   fetchProfile,
+  fetchInstanceDetails,
   updateProfileName,
   updateProfileStatus,
   updateProfilePicture,
+  getInstanceSettings,
+  setInstanceSettings,
+  getPrivacySettings,
+  updatePrivacySettings,
+  restartInstance,
 } from "../../services/evolution.service";
 import { authMiddleware } from "../../middleware/auth";
 
@@ -94,18 +100,24 @@ export default async function instanceRoutes(app: FastifyInstance) {
       );
       if (!membership) return reply.status(403).send({ error: "Acesso negado" });
 
-      const status = await getInstanceStatus(instance.instance_name) as Record<string, Record<string, string>>;
+      const [status, details] = await Promise.all([
+        getInstanceStatus(instance.instance_name) as Promise<Record<string, Record<string, string>>>,
+        fetchInstanceDetails(instance.instance_name),
+      ]);
 
-      // Sync status to DB
       const newStatus = status?.instance?.state === "open" ? "connected" as const : "disconnected" as const;
-      if (newStatus !== instance.status) {
+      const ownerJid = details?.ownerJid as string | undefined;
+      const phoneNumber = ownerJid ? ownerJid.replace(/@.*$/, "") : instance.phone_number;
+
+      // Sync status and phone_number to DB
+      if (newStatus !== instance.status || (phoneNumber && instance.phone_number !== phoneNumber)) {
         await updateInstance(db, instance.id, {
           status: newStatus,
-          phone_number: status?.instance?.phoneNumber || instance.phone_number,
+          phone_number: phoneNumber || instance.phone_number,
         });
       }
 
-      return { ...instance, status: newStatus, live: status };
+      return { ...instance, status: newStatus, phone_number: phoneNumber || instance.phone_number, live: status };
     }
   );
 
@@ -128,16 +140,41 @@ export default async function instanceRoutes(app: FastifyInstance) {
       );
       if (!membership) return reply.status(403).send({ error: "Acesso negado" });
 
-      if (!instance.phone_number || instance.status !== "connected") {
+      if (instance.status !== "connected") {
         return { name: null, status: null, picture: null };
       }
 
       try {
-        const profile = await fetchProfile(instance.instance_name, instance.phone_number) as Record<string, string>;
+        const details = await fetchInstanceDetails(instance.instance_name);
+        const ownerJid = details?.ownerJid as string | undefined;
+        const phoneNumber = ownerJid
+          ? ownerJid.replace(/@.*$/, "")
+          : instance.phone_number;
+
+        if (!phoneNumber) return { name: null, status: null, picture: null };
+
+        // Persist phone_number if not set yet
+        if (!instance.phone_number && phoneNumber) {
+          await updateInstance(db, instance.id, { phone_number: phoneNumber });
+        }
+
+        let bioText: string | null = null;
+        try {
+          const profileData = await fetchProfile(instance.instance_name, phoneNumber) as Record<string, unknown>;
+          const statusField = profileData?.status as Record<string, string> | string | undefined;
+          bioText =
+            (typeof statusField === "object" ? statusField?.status : statusField) ||
+            (profileData?.description as string) ||
+            null;
+          if (bioText?.trim() === "") bioText = null;
+        } catch {
+          // bio is optional — proceed without it
+        }
+
         return {
-          name: profile.name ?? null,
-          status: profile.status ?? null,
-          picture: profile.picture ?? null,
+          name: (details?.profileName as string) ?? null,
+          status: bioText,
+          picture: (details?.profilePicUrl as string) ?? null,
         };
       } catch (err) {
         request.log.warn({ err }, "fetchProfile failed — returning empty profile");
@@ -282,6 +319,126 @@ export default async function instanceRoutes(app: FastifyInstance) {
 
       await deleteInstanceRecord(db, instance.id);
       return reply.status(204).send();
+    }
+  );
+
+  // Get instance settings
+  app.get<{ Params: { instanceId: string } }>(
+    "/instances/:instanceId/settings",
+    async (request, reply) => {
+      const db = getAdminClient();
+      let instance;
+      try {
+        instance = await getInstanceById(db, request.params.instanceId);
+      } catch (err: unknown) {
+        const code = (err as { code?: string })?.code;
+        if (code === "PGRST116") return reply.status(404).send({ error: "Instância não encontrada" });
+        throw err;
+      }
+      const membership = request.user.memberships.find((m) => m.organization_id === instance.organization_id);
+      if (!membership) return reply.status(403).send({ error: "Acesso negado" });
+      try {
+        const settings = await getInstanceSettings(instance.instance_name);
+        return settings;
+      } catch {
+        return {};
+      }
+    }
+  );
+
+  // Update instance settings
+  app.post<{ Params: { instanceId: string } }>(
+    "/instances/:instanceId/settings",
+    async (request, reply) => {
+      const db = getAdminClient();
+      let instance;
+      try {
+        instance = await getInstanceById(db, request.params.instanceId);
+      } catch (err: unknown) {
+        const code = (err as { code?: string })?.code;
+        if (code === "PGRST116") return reply.status(404).send({ error: "Instância não encontrada" });
+        throw err;
+      }
+      const membership = request.user.memberships.find(
+        (m) => m.organization_id === instance.organization_id && m.role !== "agent"
+      );
+      if (!membership) return reply.status(403).send({ error: "Acesso de administrador necessário" });
+      await setInstanceSettings(instance.instance_name, request.body as Record<string, unknown>);
+      return { ok: true };
+    }
+  );
+
+  // Get privacy settings
+  app.get<{ Params: { instanceId: string } }>(
+    "/instances/:instanceId/privacy",
+    async (request, reply) => {
+      const db = getAdminClient();
+      let instance;
+      try {
+        instance = await getInstanceById(db, request.params.instanceId);
+      } catch (err: unknown) {
+        const code = (err as { code?: string })?.code;
+        if (code === "PGRST116") return reply.status(404).send({ error: "Instância não encontrada" });
+        throw err;
+      }
+      const membership = request.user.memberships.find((m) => m.organization_id === instance.organization_id);
+      if (!membership) return reply.status(403).send({ error: "Acesso negado" });
+      if (instance.status !== "connected") return reply.status(422).send({ error: "Instância não está conectada" });
+      try {
+        const privacy = await getPrivacySettings(instance.instance_name);
+        return privacy;
+      } catch {
+        return {};
+      }
+    }
+  );
+
+  // Update privacy settings
+  app.put<{ Params: { instanceId: string } }>(
+    "/instances/:instanceId/privacy",
+    async (request, reply) => {
+      const db = getAdminClient();
+      let instance;
+      try {
+        instance = await getInstanceById(db, request.params.instanceId);
+      } catch (err: unknown) {
+        const code = (err as { code?: string })?.code;
+        if (code === "PGRST116") return reply.status(404).send({ error: "Instância não encontrada" });
+        throw err;
+      }
+      const membership = request.user.memberships.find(
+        (m) => m.organization_id === instance.organization_id && m.role !== "agent"
+      );
+      if (!membership) return reply.status(403).send({ error: "Acesso de administrador necessário" });
+      if (instance.status !== "connected") return reply.status(422).send({ error: "Instância não está conectada" });
+      await updatePrivacySettings(instance.instance_name, request.body as Record<string, unknown>);
+      return { ok: true };
+    }
+  );
+
+  // Restart instance
+  app.post<{ Params: { instanceId: string } }>(
+    "/instances/:instanceId/restart",
+    async (request, reply) => {
+      const db = getAdminClient();
+      let instance;
+      try {
+        instance = await getInstanceById(db, request.params.instanceId);
+      } catch (err: unknown) {
+        const code = (err as { code?: string })?.code;
+        if (code === "PGRST116") return reply.status(404).send({ error: "Instância não encontrada" });
+        throw err;
+      }
+      const membership = request.user.memberships.find(
+        (m) => m.organization_id === instance.organization_id && m.role !== "agent"
+      );
+      if (!membership) return reply.status(403).send({ error: "Acesso de administrador necessário" });
+      try {
+        await restartInstance(instance.instance_name);
+      } catch (err) {
+        request.log.warn({ err }, "restartInstance failed on Evolution API");
+      }
+      return { ok: true };
     }
   );
 

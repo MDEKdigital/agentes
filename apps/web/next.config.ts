@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  output: "standalone",
   transpilePackages: ["@aula-agente/shared", "@aula-agente/database"],
   experimental: {
     // On Windows+pnpm, symlinks=false (needed to prevent duplicate React instances

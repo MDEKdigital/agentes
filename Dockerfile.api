@@ -1,0 +1,47 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Stage 1 — Build
+# Installs all deps (including devDeps for tsup), compiles TypeScript and
+# bundles workspace packages (@aula-agente/*) into dist/server.js
+# ─────────────────────────────────────────────────────────────────────────────
+FROM node:20-alpine AS builder
+RUN npm install -g pnpm@9.15.0
+WORKDIR /app
+
+# Copy manifests first — Docker layer-caches the install step
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml turbo.json ./
+COPY packages/shared/package.json    ./packages/shared/
+COPY packages/database/package.json  ./packages/database/
+COPY packages/queue/package.json     ./packages/queue/
+COPY apps/api/package.json           ./apps/api/
+RUN pnpm install --frozen-lockfile
+
+# Copy source then build
+COPY packages/ ./packages/
+COPY apps/api/  ./apps/api/
+RUN pnpm --filter=@aula-agente/api build
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Stage 2 — Runtime (lean)
+# Only production deps + the compiled bundle — no TypeScript, no devDeps
+# ─────────────────────────────────────────────────────────────────────────────
+FROM node:20-alpine AS runner
+RUN apk add --no-cache curl
+WORKDIR /app
+
+RUN npm install -g pnpm@9.15.0
+
+# Install only production dependencies
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml turbo.json ./
+COPY packages/shared/package.json    ./packages/shared/
+COPY packages/database/package.json  ./packages/database/
+COPY packages/queue/package.json     ./packages/queue/
+COPY apps/api/package.json           ./apps/api/
+RUN pnpm install --frozen-lockfile --prod
+
+# Copy compiled bundle from builder
+# tsup already inlined all @aula-agente/* code, so no source files needed
+COPY --from=builder /app/apps/api/dist ./apps/api/dist
+
+WORKDIR /app/apps/api
+EXPOSE 3001
+CMD ["node", "dist/server.js"]

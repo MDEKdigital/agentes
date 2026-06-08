@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 interface ProfileCardProps {
   instanceId: string;
   instanceStatus: string;
+  reloadTrigger?: number;
 }
 
 interface Profile {
@@ -34,7 +35,7 @@ function fileToBase64(file: File): Promise<string> {
   });
 }
 
-export function ProfileCard({ instanceId, instanceStatus }: ProfileCardProps) {
+export function ProfileCard({ instanceId, instanceStatus, reloadTrigger }: ProfileCardProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -58,6 +59,7 @@ export function ProfileCard({ instanceId, instanceStatus }: ProfileCardProps) {
       return;
     }
 
+    setLoadingProfile(true);
     apiFetch(`/instances/${instanceId}/profile`)
       .then((data: Profile) => {
         setOriginal(data);
@@ -69,7 +71,7 @@ export function ProfileCard({ instanceId, instanceStatus }: ProfileCardProps) {
         toast.error(err instanceof Error ? err.message : "Erro ao carregar perfil do WhatsApp");
       })
       .finally(() => setLoadingProfile(false));
-  }, [instanceId, disabled]);
+  }, [instanceId, disabled, reloadTrigger]);
 
   useEffect(() => {
     return () => {

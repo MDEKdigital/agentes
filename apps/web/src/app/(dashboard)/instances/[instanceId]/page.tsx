@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { QrCodeDialog } from "@/components/instances/qrcode-dialog";
 import { InstanceStatus } from "@/components/instances/instance-status";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Select,
   SelectContent,
@@ -17,8 +17,21 @@ import {
 } from "@/components/ui/select";
 import { ArrowLeft, Trash2, LogOut } from "lucide-react";
 import Link from "next/link";
+import { cn } from "@/lib/utils";
 import type { Agent, EvolutionInstance, InstanceStatus as InstanceStatusType } from "@aula-agente/shared";
 import { ProfileCard } from "@/components/instances/profile-card";
+import { SettingsContent } from "@/components/instances/settings-card";
+import { PrivacyContent } from "@/components/instances/privacy-card";
+import { AdvancedContent } from "@/components/instances/advanced-card";
+
+type TabId = "conexao" | "configuracoes" | "privacidade" | "avancado";
+
+const TABS: { id: TabId; label: string }[] = [
+  { id: "conexao", label: "Conexão" },
+  { id: "configuracoes", label: "Configurações" },
+  { id: "privacidade", label: "Privacidade" },
+  { id: "avancado", label: "Avançado" },
+];
 
 export default function InstanceDetailPage() {
   const { instanceId } = useParams<{ instanceId: string }>();
@@ -26,6 +39,8 @@ export default function InstanceDetailPage() {
   const [instance, setInstance] = useState<EvolutionInstance | null>(null);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<TabId>("conexao");
+  const [profileReloadTrigger, setProfileReloadTrigger] = useState(0);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -36,7 +51,6 @@ export default function InstanceDetailPage() {
         .select("*")
         .eq("id", instanceId)
         .single();
-      setInstance(inst as EvolutionInstance);
 
       if (inst) {
         const { data: agentList } = await supabase
@@ -48,9 +62,37 @@ export default function InstanceDetailPage() {
       }
 
       setLoading(false);
+
+      // Sempre sincroniza status e phone_number da Evolution API ao carregar
+      try {
+        const liveData = await apiFetch(`/instances/${instanceId}/status`);
+        setInstance({
+          ...(inst as EvolutionInstance),
+          status: liveData.status,
+          phone_number: liveData.phone_number ?? (inst as EvolutionInstance).phone_number,
+        });
+        if (liveData.status === "connected") {
+          setProfileReloadTrigger((n) => n + 1);
+        }
+      } catch {
+        setInstance(inst as EvolutionInstance);
+      }
     };
     fetchData();
   }, [instanceId]);
+
+  const applyInstanceData = (data: Record<string, unknown>) => {
+    setInstance((prev) =>
+      prev
+        ? {
+            ...prev,
+            status: (data.status as InstanceStatusType) ?? prev.status,
+            phone_number: (data.phone_number as string | null) ?? prev.phone_number,
+          }
+        : null
+    );
+    setProfileReloadTrigger((n) => n + 1);
+  };
 
   const handleAssignAgent = async (agentId: string) => {
     await apiFetch(`/instances/${instanceId}`, {
@@ -67,7 +109,7 @@ export default function InstanceDetailPage() {
   const handleLogout = async () => {
     if (!confirm("Desconectar instância?")) return;
     await apiFetch(`/instances/${instanceId}/logout`, { method: "POST" });
-    setInstance((prev) => (prev ? { ...prev, status: "disconnected" as InstanceStatusType} : null));
+    setInstance((prev) => (prev ? { ...prev, status: "disconnected" as InstanceStatusType } : null));
   };
 
   const handleDelete = async () => {
@@ -91,40 +133,86 @@ export default function InstanceDetailPage() {
         <InstanceStatus
           instanceId={instanceId}
           initialStatus={instance.status}
-          onStatusChange={(s) => setInstance((prev) => (prev ? { ...prev, status: s as InstanceStatusType} : null))}
+          onStatusChange={(s, data) => {
+            if (data) applyInstanceData(data);
+            else setInstance((prev) => (prev ? { ...prev, status: s as InstanceStatusType } : null));
+          }}
         />
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Conexão</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium">Telefone</p>
-              <p className="text-sm text-muted-foreground">
-                {instance.phone_number || "Não conectado"}
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <QrCodeDialog instanceId={instanceId} />
-              {instance.status === "connected" && (
-                <Button variant="outline" onClick={handleLogout}>
-                  <LogOut className="mr-2 h-4 w-4" />
-                  Desconectar
-                </Button>
+      {/* Card com abas */}
+      <Card className="overflow-hidden">
+        {/* Abas */}
+        <div className="flex overflow-x-auto border-b border-border scrollbar-hide">
+          {TABS.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={cn(
+                "shrink-0 whitespace-nowrap px-4 py-3 text-sm font-medium transition-colors",
+                activeTab === tab.id
+                  ? "border-b-2 border-primary text-foreground"
+                  : "text-muted-foreground hover:text-foreground"
               )}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        <CardContent className="pt-4">
+          {activeTab === "conexao" && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium">Telefone</p>
+                  <p className="text-sm text-muted-foreground">
+                    {instance.phone_number || "Não conectado"}
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <QrCodeDialog
+                    instanceId={instanceId}
+                    onConnected={(data) => applyInstanceData(data)}
+                  />
+                  {instance.status === "connected" && (
+                    <Button variant="outline" onClick={handleLogout}>
+                      <LogOut className="mr-2 h-4 w-4" />
+                      Desconectar
+                    </Button>
+                  )}
+                </div>
+              </div>
             </div>
-          </div>
+          )}
+
+          {activeTab === "configuracoes" && (
+            <SettingsContent instanceId={instanceId} />
+          )}
+
+          {activeTab === "privacidade" && (
+            <PrivacyContent
+              instanceId={instanceId}
+              instanceConnected={instance.status === "connected"}
+            />
+          )}
+
+          {activeTab === "avancado" && (
+            <AdvancedContent
+              instance={instance}
+              onRestart={() =>
+                setInstance((prev) =>
+                  prev ? { ...prev, status: "connecting" as InstanceStatusType } : null
+                )
+              }
+            />
+          )}
         </CardContent>
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Agente Vinculado</CardTitle>
-        </CardHeader>
-        <CardContent>
+        <CardContent className="pt-6">
+          <p className="mb-2 text-sm font-medium">Agente Vinculado</p>
           <Select
             value={instance.active_agent_id || "none"}
             onValueChange={handleAssignAgent}
@@ -147,7 +235,11 @@ export default function InstanceDetailPage() {
         </CardContent>
       </Card>
 
-      <ProfileCard instanceId={instanceId} instanceStatus={instance.status} />
+      <ProfileCard
+        instanceId={instanceId}
+        instanceStatus={instance.status}
+        reloadTrigger={profileReloadTrigger}
+      />
 
       <div className="flex justify-end">
         <Button variant="destructive" onClick={handleDelete}>

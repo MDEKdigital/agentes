@@ -1,0 +1,55 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Stage 1 — Build
+# NEXT_PUBLIC_* vars must be provided as build args — they get baked into
+# the JavaScript bundle at build time (not available at runtime)
+# ─────────────────────────────────────────────────────────────────────────────
+FROM node:20-alpine AS builder
+RUN npm install -g pnpm@9.15.0
+WORKDIR /app
+
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml turbo.json ./
+COPY packages/shared/package.json    ./packages/shared/
+COPY packages/database/package.json  ./packages/database/
+COPY apps/web/package.json           ./apps/web/
+RUN pnpm install --frozen-lockfile
+
+COPY packages/ ./packages/
+COPY apps/web/  ./apps/web/
+
+# Inject public env vars at build time
+ARG NEXT_PUBLIC_SUPABASE_URL
+ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL
+ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+
+ENV NEXT_TELEMETRY_DISABLED=1
+# Ensure public dir exists even if there are no static assets
+RUN mkdir -p apps/web/public
+RUN pnpm --filter=@aula-agente/web build
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Stage 2 — Runtime (lean Next.js standalone)
+# The standalone output ships its own node_modules — no pnpm install needed
+# ─────────────────────────────────────────────────────────────────────────────
+FROM node:20-alpine AS runner
+WORKDIR /app
+
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser  --system --uid 1001 nextjs
+
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+
+# standalone mirrors the monorepo root — server.js lives at apps/web/server.js
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/standalone ./
+# Static assets and public dir must be added separately
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static     ./apps/web/.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/public           ./apps/web/public
+
+USER nextjs
+EXPOSE 3000
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
+CMD ["node", "apps/web/server.js"]

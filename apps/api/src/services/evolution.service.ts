@@ -75,7 +75,18 @@ export async function logoutInstance(instanceName: string) {
 
 export async function fetchProfile(instanceName: string, number: string) {
   const cleaned = number.replace(/\D/g, "");
-  return evolutionFetch(`/chat/fetchProfile/${encodeURIComponent(instanceName)}?number=${cleaned}`);
+  return evolutionFetch(`/chat/fetchProfile/${encodeURIComponent(instanceName)}`, {
+    method: "POST",
+    body: JSON.stringify({ number: cleaned }),
+  });
+}
+
+export async function fetchInstanceDetails(instanceName: string) {
+  const data = await evolutionFetch(
+    `/instance/fetchInstances?instanceName=${encodeURIComponent(instanceName)}`
+  );
+  const list = Array.isArray(data) ? data : [data];
+  return (list.find((i: Record<string, unknown>) => i.name === instanceName) || list[0] || null) as Record<string, unknown> | null;
 }
 
 export async function updateProfileName(instanceName: string, name: string) {
@@ -96,5 +107,33 @@ export async function updateProfilePicture(instanceName: string, pictureBase64: 
   return evolutionFetch(`/chat/updateProfilePicture/${encodeURIComponent(instanceName)}`, {
     method: "POST",
     body: JSON.stringify({ picture: pictureBase64 }),
+  });
+}
+
+export async function getInstanceSettings(instanceName: string) {
+  return evolutionFetch(`/settings/find/${encodeURIComponent(instanceName)}`);
+}
+
+export async function setInstanceSettings(instanceName: string, settings: Record<string, unknown>) {
+  return evolutionFetch(`/settings/set/${encodeURIComponent(instanceName)}`, {
+    method: "POST",
+    body: JSON.stringify(settings),
+  });
+}
+
+export async function getPrivacySettings(instanceName: string) {
+  return evolutionFetch(`/chat/fetchPrivacySettings/${encodeURIComponent(instanceName)}`);
+}
+
+export async function updatePrivacySettings(instanceName: string, settings: Record<string, unknown>) {
+  return evolutionFetch(`/chat/updatePrivacySettings/${encodeURIComponent(instanceName)}`, {
+    method: "PUT",
+    body: JSON.stringify(settings),
+  });
+}
+
+export async function restartInstance(instanceName: string) {
+  return evolutionFetch(`/instance/restart/${encodeURIComponent(instanceName)}`, {
+    method: "PUT",
   });
 }

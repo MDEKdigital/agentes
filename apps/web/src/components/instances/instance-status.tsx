@@ -9,7 +9,7 @@ import { RefreshCw } from "lucide-react";
 interface InstanceStatusProps {
   instanceId: string;
   initialStatus: string;
-  onStatusChange: (status: string) => void;
+  onStatusChange: (status: string, instanceData?: Record<string, unknown>) => void;
 }
 
 const statusVariant: Record<string, "default" | "secondary" | "destructive"> = {
@@ -31,7 +31,7 @@ export function InstanceStatus({
     try {
       const data = await apiFetch(`/instances/${instanceId}/status`);
       setStatus(data.status);
-      onStatusChange(data.status);
+      onStatusChange(data.status, data);
     } catch {
       // ignore
     }
