@@ -21,7 +21,10 @@ import organizationRoutes from "./routes/organizations/index";
 const server = Fastify({ logger: true });
 
 // Plugins
-server.register(cors, { origin: true });
+server.register(cors, {
+  origin: true,
+  methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+});
 
 // Health check
 server.get("/health", async () => {
