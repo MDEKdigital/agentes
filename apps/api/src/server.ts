@@ -1,4 +1,10 @@
 import "dotenv/config";
+// Polyfill WebSocket for Node.js < 22 (Supabase Realtime requires it)
+import { WebSocket } from "ws";
+if (!globalThis.WebSocket) {
+  // @ts-ignore
+  globalThis.WebSocket = WebSocket;
+}
 import Fastify from "fastify";
 
 const REQUIRED_ENV = [

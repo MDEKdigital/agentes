@@ -1,4 +1,10 @@
 import "dotenv/config";
+// Polyfill WebSocket for Node.js < 22 (Supabase Realtime requires it)
+import { WebSocket } from "ws";
+if (!globalThis.WebSocket) {
+  // @ts-ignore
+  globalThis.WebSocket = WebSocket;
+}
 import { createServer } from "node:http";
 
 const REQUIRED_ENV = [
