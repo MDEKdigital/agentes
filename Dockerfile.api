@@ -44,4 +44,6 @@ COPY --from=builder /app/apps/api/dist ./apps/api/dist
 
 WORKDIR /app/apps/api
 EXPOSE 3001
+HEALTHCHECK --interval=15s --timeout=5s --start-period=30s --retries=3 \
+  CMD curl -f http://localhost:3001/health || exit 1
 CMD ["node", "dist/server.js"]
