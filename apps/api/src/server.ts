@@ -1,9 +1,10 @@
 import "dotenv/config";
-// Polyfill WebSocket for Node.js < 22 (Supabase Realtime requires it)
-import { WebSocket } from "ws";
+// ws is bundled via tsup noExternal — safe to require synchronously
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const WsImpl = require("ws");
 if (!globalThis.WebSocket) {
   // @ts-ignore
-  globalThis.WebSocket = WebSocket;
+  globalThis.WebSocket = WsImpl.WebSocket ?? WsImpl;
 }
 import Fastify from "fastify";
 
@@ -44,7 +45,7 @@ server.register(cors, {
 
 // Health check
 server.get("/health", { logLevel: "silent" }, async () => {
-  return { status: "ok", timestamp: new Date().toISOString() };
+  return { status: "ok", timestamp: new Date().toISOString(), node: process.version };
 });
 
 // Routes

@@ -1,6 +1,9 @@
 import type { FastifyRequest, FastifyReply } from "fastify";
 import { createClient } from "@supabase/supabase-js";
-import ws from "ws";
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const WsImpl = require("ws");
+// ws package exports { WebSocket } as named export and also as default
+const WsConstructor = WsImpl.WebSocket ?? WsImpl;
 
 const supabaseUrl = process.env.SUPABASE_URL!;
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY!;
@@ -18,7 +21,8 @@ export async function authMiddleware(request: FastifyRequest, reply: FastifyRepl
   try {
     supabase = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: `Bearer ${token}` } },
-      realtime: { transport: ws },
+      // @ts-ignore — ws constructor is compatible at runtime despite TS type mismatch
+      realtime: { transport: WsConstructor },
     });
   } catch (err) {
     request.log.error({ err }, "Failed to create Supabase client in auth middleware");

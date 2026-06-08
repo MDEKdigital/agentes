@@ -4,7 +4,6 @@ export default defineConfig({
   entry: ["src/server.ts"],
   format: ["cjs"],
   clean: true,
-  // Bundle workspace packages into the output so the runner image
-  // doesn't need TypeScript source at runtime
-  noExternal: [/@aula-agente\/.*/],
+  // Bundle workspace packages AND ws so the runner never needs to resolve them
+  noExternal: [/@aula-agente\/.*/, "ws"],
 });
