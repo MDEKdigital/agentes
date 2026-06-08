@@ -12,9 +12,16 @@ export async function authMiddleware(request: FastifyRequest, reply: FastifyRepl
   }
 
   const token = authHeader.slice(7);
-  const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-    global: { headers: { Authorization: `Bearer ${token}` } },
-  });
+
+  let supabase;
+  try {
+    supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: `Bearer ${token}` } },
+    });
+  } catch (err) {
+    request.log.error({ err }, "Failed to create Supabase client in auth middleware");
+    return reply.status(500).send({ error: "Auth service unavailable" });
+  }
 
   const { data: { user }, error } = await supabase.auth.getUser();
 
@@ -29,6 +36,7 @@ export async function authMiddleware(request: FastifyRequest, reply: FastifyRepl
     .eq("user_id", user.id);
 
   if (memberError) {
+    request.log.error({ err: memberError }, "Failed to fetch memberships");
     return reply.status(500).send({ error: "Failed to fetch user memberships" });
   }
 

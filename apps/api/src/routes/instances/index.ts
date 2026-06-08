@@ -41,9 +41,14 @@ export default async function instanceRoutes(app: FastifyInstance) {
       );
       if (!membership) return reply.status(403).send({ error: "Acesso negado" });
 
-      const db = getAdminClient();
-      const instances = await getInstancesByOrganization(db, organizationId);
-      return instances;
+      try {
+        const db = getAdminClient();
+        const instances = await getInstancesByOrganization(db, organizationId);
+        return instances;
+      } catch (err) {
+        request.log.error({ err }, "Failed to list instances");
+        return reply.status(500).send({ error: "Erro ao listar instâncias" });
+      }
     }
   );
 
