@@ -20,5 +20,6 @@ ARG NEXT_PUBLIC_API_URL
 RUN pnpm turbo build --filter=@aula-agente/web
 
 WORKDIR /app/apps/web
-EXPOSE 3000
+ENV PORT=3001
+EXPOSE 3001
 CMD ["node", "server.js"]

@@ -19,7 +19,7 @@ RUN pnpm turbo build --filter=@aula-agente/api
 
 WORKDIR /app/apps/api
 RUN apk add --no-cache curl
-EXPOSE 3000
+EXPOSE 3001
 HEALTHCHECK --interval=15s --timeout=5s --start-period=30s --retries=3 \
-  CMD curl -f http://localhost:3000/health || exit 1
+  CMD curl -f http://localhost:3001/health || exit 1
 CMD ["node", "dist/server.js"]
