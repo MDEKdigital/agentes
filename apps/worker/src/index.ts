@@ -36,7 +36,7 @@ async function main() {
 
   // Minimal HTTP server so container orchestrators (EasyPanel, k8s, etc.)
   // can health-check this background process
-  const healthPort = parseInt(process.env.HEALTH_PORT || "3002", 10);
+  const healthPort = parseInt(process.env.HEALTH_PORT || "3000", 10);
   const healthServer = createServer((req, res) => {
     if (req.url === "/health" && req.method === "GET") {
       res.writeHead(200, { "Content-Type": "application/json" });

@@ -53,7 +53,7 @@ server.register(organizationRoutes);
 
 // Start
 const start = async () => {
-  const port = parseInt(process.env.API_PORT || "3001", 10);
+  const port = parseInt(process.env.API_PORT || "3000", 10);
   await server.listen({ port, host: "0.0.0.0" });
   server.log.info(`API server running on port ${port}`);
 };

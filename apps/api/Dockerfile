@@ -1,4 +1,4 @@
-FROM node:20-alpine AS base
+FROM node:22-alpine AS base
 RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 WORKDIR /app
 
@@ -19,5 +19,7 @@ RUN pnpm turbo build --filter=@aula-agente/api
 
 WORKDIR /app/apps/api
 RUN apk add --no-cache curl
-EXPOSE 3001
+EXPOSE 3000
+HEALTHCHECK --interval=15s --timeout=5s --start-period=30s --retries=3 \
+  CMD curl -f http://localhost:3000/health || exit 1
 CMD ["node", "dist/server.js"]
