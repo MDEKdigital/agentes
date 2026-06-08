@@ -1,5 +1,6 @@
 import type { FastifyRequest, FastifyReply } from "fastify";
 import { createClient } from "@supabase/supabase-js";
+import ws from "ws";
 
 const supabaseUrl = process.env.SUPABASE_URL!;
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY!;
@@ -17,6 +18,7 @@ export async function authMiddleware(request: FastifyRequest, reply: FastifyRepl
   try {
     supabase = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: `Bearer ${token}` } },
+      realtime: { transport: ws },
     });
   } catch (err) {
     request.log.error({ err }, "Failed to create Supabase client in auth middleware");

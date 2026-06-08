@@ -245,10 +245,16 @@ importers:
       '@supabase/supabase-js':
         specifier: ^2.49.0
         version: 2.107.0
+      ws:
+        specifier: ^8.21.0
+        version: 8.21.0
     devDependencies:
       '@types/node':
         specifier: ^22.0.0
         version: 22.19.19
+      '@types/ws':
+        specifier: ^8.18.1
+        version: 8.18.1
       typescript:
         specifier: ^5.7.0
         version: 5.9.3
