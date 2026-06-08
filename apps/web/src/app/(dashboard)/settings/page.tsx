@@ -223,16 +223,25 @@ export default function SettingsPage() {
               <div className="flex gap-2">
                 <div className="relative flex-1">
                   <Input
-                    type={showKeys[provider.id] ? "text" : "password"}
-                    value={keyInputs[provider.id] || ""}
-                    onChange={(e) =>
-                      setKeyInputs((prev) => ({ ...prev, [provider.id]: e.target.value }))
+                    type="text"
+                    value={
+                      showKeys[provider.id]
+                        ? keyInputs[provider.id] || ""
+                        : keyInputs[provider.id]?.replace(/./g, "•") || ""
                     }
+                    onChange={(e) => {
+                      if (!showKeys[provider.id]) return;
+                      setKeyInputs((prev) => ({ ...prev, [provider.id]: e.target.value }));
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleSaveApiKey(provider.id);
+                    }}
                     placeholder={
                       configuredProviders[provider.id]
                         ? "Nova chave para substituir..."
                         : provider.placeholder
                     }
+                    autoComplete="off"
                     className="bg-muted border-border pr-9 font-mono text-xs"
                   />
                   <button
@@ -250,6 +259,7 @@ export default function SettingsPage() {
                   </button>
                 </div>
                 <button
+                  type="button"
                   onClick={() => handleSaveApiKey(provider.id)}
                   disabled={savingKey === provider.id || !keyInputs[provider.id]?.trim()}
                   className="rounded-lg border border-border bg-muted px-3 text-xs font-medium text-foreground transition-colors hover:bg-elevated disabled:opacity-50 disabled:cursor-not-allowed"
@@ -258,6 +268,7 @@ export default function SettingsPage() {
                 </button>
                 {configuredProviders[provider.id] && (
                   <button
+                    type="button"
                     onClick={() => handleRemoveApiKey(provider.id)}
                     disabled={savingKey === provider.id}
                     className="flex h-9 w-9 items-center justify-center rounded-lg border border-destructive/30 text-destructive/70 transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"

@@ -158,13 +158,13 @@ function InboxContent() {
         </div>
 
         {/* Tabs de status */}
-        <div className="flex border-b border-border px-2">
+        <div className="flex border-b border-border px-2 overflow-x-auto scrollbar-hide">
           {STATUS_TABS.map((tab) => (
             <button
               key={tab.value}
               onClick={() => setStatusFilter(tab.value)}
               className={cn(
-                "flex-1 py-2.5 text-[11px] font-medium transition-colors",
+                "shrink-0 whitespace-nowrap px-2.5 py-2.5 text-[11px] font-medium transition-colors",
                 statusFilter === tab.value
                   ? "border-b-2 border-blue-electric-400 text-blue-electric-300"
                   : "text-muted-foreground hover:text-foreground"
