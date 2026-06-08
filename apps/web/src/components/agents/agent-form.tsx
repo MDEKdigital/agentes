@@ -22,7 +22,7 @@ interface AgentFormProps {
 }
 
 const MODELS: Record<string, string[]> = {
-  openai: ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo"],
+  openai: ["gpt-4.1", "gpt-4.1-mini", "gpt-4.1-nano", "gpt-4o", "gpt-4o-mini"],
   anthropic: ["claude-sonnet-4-20250514", "claude-haiku-4-20250414"],
   google: ["gemini-2.0-flash", "gemini-2.0-flash-lite"],
 };
@@ -34,7 +34,7 @@ export function AgentForm({ defaultValues, onSubmit, submitLabel }: AgentFormPro
       name: "",
       description: "",
       system_prompt: "",
-      model: "gpt-4o-mini",
+      model: "gpt-4.1-mini",
       provider: "openai",
       temperature: 0.7,
       max_tokens: 1024,
