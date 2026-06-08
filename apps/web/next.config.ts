@@ -1,18 +1,23 @@
+import path from "path";
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  // In a pnpm monorepo, the file tracer must start from the workspace root
+  // so it can resolve node_modules that live at the root (e.g. next itself).
+  // Without this, standalone output is missing packages → MODULE_NOT_FOUND.
+  outputFileTracingRoot: path.join(__dirname, "../../"),
   transpilePackages: ["@aula-agente/shared", "@aula-agente/database"],
   experimental: {
-    // On Windows+pnpm, symlinks=false (needed to prevent duplicate React instances
-    // from path-casing differences) causes the devtools RSC manifest lookup to fail.
-    // Disabling the segment explorer avoids the 500 error without losing functionality.
     devtoolSegmentExplorer: false,
   },
   webpack: (config) => {
-    // Prevents webpack from treating the same file as different modules due to
-    // Windows case-insensitive paths (Desktop vs desktop) causing duplicate React instances
-    config.resolve.symlinks = false;
+    // symlinks=false only needed on Windows to prevent duplicate React instances
+    // from case-insensitive path differences. Not needed (and potentially harmful)
+    // in the Linux Docker production build.
+    if (process.platform === "win32") {
+      config.resolve.symlinks = false;
+    }
     return config;
   },
 };
