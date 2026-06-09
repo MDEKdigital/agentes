@@ -82,6 +82,9 @@ export function AgentForm({ defaultValues, onSubmit, submitLabel }: AgentFormPro
               placeholder="Você é um assistente de suporte..."
               rows={8}
             />
+            <p className="text-xs text-muted-foreground text-right">
+              {(form.watch("system_prompt") ?? "").length}/50000
+            </p>
             {form.formState.errors.system_prompt && (
               <p className="text-sm text-destructive">
                 {form.formState.errors.system_prompt.message}

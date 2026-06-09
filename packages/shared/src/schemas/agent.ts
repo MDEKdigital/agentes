@@ -8,7 +8,7 @@ export const toolsConfigSchema = z.object({
 export const createAgentSchema = z.object({
   name: z.string().min(1).max(100),
   description: z.string().max(50000).default(""),
-  system_prompt: z.string().min(1).max(10000),
+  system_prompt: z.string().min(1).max(50000),
   model: z.string().min(1),
   provider: z.enum(["openai", "anthropic", "google"]),
   temperature: z.number().min(0).max(2).default(0.7),
