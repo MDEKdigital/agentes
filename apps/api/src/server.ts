@@ -21,9 +21,8 @@ const REQUIRED_ENV = [
 
 const missing = REQUIRED_ENV.filter((key) => !process.env[key]);
 if (missing.length > 0) {
-  console.error("[startup] Missing required environment variables:");
-  missing.forEach((key) => console.error(`  - ${key}`));
-  process.exit(1);
+  console.warn("[startup] WARNING: Missing environment variables (server will start anyway):");
+  missing.forEach((key) => console.warn(`  - ${key}`));
 }
 import cors from "@fastify/cors";
 import evolutionWebhookRoutes from "./routes/webhooks/evolution";
