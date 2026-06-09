@@ -70,7 +70,7 @@ export function AgentForm({ defaultValues, onSubmit, submitLabel }: AgentFormPro
               rows={4}
             />
             <p className="text-xs text-muted-foreground text-right">
-              {(form.watch("description") ?? "").length}/2000
+              {(form.watch("description") ?? "").length}/50000
             </p>
           </div>
 
