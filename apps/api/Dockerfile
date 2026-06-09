@@ -1,5 +1,5 @@
 FROM node:22-alpine AS base
-RUN npm install -g pnpm@9.15.0
+RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 WORKDIR /app
 
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml turbo.json ./

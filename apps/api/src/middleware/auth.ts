@@ -1,12 +1,5 @@
 import type { FastifyRequest, FastifyReply } from "fastify";
-import { createClient } from "@supabase/supabase-js";
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const WsImpl = require("ws");
-// ws package exports { WebSocket } as named export and also as default
-const WsConstructor = WsImpl.WebSocket ?? WsImpl;
-
-const supabaseUrl = process.env.SUPABASE_URL!;
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY!;
+import { getAdminClient } from "@aula-agente/database";
 
 export async function authMiddleware(request: FastifyRequest, reply: FastifyReply) {
   const authHeader = request.headers.authorization;
@@ -16,27 +9,15 @@ export async function authMiddleware(request: FastifyRequest, reply: FastifyRepl
   }
 
   const token = authHeader.slice(7);
+  const adminClient = getAdminClient();
 
-  let supabase;
-  try {
-    supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: `Bearer ${token}` } },
-      // @ts-ignore — ws constructor is compatible at runtime despite TS type mismatch
-      realtime: { transport: WsConstructor },
-    });
-  } catch (err) {
-    request.log.error({ err }, "Failed to create Supabase client in auth middleware");
-    return reply.status(500).send({ error: "Auth service unavailable" });
-  }
-
-  const { data: { user }, error } = await supabase.auth.getUser();
+  const { data: { user }, error } = await adminClient.auth.getUser(token);
 
   if (error || !user) {
     return reply.status(401).send({ error: "Invalid or expired token" });
   }
 
-  // Fetch user's organizations
-  const { data: memberships, error: memberError } = await supabase
+  const { data: memberships, error: memberError } = await adminClient
     .from("organization_members")
     .select("organization_id, role")
     .eq("user_id", user.id);
@@ -53,7 +34,6 @@ export async function authMiddleware(request: FastifyRequest, reply: FastifyRepl
   };
 }
 
-// Middleware to require specific org access
 export function requireOrg(request: FastifyRequest, reply: FastifyReply) {
   const orgId = (request.params as Record<string, string>).organizationId
     || (request.body as Record<string, string>)?.organization_id
@@ -75,7 +55,6 @@ export function requireOrg(request: FastifyRequest, reply: FastifyReply) {
   request.userRole = membership.role;
 }
 
-// Augment Fastify types
 declare module "fastify" {
   interface FastifyRequest {
     user: {

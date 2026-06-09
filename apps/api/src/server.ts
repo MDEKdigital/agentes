@@ -1,10 +1,13 @@
 import "dotenv/config";
-// ws is bundled via tsup noExternal — safe to require synchronously
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const WsImpl = require("ws");
 if (!globalThis.WebSocket) {
+  const WsClass = WsImpl.WebSocket ?? WsImpl;
+  if (typeof WsClass !== "function") {
+    throw new Error("[server] ws module did not export a WebSocket constructor — check bundle");
+  }
   // @ts-ignore
-  globalThis.WebSocket = WsImpl.WebSocket ?? WsImpl;
+  globalThis.WebSocket = WsClass;
 }
 import Fastify from "fastify";
 
@@ -21,8 +24,9 @@ const REQUIRED_ENV = [
 
 const missing = REQUIRED_ENV.filter((key) => !process.env[key]);
 if (missing.length > 0) {
-  console.warn("[startup] WARNING: Missing environment variables (server will start anyway):");
-  missing.forEach((key) => console.warn(`  - ${key}`));
+  console.error("[startup] Missing required environment variables:");
+  missing.forEach((key) => console.error(`  - ${key}`));
+  process.exit(1);
 }
 import cors from "@fastify/cors";
 import evolutionWebhookRoutes from "./routes/webhooks/evolution";
