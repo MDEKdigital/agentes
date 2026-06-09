@@ -63,11 +63,15 @@ export function AgentForm({ defaultValues, onSubmit, submitLabel }: AgentFormPro
 
           <div className="space-y-2">
             <Label htmlFor="description">Descrição</Label>
-            <Input
+            <Textarea
               id="description"
               {...form.register("description")}
               placeholder="Agente para atendimento ao cliente"
+              rows={4}
             />
+            <p className="text-xs text-muted-foreground text-right">
+              {(form.watch("description") ?? "").length}/2000
+            </p>
           </div>
 
           <div className="space-y-2">
