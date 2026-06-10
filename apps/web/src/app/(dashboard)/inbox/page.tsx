@@ -80,11 +80,41 @@ function InboxContent() {
     fetchConversations();
   }, [fetchConversations]);
 
+  const handleRealtimeInsert = useCallback(async (newRow: Record<string, unknown>) => {
+    if (!currentOrg) return;
+    const supabase = createClient();
+    const { data } = await supabase
+      .from("conversations")
+      .select("*, contacts(phone, name), agents(name)")
+      .eq("id", newRow.id as string)
+      .single();
+    if (data) {
+      setConversations((prev) => [data as ConversationRow, ...prev]);
+    }
+  }, [currentOrg]);
+
+  const handleRealtimeUpdate = useCallback((updatedRow: Record<string, unknown>) => {
+    setConversations((prev) =>
+      prev.map((c) =>
+        c.id === updatedRow.id
+          ? {
+              ...c,
+              status: updatedRow.status as string,
+              is_human_takeover: updatedRow.is_human_takeover as boolean,
+              last_message_at: updatedRow.last_message_at as string,
+              tags: updatedRow.tags as string[],
+              assigned_to: updatedRow.assigned_to as string | null,
+            }
+          : c
+      )
+    );
+  }, []);
+
   useRealtime({
     table: "conversations",
     filter: currentOrg ? `organization_id=eq.${currentOrg.id}` : undefined,
-    onInsert: fetchConversations,
-    onUpdate: fetchConversations,
+    onInsert: handleRealtimeInsert,
+    onUpdate: handleRealtimeUpdate,
     enabled: !!currentOrg,
   });
 
