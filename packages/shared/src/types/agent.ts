@@ -10,6 +10,7 @@ export interface Agent {
   provider: LLMProvider;
   temperature: number;
   max_tokens: number;
+  max_steps: number;
   tools_config: ToolsConfig;
   is_active: boolean;
   created_at: string;

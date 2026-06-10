@@ -1,0 +1,5 @@
+ALTER TABLE agents
+  ADD COLUMN IF NOT EXISTS max_steps INTEGER NOT NULL DEFAULT 5;
+
+ALTER TABLE agents
+  ADD CONSTRAINT agents_max_steps_range CHECK (max_steps BETWEEN 1 AND 20);

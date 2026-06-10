@@ -13,6 +13,7 @@ export const createAgentSchema = z.object({
   provider: z.enum(["openai", "anthropic", "google"]),
   temperature: z.number().min(0).max(2).default(0.7),
   max_tokens: z.number().int().min(1).max(16384).default(1024),
+  max_steps: z.number().int().min(1).max(20).default(5),
   tools_config: toolsConfigSchema.default({ search_knowledge: true, search_faq: true }),
 });
 
