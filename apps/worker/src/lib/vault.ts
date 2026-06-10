@@ -57,3 +57,18 @@ export async function resolveApiKey(
 
   return envKey;
 }
+
+export async function resolveEmbeddingApiKey(organizationId: string): Promise<string> {
+  try {
+    return await resolveApiKey(organizationId, "openai");
+  } catch {
+    const fallback = process.env.PLATFORM_OPENAI_EMBEDDING_KEY;
+    if (!fallback) {
+      throw new Error(
+        `No OpenAI key available for embeddings in org ${organizationId}. ` +
+        `Add an OpenAI secret to the org or set PLATFORM_OPENAI_EMBEDDING_KEY.`
+      );
+    }
+    return fallback;
+  }
+}

@@ -4,7 +4,7 @@ import type { ProcessDocumentJobData } from "@aula-agente/queue";
 import type { DocumentFileType } from "@aula-agente/shared";
 import { getConnectionOptions } from "../lib/redis";
 import { getAdminClient, getDocumentById, updateDocument, insertChunks } from "@aula-agente/database";
-import { resolveApiKey } from "../lib/vault";
+import { resolveEmbeddingApiKey } from "../lib/vault";
 import { chunkText } from "../embeddings/chunker";
 import { generateEmbeddings } from "../embeddings/embedder";
 import pdfParse from "pdf-parse";
@@ -57,7 +57,7 @@ export function startProcessDocumentWorker() {
         const chunks = chunkText(text);
 
         // Resolve API key for embeddings (always uses OpenAI for embeddings)
-        const apiKey = await resolveApiKey(organizationId, "openai");
+        const apiKey = await resolveEmbeddingApiKey(organizationId);
 
         // Generate embeddings
         const embeddings = await generateEmbeddings(
