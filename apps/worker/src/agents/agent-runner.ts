@@ -73,7 +73,7 @@ export async function runAgent(params: RunAgentParams): Promise<RunAgentResult> 
       { role: "user", content: currentMessage.content },
     ],
     tools,
-    maxSteps: 5, // Max tool calling iterations
+    maxSteps: agent.max_steps,
     temperature: agent.temperature,
     maxTokens: agent.max_tokens,
   });
