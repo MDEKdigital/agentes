@@ -38,6 +38,7 @@ export function AgentForm({ defaultValues, onSubmit, submitLabel }: AgentFormPro
       provider: "openai",
       temperature: 0.7,
       max_tokens: 1024,
+      max_steps: 5,
       tools_config: { search_knowledge: true, search_faq: true },
       is_active: true,
       ...defaultValues,
@@ -167,6 +168,20 @@ export function AgentForm({ defaultValues, onSubmit, submitLabel }: AgentFormPro
                 {...form.register("max_tokens", { valueAsNumber: true })}
               />
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Máximo de passos ({form.watch("max_steps")})</Label>
+            <Input
+              type="range"
+              min="1"
+              max="20"
+              step="1"
+              {...form.register("max_steps", { valueAsNumber: true })}
+            />
+            <p className="text-xs text-muted-foreground">
+              Número máximo de iterações de ferramentas por resposta (1–20)
+            </p>
           </div>
         </CardContent>
       </Card>
