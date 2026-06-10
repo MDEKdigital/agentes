@@ -27,6 +27,7 @@ export const EMBEDDING_DIMENSION = 1536;
 export const DEFAULT_AGENT_SETTINGS = {
   temperature: 0.7,
   max_tokens: 1024,
+  max_steps: 5,
   model: "gpt-4o-mini",
   provider: "openai" as const,
 };
