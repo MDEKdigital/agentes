@@ -51,8 +51,12 @@ export function chunkText(text: string): Chunk[] {
       chunkIndex++;
     }
 
-    start = end - CHUNK_OVERLAP;
-    if (start >= text.length) break;
+    // Reached the end of the text — the final chunk has been emitted.
+    if (end >= text.length) break;
+
+    const nextStart = end - CHUNK_OVERLAP;
+    // Guard against non-advancing start (prevents infinite loop).
+    start = nextStart > start ? nextStart : end;
   }
 
   return chunks;
