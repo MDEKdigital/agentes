@@ -94,7 +94,7 @@ export function PairingCodeDialog({ instanceId, onConnected }: PairingCodeDialog
           Conectar via Número
         </Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>Conectar via Número</DialogTitle>
         </DialogHeader>
