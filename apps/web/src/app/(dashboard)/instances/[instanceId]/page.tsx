@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 import { createClient } from "@/lib/supabase/client";
 import { QrCodeDialog } from "@/components/instances/qrcode-dialog";
+import { PairingCodeDialog } from "@/components/instances/pairing-code-dialog";
 import { InstanceStatus } from "@/components/instances/instance-status";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -184,6 +185,10 @@ export default function InstanceDetailPage() {
                 </div>
                 <div className="flex gap-2">
                   <QrCodeDialog
+                    instanceId={instanceId}
+                    onConnected={(data) => applyInstanceData(data)}
+                  />
+                  <PairingCodeDialog
                     instanceId={instanceId}
                     onConnected={(data) => applyInstanceData(data)}
                   />
