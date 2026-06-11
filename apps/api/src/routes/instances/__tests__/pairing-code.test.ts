@@ -2,9 +2,14 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import Fastify from "fastify";
 
 // Use vi.hoisted to define mocks outside of the mock factory
-const { mockGetInstanceById, mockRequestPairingCode } = vi.hoisted(() => ({
+const { mockGetInstanceById, mockRequestPairingCode, mockAuthMiddleware } = vi.hoisted(() => ({
   mockGetInstanceById: vi.fn(),
   mockRequestPairingCode: vi.fn(),
+  mockAuthMiddleware: vi.fn(async (request: { user: unknown }) => {
+    request.user = {
+      memberships: [{ organization_id: "org-1", role: "admin" }],
+    };
+  }),
 }));
 
 vi.mock("@aula-agente/database", () => ({
@@ -17,11 +22,7 @@ vi.mock("../../../services/evolution.service", () => ({
 }));
 
 vi.mock("../../../middleware/auth", () => ({
-  authMiddleware: vi.fn(async (request: { user: unknown }) => {
-    request.user = {
-      memberships: [{ organization_id: "org-1", role: "admin" }],
-    };
-  }),
+  authMiddleware: mockAuthMiddleware,
 }));
 
 import instanceRoutes from "../index";
@@ -126,5 +127,23 @@ describe("POST /instances/:instanceId/pairing-code", () => {
     });
 
     expect(res.statusCode).toBe(404);
+  });
+
+  it("retorna 403 quando usuário não tem permissão de admin", async () => {
+    mockAuthMiddleware.mockImplementationOnce(async (request: { user: unknown }) => {
+      request.user = {
+        memberships: [{ organization_id: "other-org", role: "admin" }],
+      };
+    });
+    mockGetInstanceById.mockResolvedValue(mockInstance);
+
+    const app = await buildApp();
+    const res = await app.inject({
+      method: "POST",
+      url: "/instances/inst-1/pairing-code",
+      payload: { phone_number: "11999999999" },
+    });
+
+    expect(res.statusCode).toBe(403);
   });
 });

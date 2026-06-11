@@ -493,9 +493,9 @@ export default async function instanceRoutes(app: FastifyInstance) {
       }
 
       const membership = request.user.memberships.find(
-        (m) => m.organization_id === instance.organization_id
+        (m) => m.organization_id === instance.organization_id && m.role !== "agent"
       );
-      if (!membership) return reply.status(403).send({ error: "Acesso negado" });
+      if (!membership) return reply.status(403).send({ error: "Acesso de administrador necessário" });
 
       const body = request.body as { phone_number?: unknown };
       const phone = String(body?.phone_number ?? "");
