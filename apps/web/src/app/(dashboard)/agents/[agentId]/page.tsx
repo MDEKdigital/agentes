@@ -28,7 +28,10 @@ export default function EditAgentPage() {
   const handleSubmit = async (values: Record<string, unknown>) => {
     const supabase = createClient();
     const { error } = await supabase.from("agents").update(values).eq("id", agentId);
-    if (error) throw error;
+    if (error) {
+      alert(`Erro ao salvar: ${error.message}`);
+      throw error;
+    }
     router.push("/agents");
   };
 
