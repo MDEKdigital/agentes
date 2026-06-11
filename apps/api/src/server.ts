@@ -40,6 +40,24 @@ import organizationRoutes from "./routes/organizations/index";
 
 const server = Fastify({ logger: true });
 
+// Allow POST/PUT/PATCH requests that send Content-Type: application/json with empty body
+// (happens when clients set the header unconditionally but have no payload)
+server.addContentTypeParser(
+  "application/json",
+  { parseAs: "string" },
+  (_req, body, done) => {
+    if (!body || (body as string).trim() === "") {
+      done(null, {});
+      return;
+    }
+    try {
+      done(null, JSON.parse(body as string));
+    } catch (err) {
+      done(err as Error, undefined);
+    }
+  }
+);
+
 // Plugins
 server.register(cors, {
   origin: true,

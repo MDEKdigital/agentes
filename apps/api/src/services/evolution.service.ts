@@ -10,7 +10,7 @@ async function evolutionFetch(path: string, options: RequestInit = {}) {
   const response = await fetch(`${EVOLUTION_API_URL}${path}`, {
     ...options,
     headers: {
-      "Content-Type": "application/json",
+      ...(options.body != null ? { "Content-Type": "application/json" } : {}),
       apikey: EVOLUTION_API_KEY,
       ...options.headers,
     },

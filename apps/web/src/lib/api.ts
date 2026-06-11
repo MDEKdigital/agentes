@@ -15,12 +15,17 @@ export async function apiFetch(path: string, options: RequestInit = {}) {
     throw new Error("Sessão expirada. Faça login novamente.");
   }
 
+  const METHOD = (options.method ?? "GET").toUpperCase();
+  const needsBody = ["POST", "PUT", "PATCH"].includes(METHOD);
+  const body = options.body !== undefined ? options.body : needsBody ? "{}" : undefined;
+
   let response: Response;
   try {
     response = await fetch(`${API_URL}${path}`, {
       ...options,
+      ...(body !== undefined ? { body } : {}),
       headers: {
-        "Content-Type": "application/json",
+        ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
         Authorization: `Bearer ${session.access_token}`,
         ...options.headers,
       },
