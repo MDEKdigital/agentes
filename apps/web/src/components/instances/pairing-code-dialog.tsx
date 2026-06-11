@@ -27,6 +27,12 @@ export function PairingCodeDialog({ instanceId, onConnected }: PairingCodeDialog
   const [pairingCode, setPairingCode] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const connectedRef = useRef(false);
+  const onConnectedRef = useRef(onConnected);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    onConnectedRef.current = onConnected;
+  });
 
   useEffect(() => {
     if (!open) {
@@ -35,6 +41,7 @@ export function PairingCodeDialog({ instanceId, onConnected }: PairingCodeDialog
       setPairingCode(null);
       setError(null);
       connectedRef.current = false;
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
       return;
     }
 
@@ -47,8 +54,8 @@ export function PairingCodeDialog({ instanceId, onConnected }: PairingCodeDialog
         if (data.status === "connected") {
           connectedRef.current = true;
           setState("connected");
-          onConnected?.(data);
-          setTimeout(() => setOpen(false), 2500);
+          onConnectedRef.current?.(data);
+          timeoutRef.current = setTimeout(() => setOpen(false), 2500);
         }
       } catch {
         // ignore polling errors
@@ -56,8 +63,11 @@ export function PairingCodeDialog({ instanceId, onConnected }: PairingCodeDialog
     };
 
     const statusInterval = setInterval(checkStatus, 5_000);
-    return () => clearInterval(statusInterval);
-  }, [open, state, instanceId, onConnected]);
+    return () => {
+      clearInterval(statusInterval);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, [open, state, instanceId]);
 
   const handleSend = async () => {
     if (phone.length < 10) return;
