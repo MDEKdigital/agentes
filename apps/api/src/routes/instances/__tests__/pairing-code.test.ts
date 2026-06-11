@@ -1,13 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import Fastify from "fastify";
 
+// Use vi.hoisted to define mocks outside of the mock factory
+const { mockGetInstanceById, mockRequestPairingCode } = vi.hoisted(() => ({
+  mockGetInstanceById: vi.fn(),
+  mockRequestPairingCode: vi.fn(),
+}));
+
 vi.mock("@aula-agente/database", () => ({
   getAdminClient: vi.fn(() => ({})),
-  getInstanceById: vi.fn(),
+  getInstanceById: mockGetInstanceById,
 }));
 
 vi.mock("../../../services/evolution.service", () => ({
-  requestPairingCode: vi.fn(),
+  requestPairingCode: mockRequestPairingCode,
 }));
 
 vi.mock("../../../middleware/auth", () => ({
@@ -18,8 +24,6 @@ vi.mock("../../../middleware/auth", () => ({
   }),
 }));
 
-import { getInstanceById } from "@aula-agente/database";
-import { requestPairingCode } from "../../../services/evolution.service";
 import instanceRoutes from "../index";
 
 const mockInstance = {
@@ -42,8 +46,8 @@ beforeEach(() => {
 
 describe("POST /instances/:instanceId/pairing-code", () => {
   it("retorna código quando número válido (11 dígitos)", async () => {
-    vi.mocked(getInstanceById).mockResolvedValue(mockInstance as never);
-    vi.mocked(requestPairingCode).mockResolvedValue({ code: "ABCD-EFGH" });
+    mockGetInstanceById.mockResolvedValue(mockInstance as never);
+    mockRequestPairingCode.mockResolvedValue({ code: "ABCD-EFGH" });
 
     const app = await buildApp();
     const res = await app.inject({
@@ -54,12 +58,12 @@ describe("POST /instances/:instanceId/pairing-code", () => {
 
     expect(res.statusCode).toBe(200);
     expect(JSON.parse(res.body)).toEqual({ code: "ABCD-EFGH" });
-    expect(requestPairingCode).toHaveBeenCalledWith("test-instance", "5511999999999");
+    expect(mockRequestPairingCode).toHaveBeenCalledWith("test-instance", "5511999999999");
   });
 
   it("retorna código quando número válido (10 dígitos)", async () => {
-    vi.mocked(getInstanceById).mockResolvedValue(mockInstance as never);
-    vi.mocked(requestPairingCode).mockResolvedValue({ code: "WXYZ-1234" });
+    mockGetInstanceById.mockResolvedValue(mockInstance as never);
+    mockRequestPairingCode.mockResolvedValue({ code: "WXYZ-1234" });
 
     const app = await buildApp();
     const res = await app.inject({
@@ -69,11 +73,11 @@ describe("POST /instances/:instanceId/pairing-code", () => {
     });
 
     expect(res.statusCode).toBe(200);
-    expect(requestPairingCode).toHaveBeenCalledWith("test-instance", "551199999999");
+    expect(mockRequestPairingCode).toHaveBeenCalledWith("test-instance", "551199999999");
   });
 
   it("retorna 400 quando número tem menos de 10 dígitos", async () => {
-    vi.mocked(getInstanceById).mockResolvedValue(mockInstance as never);
+    mockGetInstanceById.mockResolvedValue(mockInstance as never);
 
     const app = await buildApp();
     const res = await app.inject({
@@ -86,7 +90,7 @@ describe("POST /instances/:instanceId/pairing-code", () => {
   });
 
   it("retorna 400 quando número contém letras", async () => {
-    vi.mocked(getInstanceById).mockResolvedValue(mockInstance as never);
+    mockGetInstanceById.mockResolvedValue(mockInstance as never);
 
     const app = await buildApp();
     const res = await app.inject({
@@ -99,7 +103,7 @@ describe("POST /instances/:instanceId/pairing-code", () => {
   });
 
   it("retorna 400 quando número tem mais de 11 dígitos", async () => {
-    vi.mocked(getInstanceById).mockResolvedValue(mockInstance as never);
+    mockGetInstanceById.mockResolvedValue(mockInstance as never);
 
     const app = await buildApp();
     const res = await app.inject({
@@ -112,7 +116,7 @@ describe("POST /instances/:instanceId/pairing-code", () => {
   });
 
   it("retorna 404 quando instância não existe", async () => {
-    vi.mocked(getInstanceById).mockRejectedValue({ code: "PGRST116" });
+    mockGetInstanceById.mockRejectedValue({ code: "PGRST116" });
 
     const app = await buildApp();
     const res = await app.inject({
