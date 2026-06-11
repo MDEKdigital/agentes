@@ -24,6 +24,7 @@ import {
   getPrivacySettings,
   updatePrivacySettings,
   restartInstance,
+  requestPairingCode,
 } from "../../services/evolution.service";
 import { authMiddleware } from "../../middleware/auth";
 
@@ -474,6 +475,38 @@ export default async function instanceRoutes(app: FastifyInstance) {
       await updateInstance(db, instance.id, { status: "disconnected" });
 
       return { ok: true };
+    }
+  );
+
+  // Request pairing code (connect via phone number)
+  app.post<{ Params: { instanceId: string } }>(
+    "/instances/:instanceId/pairing-code",
+    async (request, reply) => {
+      const db = getAdminClient();
+      let instance;
+      try {
+        instance = await getInstanceById(db, request.params.instanceId);
+      } catch (err: unknown) {
+        const code = (err as { code?: string })?.code;
+        if (code === "PGRST116") return reply.status(404).send({ error: "Instância não encontrada" });
+        throw err;
+      }
+
+      const membership = request.user.memberships.find(
+        (m) => m.organization_id === instance.organization_id
+      );
+      if (!membership) return reply.status(403).send({ error: "Acesso negado" });
+
+      const body = request.body as { phone_number?: unknown };
+      const phone = String(body?.phone_number ?? "");
+
+      if (!/^\d{10,11}$/.test(phone)) {
+        return reply.status(400).send({ error: "Número inválido. Informe DDD + número (10 ou 11 dígitos, apenas números)" });
+      }
+
+      const fullNumber = `55${phone}`;
+      const result = await requestPairingCode(instance.instance_name, fullNumber) as { code: string };
+      return { code: result.code };
     }
   );
 }
