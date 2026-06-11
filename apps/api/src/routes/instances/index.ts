@@ -505,7 +505,16 @@ export default async function instanceRoutes(app: FastifyInstance) {
       }
 
       const fullNumber = `55${phone}`;
-      const result = await requestPairingCode(instance.instance_name, fullNumber) as { code: string };
+      let result: { code?: unknown };
+      try {
+        result = await requestPairingCode(instance.instance_name, fullNumber) as { code?: unknown };
+      } catch (err) {
+        request.log.warn({ err }, "requestPairingCode failed on Evolution API");
+        return reply.status(502).send({ error: "Erro ao solicitar código na Evolution API" });
+      }
+      if (typeof result.code !== "string") {
+        return reply.status(502).send({ error: "Resposta inesperada da Evolution API" });
+      }
       return { code: result.code };
     }
   );

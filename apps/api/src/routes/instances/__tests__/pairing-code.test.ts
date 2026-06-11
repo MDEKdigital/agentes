@@ -129,6 +129,20 @@ describe("POST /instances/:instanceId/pairing-code", () => {
     expect(res.statusCode).toBe(404);
   });
 
+  it("retorna 502 quando a Evolution API falha", async () => {
+    mockGetInstanceById.mockResolvedValue(mockInstance);
+    mockRequestPairingCode.mockRejectedValue(new Error("Evolution down"));
+
+    const app = await buildApp();
+    const res = await app.inject({
+      method: "POST",
+      url: "/instances/inst-1/pairing-code",
+      payload: { phone_number: "11999999999" },
+    });
+
+    expect(res.statusCode).toBe(502);
+  });
+
   it("retorna 403 quando usuário não tem permissão de admin", async () => {
     mockAuthMiddleware.mockImplementationOnce(async (request: { user: unknown }) => {
       request.user = {
