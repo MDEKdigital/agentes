@@ -159,7 +159,7 @@ export async function runAgent(params: RunAgentParams): Promise<RunAgentResult> 
 
     const sanitizedViolation = (validation.violation ?? "")
       .slice(0, 200)
-      .replace(/[\x00-\x1F\x7F`\[\]]/g, "");
+      .replace(/[\x00-\x1F\x7F`\[\]"']/g, "");
     systemPrompt = `${agent.system_prompt}\n\n[ATENCAO: sua resposta anterior violou uma regra do sistema. Detalhe: ${sanitizedViolation}. Corrija na proxima resposta.]`;
   }
 
