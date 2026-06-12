@@ -89,18 +89,18 @@ O worker atualmente faz `as Record<string, unknown>` na conversa. Com `is_keywor
 
 ### Ordenação das operações
 
-O keyword guard deve ser inserido **antes de `getRecentMessages`** — se a mensagem não ativar o agente, a query de 20 linhas é desnecessária.
+O keyword guard deve ser inserido **depois de `getRecentMessages`** (pois precisa de `currentMessage`) mas **antes do media preprocessing** — ainda evita o preprocessing de mídia e a chamada ao LLM para mensagens que não ativam o agente.
 
 Ordem correta:
 
 ```
-1. getAgentById          ← já existe
-2. is_active check       ← já existe
-3. getConversationById   ← já existe
+1. getAgentById            ← já existe
+2. is_active check         ← já existe
+3. getConversationById     ← já existe
 4. is_human_takeover check ← já existe
-5. resolveApiKey         ← já existe
-6. *** KEYWORD GUARD ***  ← inserir aqui (antes de getRecentMessages)
-7. getRecentMessages     ← mover para depois do guard
+5. resolveApiKey           ← já existe
+6. getRecentMessages       ← já existe (currentMessage derivado daqui)
+7. *** KEYWORD GUARD ***   ← inserir aqui (depois de getRecentMessages, antes de media)
 8. media preprocessing
 9. runAgent
 ```
@@ -151,14 +151,16 @@ Webhook: is_human_takeover? → sim: skipped (keyword não avaliada durante take
   ↓
 Enfileira job → worker adquire lock
   ↓
+busca histórico (getRecentMessages) → extrai currentMessage
+  ↓
 agent.activation_keywords vazio?
-  → sim: busca histórico → processa normalmente
+  → sim: processa normalmente (media + LLM)
   → não:
       conversation.is_keyword_activated?
-        → true: busca histórico → processa normalmente
-        → false: testa regexes contra conteúdo bruto da mensagem
-            match? → atualiza DB → busca histórico → processa normalmente
-            sem match? → return (silencioso, sem buscar histórico)
+        → true: processa normalmente (media + LLM)
+        → false: testa regexes contra currentMessage.content
+            match? → atualiza DB → processa normalmente (media + LLM)
+            sem match? → return (silencioso, sem media preprocessing nem LLM)
 ```
 
 ## O que não está no escopo
