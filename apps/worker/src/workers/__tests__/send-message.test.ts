@@ -118,4 +118,21 @@ describe("startSendMessageWorker", () => {
     expect(body.number).toBe("5511999999999");
     expect(body.text).toBe("Olá! Posso ajudar?");
   });
+
+  it("envia sendPresence paused mesmo quando sendEvolutionText falha", async () => {
+    // sendPresence composing OK, sendText falha, sendPresence paused deve ainda ser chamado
+    mockFetch
+      .mockResolvedValueOnce({ ok: true, json: async () => ({}) } as never) // composing OK
+      .mockResolvedValueOnce({ ok: false, text: async () => "Internal Server Error" } as never) // sendText falha
+      .mockResolvedValueOnce({ ok: true, json: async () => ({}) } as never); // paused OK
+
+    await expect(runJob()).rejects.toThrow();
+
+    const presenceCalls = mockFetch.mock.calls.filter((c) =>
+      (c[0] as string).includes("/chat/sendPresence/")
+    );
+    expect(presenceCalls.length).toBe(2);
+    const lastPresenceBody = JSON.parse(presenceCalls[1][1].body as string);
+    expect(lastPresenceBody.options.presence).toBe("paused");
+  });
 });

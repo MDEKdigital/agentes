@@ -64,8 +64,11 @@ export function startSendMessageWorker() {
 
       await sendPresence(instance.instance_name, phone, "composing");
       await randomDelay();
-      await sendEvolutionText(instance.instance_name, phone, content);
-      await sendPresence(instance.instance_name, phone, "paused");
+      try {
+        await sendEvolutionText(instance.instance_name, phone, content);
+      } finally {
+        await sendPresence(instance.instance_name, phone, "paused");
+      }
 
       console.log(`Sent message to ${phone} via instance ${instance.instance_name}`);
     },
