@@ -13,6 +13,7 @@ export interface Agent {
   max_steps: number;
   tools_config: ToolsConfig;
   is_active: boolean;
+  activation_keywords: string[];
   created_at: string;
   updated_at: string;
 }

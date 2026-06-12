@@ -12,6 +12,7 @@ export interface Conversation {
   assigned_to: string | null;
   tags: string[];
   last_message_at: string;
+  is_keyword_activated: boolean;
   created_at: string;
   updated_at: string;
 }
