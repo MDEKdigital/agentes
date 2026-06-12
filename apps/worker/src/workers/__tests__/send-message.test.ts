@@ -52,6 +52,7 @@ async function runJob() {
   startSendMessageWorker();
   const workerInstance = vi.mocked(Worker).mock.results[0].value;
   const jobPromise = workerInstance._processor({ data: jobData });
+  jobPromise.catch(() => {}); // previne unhandled rejection durante runAllTimersAsync
   await vi.runAllTimersAsync();
   return jobPromise;
 }
