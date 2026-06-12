@@ -70,6 +70,14 @@ async function validateResponse(params: {
 
 O loop de geração + validação substitui a chamada única a `generateText`. O restante da função (`latencyMs`, `toolCalls`, `tokensUsed`) é calculado sobre todas as tentativas somadas.
 
+Nas retentativas, a `violation` retornada pelo validador é appended ao system prompt como instrução adicional:
+
+```
+[ATENÇÃO: sua resposta anterior violou a seguinte regra: "<violation>". Corrija na próxima resposta.]
+```
+
+Isso guia o modelo a não repetir o mesmo erro.
+
 ## Tratamento de Erros
 
 | Situação | Comportamento |
