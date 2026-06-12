@@ -81,10 +81,12 @@ export function AgentForm({ defaultValues, onSubmit, submitLabel }: AgentFormPro
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label htmlFor="system_prompt">System Prompt</Label>
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="sm"
                 onClick={() => setIsExpanded((prev) => !prev)}
-                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                className="h-auto gap-1 p-0 text-xs text-muted-foreground hover:bg-transparent hover:text-foreground"
               >
                 {isExpanded ? (
                   <>
@@ -97,7 +99,7 @@ export function AgentForm({ defaultValues, onSubmit, submitLabel }: AgentFormPro
                     Expandir
                   </>
                 )}
-              </button>
+              </Button>
             </div>
             <Textarea
               id="system_prompt"
