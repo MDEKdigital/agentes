@@ -113,3 +113,49 @@ describe("POST /webhooks/evolution", () => {
     );
   });
 });
+
+import { extractMessageContent } from "../evolution";
+
+describe("extractMessageContent", () => {
+  it("extrai url de audioMessage", () => {
+    const data = {
+      messageType: "audioMessage",
+      message: { audioMessage: { url: "https://cdn.example.com/audio.ogg" } },
+    };
+    const result = extractMessageContent(data as Record<string, unknown>);
+    expect(result.content).toBe("[áudio]");
+    expect(result.mediaType).toBe("audio");
+    expect(result.mediaUrl).toBe("https://cdn.example.com/audio.ogg");
+  });
+
+  it("extrai url e caption de imageMessage", () => {
+    const data = {
+      messageType: "imageMessage",
+      message: {
+        imageMessage: { url: "https://cdn.example.com/photo.jpg", caption: "olha isso" },
+      },
+    };
+    const result = extractMessageContent(data as Record<string, unknown>);
+    expect(result.content).toBe("olha isso");
+    expect(result.mediaType).toBe("image");
+    expect(result.mediaUrl).toBe("https://cdn.example.com/photo.jpg");
+  });
+
+  it("retorna mediaUrl null para mensagem de texto", () => {
+    const data = {
+      messageType: "conversation",
+      message: { conversation: "oi" },
+    };
+    const result = extractMessageContent(data as Record<string, unknown>);
+    expect(result.mediaUrl).toBeNull();
+  });
+
+  it("retorna mediaUrl null quando audioMessage não tem url", () => {
+    const data = {
+      messageType: "audioMessage",
+      message: { audioMessage: {} },
+    };
+    const result = extractMessageContent(data as Record<string, unknown>);
+    expect(result.mediaUrl).toBeNull();
+  });
+});

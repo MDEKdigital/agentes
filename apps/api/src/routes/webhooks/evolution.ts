@@ -7,43 +7,51 @@ import { saveMessage } from "../../services/message.service";
 import { enqueueProcessMessage } from "../../lib/queue";
 import type { MediaType } from "@aula-agente/shared";
 
-function extractMessageContent(data: Record<string, unknown>): { content: string; mediaType: MediaType | null } {
+export function extractMessageContent(data: Record<string, unknown>): { content: string; mediaType: MediaType | null; mediaUrl: string | null } {
   const message = data.message as Record<string, unknown> | undefined;
   const messageType = data.messageType as string;
 
-  if (!message) return { content: "", mediaType: null };
+  if (!message) return { content: "", mediaType: null, mediaUrl: null };
 
   switch (messageType) {
     case "conversation":
-      return { content: (message.conversation as string) || "", mediaType: null };
-    case "imageMessage":
+      return { content: (message.conversation as string) || "", mediaType: null, mediaUrl: null };
+    case "imageMessage": {
+      const img = message.imageMessage as Record<string, string> | undefined;
       return {
-        content: (message.imageMessage as Record<string, string>)?.caption || "[imagem]",
+        content: img?.caption || "[imagem]",
         mediaType: "image",
+        mediaUrl: img?.url || null,
       };
-    case "audioMessage":
-      return { content: "[áudio]", mediaType: "audio" };
+    }
+    case "audioMessage": {
+      const audio = message.audioMessage as Record<string, string> | undefined;
+      return { content: "[áudio]", mediaType: "audio", mediaUrl: audio?.url || null };
+    }
     case "videoMessage":
       return {
         content: (message.videoMessage as Record<string, string>)?.caption || "[vídeo]",
         mediaType: "video",
+        mediaUrl: null,
       };
     case "documentMessage":
       return {
         content: (message.documentMessage as Record<string, string>)?.fileName || "[documento]",
         mediaType: "document",
+        mediaUrl: null,
       };
     case "stickerMessage":
-      return { content: "[sticker]", mediaType: "sticker" };
+      return { content: "[sticker]", mediaType: "sticker", mediaUrl: null };
     case "locationMessage": {
       const loc = message.locationMessage as Record<string, number> | undefined;
       return {
         content: `[localização: ${loc?.degreesLatitude}, ${loc?.degreesLongitude}]`,
         mediaType: "location",
+        mediaUrl: null,
       };
     }
     default:
-      return { content: "", mediaType: null };
+      return { content: "", mediaType: null, mediaUrl: null };
   }
 }
 
@@ -106,7 +114,7 @@ export default async function evolutionWebhookRoutes(app: FastifyInstance) {
         });
 
         // Extract message content
-        const { content, mediaType } = extractMessageContent(payload.data as Record<string, unknown>);
+        const { content, mediaType, mediaUrl } = extractMessageContent(payload.data as Record<string, unknown>);
 
         // Save message (with idempotency)
         const message = await saveMessage({
@@ -116,6 +124,7 @@ export default async function evolutionWebhookRoutes(app: FastifyInstance) {
           role: "contact",
           content,
           mediaType,
+          mediaUrl,
         });
 
         // If message was already processed (duplicate webhook), skip
