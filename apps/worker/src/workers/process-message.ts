@@ -4,6 +4,7 @@ import type { LLMProvider, Message } from "@aula-agente/shared";
 import type { ProcessMessageJobData } from "@aula-agente/queue";
 import { getSendMessageQueue } from "@aula-agente/queue";
 import { getConnectionOptions } from "../lib/redis";
+import { evolutionPostJson } from "../lib/evolution";
 import {
   getAdminClient,
   getAgentById,
@@ -17,8 +18,19 @@ import { acquireConversationLock, releaseConversationLock } from "../lib/lock";
 import { resolveApiKey } from "../lib/vault";
 import { runAgent } from "../agents/agent-runner";
 
-const EVOLUTION_API_URL = () => process.env.EVOLUTION_API_URL!;
-const EVOLUTION_API_KEY = () => process.env.EVOLUTION_API_KEY!;
+function mimeTypeToAudioExtension(mimeType: string): string {
+  const base = mimeType.split(";")[0].trim();
+  const map: Record<string, string> = {
+    "audio/ogg": "ogg",
+    "audio/mp4": "mp4",
+    "audio/mpeg": "mp3",
+    "audio/wav": "wav",
+    "audio/webm": "webm",
+    "audio/aac": "aac",
+    "audio/x-m4a": "m4a",
+  };
+  return map[base] ?? "ogg";
+}
 
 export async function fetchMediaBase64(
   instanceName: string,
@@ -26,27 +38,15 @@ export async function fetchMediaBase64(
   messageId: string,
   messageType: string
 ): Promise<{ base64: string; mimeType: string }> {
-  const response = await fetch(
-    `${EVOLUTION_API_URL()}/chat/getBase64FromMediaMessage/${encodeURIComponent(instanceName)}`,
+  const json = await evolutionPostJson<{ base64: string; mimetype: string }>(
+    `/chat/getBase64FromMediaMessage/${encodeURIComponent(instanceName)}`,
     {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        apikey: EVOLUTION_API_KEY(),
+      message: {
+        key: { remoteJid, fromMe: false, id: messageId },
+        messageType,
       },
-      body: JSON.stringify({
-        message: {
-          key: { remoteJid, fromMe: false, id: messageId },
-          messageType,
-        },
-      }),
     }
   );
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`Evolution API error ${response.status}: ${text}`);
-  }
-  const json = (await response.json()) as { base64: string; mimetype: string };
   return { base64: json.base64, mimeType: json.mimetype };
 }
 
@@ -55,10 +55,12 @@ export async function transcribeAudio(
   mimeType: string,
   apiKey: string
 ): Promise<string> {
+  const baseMimeType = mimeType.split(";")[0].trim();
   const audioBuffer = Buffer.from(base64, "base64");
-  const audioBlob = new Blob([audioBuffer], { type: mimeType });
+  const audioBlob = new Blob([audioBuffer], { type: baseMimeType });
+  const ext = mimeTypeToAudioExtension(mimeType);
   const formData = new FormData();
-  formData.append("file", audioBlob, "audio.ogg");
+  formData.append("file", audioBlob, `audio.${ext}`);
   formData.append("model", "whisper-1");
 
   const response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
@@ -89,6 +91,7 @@ export async function preprocessAudioMessage(
     return {
       ...message,
       content: "[Usuário enviou um áudio. Transcrição não disponível para este agente.]",
+      media_type: null,
     };
   }
 
@@ -100,10 +103,14 @@ export async function preprocessAudioMessage(
       "audioMessage"
     );
     const transcription = await transcribeAudio(base64, mimeType, apiKey);
-    return { ...message, content: transcription };
+    return { ...message, content: transcription, media_type: null };
   } catch (err) {
     console.warn("[process-message] Falha ao processar áudio:", (err as Error).message);
-    return { ...message, content: "[Usuário enviou um áudio. Não foi possível processar.]" };
+    return {
+      ...message,
+      content: "[Usuário enviou um áudio. Não foi possível processar.]",
+      media_type: null,
+    };
   }
 }
 
@@ -135,7 +142,6 @@ export function startProcessMessageWorker() {
     async (job) => {
       const { conversationId, messageId, agentId, organizationId } = job.data;
 
-      // Acquire conversation lock
       const lockValue = await acquireConversationLock(conversationId);
       if (!lockValue) {
         throw new Error(`Failed to acquire lock for conversation ${conversationId}`);
@@ -144,14 +150,12 @@ export function startProcessMessageWorker() {
       try {
         const db = getAdminClient();
 
-        // Load agent config
         const agent = await getAgentById(db, agentId);
         if (!agent.is_active) {
           console.log(`Agent ${agentId} is inactive, skipping`);
           return;
         }
 
-        // Check if still not in human takeover
         const conversation = (await getConversationById(db, conversationId)) as Record<
           string,
           unknown
@@ -161,27 +165,27 @@ export function startProcessMessageWorker() {
           return;
         }
 
-        // Resolve API key for this tenant
         const apiKey = await resolveApiKey(organizationId, agent.provider);
 
-        // Load recent message history
         const recentMessages = await getRecentMessages(db, conversationId, 20);
 
-        // Find the current message
         const currentMessage = recentMessages.find((m) => m.id === messageId);
         if (!currentMessage) {
           throw new Error(`Message ${messageId} not found`);
         }
 
-        // Remove current message from history
         const history = recentMessages.filter((m) => m.id !== messageId);
 
-        // Extract phone and instance early (needed for media preprocessing and sending)
+        // Validate instance and contact exist before preprocessing (fix: explicit null guard)
         const contact = conversation.contacts as { phone: string } | null;
         if (!contact?.phone) {
           throw new Error(`Contact phone not found for conversation ${conversationId}`);
         }
-        const instance = await getInstanceById(db, conversation.evolution_instance_id as string);
+        const evolutionInstanceId = conversation.evolution_instance_id as string | null;
+        if (!evolutionInstanceId) {
+          throw new Error(`Conversation ${conversationId} has no evolution_instance_id`);
+        }
+        const instance = await getInstanceById(db, evolutionInstanceId);
 
         // Media preprocessing
         let effectiveMessage = currentMessage;
@@ -201,10 +205,17 @@ export function startProcessMessageWorker() {
             instance.instance_name,
             contact.phone
           );
-          if (imgResult) imageContent = imgResult;
+          if (imgResult) {
+            imageContent = imgResult;
+          } else {
+            // Image fetch failed — give agent a descriptive fallback (fix: not silent)
+            effectiveMessage = {
+              ...currentMessage,
+              content: "[Usuário enviou uma imagem. Não foi possível carregar para processamento.]",
+            };
+          }
         }
 
-        // Run the agent
         const result = await runAgent({
           agent,
           messages: history,
@@ -214,7 +225,6 @@ export function startProcessMessageWorker() {
           imageContent,
         });
 
-        // Save agent response
         const responseMessage = await createMessage(db, {
           conversation_id: conversationId,
           organization_id: organizationId,
@@ -231,13 +241,11 @@ export function startProcessMessageWorker() {
           },
         });
 
-        // Update conversation
         await updateConversation(db, conversationId, {
           last_message_at: new Date().toISOString(),
           status: "waiting",
         });
 
-        // Enqueue send message
         const sendQueue = getSendMessageQueue();
         await sendQueue.add("send-message", {
           conversationId,

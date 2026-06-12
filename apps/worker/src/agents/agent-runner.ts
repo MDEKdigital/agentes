@@ -35,7 +35,14 @@ const VALIDATION_MODELS: Record<LLMProvider, string> = {
 
 const MAX_ATTEMPTS = 3;
 
-const NON_VISION_MODELS = new Set(["gpt-4.1-nano"]);
+// Allowlist of models known to support vision — unknown models fall back to the vision model.
+// Conservative by default: if a model isn't listed, it gets the fallback rather than a 400.
+const VISION_CAPABLE_MODELS = new Set([
+  "gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-4-vision-preview",
+  "claude-opus-4-8", "claude-sonnet-4-6", "claude-sonnet-4-20250514",
+  "claude-haiku-4-5-20251001", "claude-haiku-4-20250414",
+  "gemini-2.0-flash", "gemini-2.0-flash-lite", "gemini-1.5-pro", "gemini-1.5-flash",
+]);
 
 const VISION_FALLBACK_MODELS: Record<LLMProvider, string> = {
   openai: "gpt-4o",
@@ -114,7 +121,10 @@ export async function runAgent(params: RunAgentParams): Promise<RunAgentResult> 
   const { agent, messages, currentMessage, apiKey, organizationId, imageContent } = params;
 
   const startTime = Date.now();
-  const model = createModel(agent.provider, agent.model, apiKey);
+  const useVisionFallback = !!imageContent && !VISION_CAPABLE_MODELS.has(agent.model);
+  const effectiveModel = useVisionFallback
+    ? createModel(agent.provider, VISION_FALLBACK_MODELS[agent.provider], apiKey)
+    : createModel(agent.provider, agent.model, apiKey);
   const tools = buildToolsForAgent({
     organizationId,
     agentId: agent.id,
@@ -123,18 +133,12 @@ export async function runAgent(params: RunAgentParams): Promise<RunAgentResult> 
   });
   const history = formatHistoryForLLM(messages);
 
-  const useVisionFallback = !!imageContent && NON_VISION_MODELS.has(agent.model);
-  const effectiveModel = useVisionFallback
-    ? createModel(agent.provider, VISION_FALLBACK_MODELS[agent.provider], apiKey)
-    : model;
-
   const currentUserContent = imageContent
     ? [
         { type: "text" as const, text: currentMessage.content },
         {
           type: "image" as const,
-          image: Buffer.from(imageContent.base64, "base64"),
-          mimeType: imageContent.mimeType,
+          image: `data:${imageContent.mimeType.split(";")[0].trim()};base64,${imageContent.base64}`,
         },
       ]
     : currentMessage.content;

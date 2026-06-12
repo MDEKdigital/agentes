@@ -2,26 +2,8 @@ import { Worker } from "bullmq";
 import { QUEUE_NAMES } from "@aula-agente/shared";
 import type { SendMessageJobData } from "@aula-agente/queue";
 import { getConnectionOptions } from "../lib/redis";
+import { evolutionPost } from "../lib/evolution";
 import { getAdminClient, getInstanceById } from "@aula-agente/database";
-
-const EVOLUTION_API_URL = () => process.env.EVOLUTION_API_URL!;
-const EVOLUTION_API_KEY = () => process.env.EVOLUTION_API_KEY!;
-
-async function evolutionPost(path: string, body: unknown): Promise<void> {
-  const response = await fetch(`${EVOLUTION_API_URL()}${path}`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      apikey: EVOLUTION_API_KEY(),
-    },
-    body: JSON.stringify(body),
-  });
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`Evolution API error ${response.status}: ${text}`);
-  }
-}
 
 async function sendEvolutionText(instanceName: string, phone: string, text: string): Promise<void> {
   await evolutionPost(`/message/sendText/${encodeURIComponent(instanceName)}`, {

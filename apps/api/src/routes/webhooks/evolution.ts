@@ -21,12 +21,12 @@ export function extractMessageContent(data: Record<string, unknown>): { content:
       return {
         content: img?.caption || "[imagem]",
         mediaType: "image",
-        mediaUrl: img?.url || null,
+        mediaUrl: img?.url ?? null,
       };
     }
     case "audioMessage": {
       const audio = message.audioMessage as Record<string, string> | undefined;
-      return { content: "[áudio]", mediaType: "audio", mediaUrl: audio?.url || null };
+      return { content: "[áudio]", mediaType: "audio", mediaUrl: audio?.url ?? null };
     }
     case "videoMessage":
       return {
