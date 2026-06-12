@@ -27,7 +27,7 @@ interface ValidationResult {
 }
 
 const VALIDATION_MODELS: Record<LLMProvider, string> = {
-  openai: "gpt-4o-mini",
+  openai: "gpt-4.1-nano",
   anthropic: "claude-haiku-4-20250414",
   google: "gemini-2.0-flash-lite",
 };
