@@ -4,25 +4,50 @@ import type { SendMessageJobData } from "@aula-agente/queue";
 import { getConnectionOptions } from "../lib/redis";
 import { getAdminClient, getInstanceById } from "@aula-agente/database";
 
-async function sendEvolutionText(instanceName: string, phone: string, text: string) {
-  const EVOLUTION_API_URL = process.env.EVOLUTION_API_URL!;
-  const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY!;
+const EVOLUTION_API_URL = () => process.env.EVOLUTION_API_URL!;
+const EVOLUTION_API_KEY = () => process.env.EVOLUTION_API_KEY!;
 
-  const response = await fetch(`${EVOLUTION_API_URL}/message/sendText/${instanceName}`, {
+async function evolutionPost(path: string, body: unknown): Promise<void> {
+  const response = await fetch(`${EVOLUTION_API_URL()}${path}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      apikey: EVOLUTION_API_KEY,
+      apikey: EVOLUTION_API_KEY(),
     },
-    body: JSON.stringify({ number: phone, text }),
+    body: JSON.stringify(body),
   });
 
   if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`Evolution API send error ${response.status}: ${body}`);
+    const text = await response.text();
+    throw new Error(`Evolution API error ${response.status}: ${text}`);
   }
+}
 
-  return response.json();
+async function sendEvolutionText(instanceName: string, phone: string, text: string): Promise<void> {
+  await evolutionPost(`/message/sendText/${encodeURIComponent(instanceName)}`, {
+    number: phone,
+    text,
+  });
+}
+
+async function sendPresence(
+  instanceName: string,
+  phone: string,
+  presence: "composing" | "paused"
+): Promise<void> {
+  try {
+    await evolutionPost(`/chat/sendPresence/${encodeURIComponent(instanceName)}`, {
+      number: phone,
+      options: { presence },
+    });
+  } catch (err) {
+    console.warn(`sendPresence(${presence}) failed (non-fatal):`, (err as Error).message);
+  }
+}
+
+function randomDelay(min = 3000, max = 8000): Promise<void> {
+  const ms = Math.floor(Math.random() * (max - min + 1)) + min;
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 export function startSendMessageWorker() {
@@ -37,7 +62,10 @@ export function startSendMessageWorker() {
         throw new Error(`Instance ${instanceId} not found — cannot send message`);
       }
 
+      await sendPresence(instance.instance_name, phone, "composing");
+      await randomDelay();
       await sendEvolutionText(instance.instance_name, phone, content);
+      await sendPresence(instance.instance_name, phone, "paused");
 
       console.log(`Sent message to ${phone} via instance ${instance.instance_name}`);
     },
@@ -46,7 +74,7 @@ export function startSendMessageWorker() {
       concurrency: 20,
       limiter: {
         max: 30,
-        duration: 1000, // 30 messages per second max
+        duration: 1000,
       },
     }
   );
