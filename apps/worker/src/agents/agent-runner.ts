@@ -21,6 +21,19 @@ interface RunAgentResult {
   toolCalls: string[];
 }
 
+interface ValidationResult {
+  compliant: boolean;
+  violation?: string;
+}
+
+const VALIDATION_MODELS: Record<LLMProvider, string> = {
+  openai: "gpt-4o-mini",
+  anthropic: "claude-haiku-4-20250414",
+  google: "gemini-2.0-flash-lite",
+};
+
+const MAX_ATTEMPTS = 3;
+
 function createModel(provider: LLMProvider, modelName: string, apiKey: string) {
   switch (provider) {
     case "openai": {
@@ -49,46 +62,107 @@ function formatHistoryForLLM(messages: Message[]) {
     }));
 }
 
+async function validateResponse(params: {
+  systemPrompt: string;
+  response: string;
+  provider: LLMProvider;
+  apiKey: string;
+}): Promise<ValidationResult> {
+  const { systemPrompt, response, provider, apiKey } = params;
+  const validationModel = createModel(provider, VALIDATION_MODELS[provider], apiKey);
+
+  const prompt = `Você é um verificador de conformidade. O system prompt abaixo contém regras que o assistente DEVE seguir. Verifique se a resposta gerada viola alguma regra explícita.
+
+System prompt:
+${systemPrompt}
+
+Resposta gerada:
+${response}
+
+Responda APENAS com JSON válido, sem markdown:
+{"compliant": true}
+ou
+{"compliant": false, "violation": "descrição breve da regra violada"}`;
+
+  try {
+    const result = await generateText({
+      model: validationModel,
+      prompt,
+      maxTokens: 100,
+      temperature: 0,
+    });
+
+    const parsed = JSON.parse(result.text.trim()) as ValidationResult;
+    return parsed;
+  } catch {
+    return { compliant: true };
+  }
+}
+
 export async function runAgent(params: RunAgentParams): Promise<RunAgentResult> {
   const { agent, messages, currentMessage, apiKey, organizationId } = params;
 
   const startTime = Date.now();
-
   const model = createModel(agent.provider, agent.model, apiKey);
-
   const tools = buildToolsForAgent({
     organizationId,
     agentId: agent.id,
     toolsConfig: agent.tools_config,
     apiKey,
   });
-
   const history = formatHistoryForLLM(messages);
 
-  const result = await generateText({
-    model,
-    system: agent.system_prompt,
-    messages: [
-      ...history,
-      { role: "user", content: currentMessage.content },
-    ],
-    tools,
-    maxSteps: agent.max_steps,
-    temperature: agent.temperature,
-    maxTokens: agent.max_tokens,
-  });
+  let totalTokens = 0;
+  let allToolCalls: string[] = [];
+  let lastText = "";
+  let systemPrompt = agent.system_prompt;
 
-  const latencyMs = Date.now() - startTime;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    const result = await generateText({
+      model,
+      system: systemPrompt,
+      messages: [
+        ...history,
+        { role: "user", content: currentMessage.content },
+      ],
+      tools,
+      maxSteps: agent.max_steps,
+      temperature: agent.temperature,
+      maxTokens: agent.max_tokens,
+    });
 
-  const toolCalls = result.steps
-    .flatMap((step) => step.toolCalls || [])
-    .map((tc) => tc.toolName);
+    totalTokens += result.usage?.totalTokens || 0;
+    allToolCalls = allToolCalls.concat(
+      result.steps.flatMap((step) => step.toolCalls || []).map((tc) => tc.toolName)
+    );
+    lastText = result.text;
+
+    const validation = await validateResponse({
+      systemPrompt: agent.system_prompt,
+      response: result.text,
+      provider: agent.provider,
+      apiKey,
+    });
+
+    if (validation.compliant) {
+      break;
+    }
+
+    if (attempt === MAX_ATTEMPTS) {
+      console.warn(
+        `[agent-runner] Resposta enviada após ${MAX_ATTEMPTS} tentativas com violation: "${validation.violation}"`
+      );
+      break;
+    }
+
+    systemPrompt = `${agent.system_prompt}\n\n[ATENÇÃO: sua resposta anterior violou a seguinte regra: "${validation.violation}". Corrija na próxima resposta.]`;
+  }
 
   return {
-    text: result.text,
+    text: lastText,
     model: agent.model,
-    tokensUsed: result.usage?.totalTokens || 0,
-    latencyMs,
-    toolCalls,
+    tokensUsed: totalTokens,
+    latencyMs: Date.now() - startTime,
+    toolCalls: allToolCalls,
   };
 }

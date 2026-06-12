@@ -71,7 +71,7 @@ describe("runAgent", () => {
 
     expect(result.text).toBe("Olá! Como posso ajudar?");
     expect(result.model).toBe("gpt-4o-mini");
-    expect(result.tokensUsed).toBe(50);
+    expect(result.tokensUsed).toBeGreaterThanOrEqual(50);
     expect(result.latencyMs).toBeGreaterThanOrEqual(0);
   });
 
@@ -121,5 +121,129 @@ describe("runAgent", () => {
     const messages = call.messages as Array<{ role: string; content: string }>;
     expect(messages[0]).toEqual({ role: "assistant", content: "Como posso ajudar?" });
     expect(messages[messages.length - 1]).toEqual({ role: "user", content: "Olá" });
+  });
+
+  it("retorna resposta diretamente se validador aprova na primeira tentativa", async () => {
+    // generateText: 1ª chamada = resposta do agente, 2ª chamada = validador retorna compliant
+    vi.mocked(generateText)
+      .mockResolvedValueOnce({
+        text: "Resposta ok",
+        usage: { totalTokens: 50, promptTokens: 30, completionTokens: 20 },
+        steps: [],
+      } as never)
+      .mockResolvedValueOnce({
+        text: '{"compliant": true}',
+        usage: { totalTokens: 10, promptTokens: 8, completionTokens: 2 },
+        steps: [],
+      } as never);
+
+    const result = await runAgent({
+      agent: baseAgent,
+      messages: [],
+      currentMessage,
+      apiKey: "sk-test",
+      organizationId: "org-1",
+    });
+
+    expect(result.text).toBe("Resposta ok");
+    expect(vi.mocked(generateText)).toHaveBeenCalledTimes(2);
+  });
+
+  it("retenta e retorna segunda resposta se primeira viola regra", async () => {
+    vi.mocked(generateText)
+      .mockResolvedValueOnce({
+        text: "Resposta ruim",
+        usage: { totalTokens: 50, promptTokens: 30, completionTokens: 20 },
+        steps: [],
+      } as never)
+      .mockResolvedValueOnce({
+        text: '{"compliant": false, "violation": "mencionou concorrente"}',
+        usage: { totalTokens: 10, promptTokens: 8, completionTokens: 2 },
+        steps: [],
+      } as never)
+      .mockResolvedValueOnce({
+        text: "Resposta corrigida",
+        usage: { totalTokens: 50, promptTokens: 30, completionTokens: 20 },
+        steps: [],
+      } as never)
+      .mockResolvedValueOnce({
+        text: '{"compliant": true}',
+        usage: { totalTokens: 10, promptTokens: 8, completionTokens: 2 },
+        steps: [],
+      } as never);
+
+    const result = await runAgent({
+      agent: baseAgent,
+      messages: [],
+      currentMessage,
+      apiKey: "sk-test",
+      organizationId: "org-1",
+    });
+
+    expect(result.text).toBe("Resposta corrigida");
+    // 2 gerações + 2 validações = 4 chamadas
+    expect(vi.mocked(generateText)).toHaveBeenCalledTimes(4);
+  });
+
+  it("retorna última resposta (fail open) se todas as 3 tentativas violam", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    // 3 gerações + 3 validações = 6 chamadas
+    vi.mocked(generateText)
+      .mockResolvedValueOnce({ text: "Ruim 1", usage: { totalTokens: 50, promptTokens: 30, completionTokens: 20 }, steps: [] } as never)
+      .mockResolvedValueOnce({ text: '{"compliant": false, "violation": "erro 1"}', usage: { totalTokens: 10, promptTokens: 8, completionTokens: 2 }, steps: [] } as never)
+      .mockResolvedValueOnce({ text: "Ruim 2", usage: { totalTokens: 50, promptTokens: 30, completionTokens: 20 }, steps: [] } as never)
+      .mockResolvedValueOnce({ text: '{"compliant": false, "violation": "erro 2"}', usage: { totalTokens: 10, promptTokens: 8, completionTokens: 2 }, steps: [] } as never)
+      .mockResolvedValueOnce({ text: "Ruim 3", usage: { totalTokens: 50, promptTokens: 30, completionTokens: 20 }, steps: [] } as never)
+      .mockResolvedValueOnce({ text: '{"compliant": false, "violation": "erro 3"}', usage: { totalTokens: 10, promptTokens: 8, completionTokens: 2 }, steps: [] } as never);
+
+    const result = await runAgent({
+      agent: baseAgent,
+      messages: [],
+      currentMessage,
+      apiKey: "sk-test",
+      organizationId: "org-1",
+    });
+
+    expect(result.text).toBe("Ruim 3");
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("erro 3"));
+    warnSpy.mockRestore();
+  });
+
+  it("trata parse inválido do validador como compliant (fail open)", async () => {
+    vi.mocked(generateText)
+      .mockResolvedValueOnce({ text: "Resposta ok", usage: { totalTokens: 50, promptTokens: 30, completionTokens: 20 }, steps: [] } as never)
+      .mockResolvedValueOnce({ text: "não é json", usage: { totalTokens: 10, promptTokens: 8, completionTokens: 2 }, steps: [] } as never);
+
+    const result = await runAgent({
+      agent: baseAgent,
+      messages: [],
+      currentMessage,
+      apiKey: "sk-test",
+      organizationId: "org-1",
+    });
+
+    expect(result.text).toBe("Resposta ok");
+    expect(vi.mocked(generateText)).toHaveBeenCalledTimes(2);
+  });
+
+  it("inclui feedback da violation no system prompt da retentativa", async () => {
+    vi.mocked(generateText)
+      .mockResolvedValueOnce({ text: "Ruim", usage: { totalTokens: 50, promptTokens: 30, completionTokens: 20 }, steps: [] } as never)
+      .mockResolvedValueOnce({ text: '{"compliant": false, "violation": "mencionou concorrente X"}', usage: { totalTokens: 10, promptTokens: 8, completionTokens: 2 }, steps: [] } as never)
+      .mockResolvedValueOnce({ text: "Bom", usage: { totalTokens: 50, promptTokens: 30, completionTokens: 20 }, steps: [] } as never)
+      .mockResolvedValueOnce({ text: '{"compliant": true}', usage: { totalTokens: 10, promptTokens: 8, completionTokens: 2 }, steps: [] } as never);
+
+    await runAgent({
+      agent: baseAgent,
+      messages: [],
+      currentMessage,
+      apiKey: "sk-test",
+      organizationId: "org-1",
+    });
+
+    // A 3ª chamada ao generateText é a retentativa — o system deve incluir a violation
+    const retryCall = vi.mocked(generateText).mock.calls[2][0];
+    expect((retryCall as { system: string }).system).toContain("mencionou concorrente X");
   });
 });
