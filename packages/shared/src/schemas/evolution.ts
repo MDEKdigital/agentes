@@ -25,8 +25,10 @@ export const evolutionWebhookPayloadSchema = z.object({
     }),
     message: z.object({
       conversation: z.string().optional(),
-      imageMessage: z.object({ caption: z.string().optional() }).optional(),
-      audioMessage: z.object({}).optional(),
+      imageMessage: z
+        .object({ caption: z.string().optional(), url: z.string().optional() })
+        .optional(),
+      audioMessage: z.object({ url: z.string().optional() }).optional(),
       videoMessage: z.object({ caption: z.string().optional() }).optional(),
       documentMessage: z.object({ fileName: z.string().optional() }).optional(),
       stickerMessage: z.object({}).optional(),
