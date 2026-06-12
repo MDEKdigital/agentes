@@ -17,6 +17,7 @@ vi.mock("../tools/registry", () => ({
 }));
 
 import { generateText } from "ai";
+import { createOpenAI } from "@ai-sdk/openai";
 import { runAgent } from "../agent-runner";
 import { buildToolsForAgent } from "../tools/registry";
 
@@ -245,5 +246,80 @@ describe("runAgent", () => {
     // A 3ª chamada ao generateText é a retentativa — o system deve incluir a violation
     const retryCall = vi.mocked(generateText).mock.calls[2][0];
     expect((retryCall as { system: string }).system).toContain("mencionou concorrente X");
+  });
+});
+
+describe("runAgent — suporte a imagem multimodal", () => {
+  const imageContent = { base64: "aW1hZ2U=", mimeType: "image/jpeg" };
+  let openaiCallable: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    openaiCallable = vi.fn((modelName: string) => `openai-model-${modelName}`);
+    vi.mocked(createOpenAI).mockReturnValue(openaiCallable as never);
+
+    vi.mocked(generateText).mockResolvedValue({
+      text: "resposta sobre a imagem",
+      usage: { totalTokens: 30, promptTokens: 20, completionTokens: 10 },
+      steps: [],
+    } as never);
+  });
+
+  it("inclui image part na mensagem quando imageContent é fornecido", async () => {
+    await runAgent({
+      agent: { ...baseAgent, model: "gpt-4o", provider: "openai" },
+      messages: [],
+      currentMessage: { ...currentMessage, media_type: "image", content: "[imagem]" },
+      apiKey: "sk-test",
+      organizationId: "org-1",
+      imageContent,
+    });
+
+    expect(generateText).toHaveBeenCalledWith(
+      expect.objectContaining({
+        messages: expect.arrayContaining([
+          expect.objectContaining({
+            role: "user",
+            content: expect.arrayContaining([
+              expect.objectContaining({ type: "text", text: "[imagem]" }),
+              expect.objectContaining({ type: "image" }),
+            ]),
+          }),
+        ]),
+      })
+    );
+  });
+
+  it("usa modelo vision fallback (gpt-4o) quando modelo configurado não suporta visão (gpt-4.1-nano)", async () => {
+    await runAgent({
+      agent: { ...baseAgent, model: "gpt-4.1-nano", provider: "openai" },
+      messages: [],
+      currentMessage: { ...currentMessage, media_type: "image", content: "[imagem]" },
+      apiKey: "sk-test",
+      organizationId: "org-1",
+      imageContent,
+    });
+
+    expect(openaiCallable).toHaveBeenCalledWith("gpt-4o");
+  });
+
+  it("sem imageContent, mensagem é texto simples (comportamento inalterado)", async () => {
+    await runAgent({
+      agent: { ...baseAgent, model: "gpt-4o", provider: "openai" },
+      messages: [],
+      currentMessage,
+      apiKey: "sk-test",
+      organizationId: "org-1",
+    });
+
+    expect(generateText).toHaveBeenCalledWith(
+      expect.objectContaining({
+        messages: expect.arrayContaining([
+          expect.objectContaining({
+            role: "user",
+            content: currentMessage.content,
+          }),
+        ]),
+      })
+    );
   });
 });

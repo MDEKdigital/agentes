@@ -11,6 +11,7 @@ interface RunAgentParams {
   currentMessage: Message;
   apiKey: string;
   organizationId: string;
+  imageContent?: { base64: string; mimeType: string };
 }
 
 interface RunAgentResult {
@@ -33,6 +34,14 @@ const VALIDATION_MODELS: Record<LLMProvider, string> = {
 };
 
 const MAX_ATTEMPTS = 3;
+
+const NON_VISION_MODELS = new Set(["gpt-4.1-nano"]);
+
+const VISION_FALLBACK_MODELS: Record<LLMProvider, string> = {
+  openai: "gpt-4o",
+  anthropic: "claude-sonnet-4-20250514",
+  google: "gemini-2.0-flash",
+};
 
 function createModel(provider: LLMProvider, modelName: string, apiKey: string) {
   switch (provider) {
@@ -102,7 +111,7 @@ ou
 }
 
 export async function runAgent(params: RunAgentParams): Promise<RunAgentResult> {
-  const { agent, messages, currentMessage, apiKey, organizationId } = params;
+  const { agent, messages, currentMessage, apiKey, organizationId, imageContent } = params;
 
   const startTime = Date.now();
   const model = createModel(agent.provider, agent.model, apiKey);
@@ -114,6 +123,22 @@ export async function runAgent(params: RunAgentParams): Promise<RunAgentResult> 
   });
   const history = formatHistoryForLLM(messages);
 
+  const useVisionFallback = !!imageContent && NON_VISION_MODELS.has(agent.model);
+  const effectiveModel = useVisionFallback
+    ? createModel(agent.provider, VISION_FALLBACK_MODELS[agent.provider], apiKey)
+    : model;
+
+  const currentUserContent = imageContent
+    ? [
+        { type: "text" as const, text: currentMessage.content },
+        {
+          type: "image" as const,
+          image: Buffer.from(imageContent.base64, "base64"),
+          mimeType: imageContent.mimeType,
+        },
+      ]
+    : currentMessage.content;
+
   let totalTokens = 0;
   let allToolCalls: string[] = [];
   let lastText = "";
@@ -121,11 +146,11 @@ export async function runAgent(params: RunAgentParams): Promise<RunAgentResult> 
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     const result = await generateText({
-      model,
+      model: effectiveModel,
       system: systemPrompt,
       messages: [
         ...history,
-        { role: "user", content: currentMessage.content },
+        { role: "user", content: currentUserContent },
       ],
       tools,
       maxSteps: agent.max_steps,
