@@ -18,18 +18,19 @@ import { acquireConversationLock, releaseConversationLock } from "../lib/lock";
 import { resolveApiKey } from "../lib/vault";
 import { runAgent } from "../agents/agent-runner";
 
+const AUDIO_EXTENSION_MAP: Record<string, string> = {
+  "audio/ogg": "ogg",
+  "audio/mp4": "mp4",
+  "audio/mpeg": "mp3",
+  "audio/wav": "wav",
+  "audio/webm": "webm",
+  "audio/aac": "aac",
+  "audio/x-m4a": "m4a",
+};
+
 function mimeTypeToAudioExtension(mimeType: string): string {
   const base = mimeType.split(";")[0].trim();
-  const map: Record<string, string> = {
-    "audio/ogg": "ogg",
-    "audio/mp4": "mp4",
-    "audio/mpeg": "mp3",
-    "audio/wav": "wav",
-    "audio/webm": "webm",
-    "audio/aac": "aac",
-    "audio/x-m4a": "m4a",
-  };
-  return map[base] ?? "ogg";
+  return AUDIO_EXTENSION_MAP[base] ?? "ogg";
 }
 
 export async function fetchMediaBase64(
@@ -47,6 +48,11 @@ export async function fetchMediaBase64(
       },
     }
   );
+  if (!json.base64 || !json.mimetype) {
+    throw new Error(
+      `Evolution API returned incomplete media for message ${messageId}: base64=${!!json.base64}, mimetype=${!!json.mimetype}`
+    );
+  }
   return { base64: json.base64, mimeType: json.mimetype };
 }
 
@@ -176,7 +182,6 @@ export function startProcessMessageWorker() {
 
         const history = recentMessages.filter((m) => m.id !== messageId);
 
-        // Validate instance and contact exist before preprocessing (fix: explicit null guard)
         const contact = conversation.contacts as { phone: string } | null;
         if (!contact?.phone) {
           throw new Error(`Contact phone not found for conversation ${conversationId}`);
@@ -185,16 +190,20 @@ export function startProcessMessageWorker() {
         if (!evolutionInstanceId) {
           throw new Error(`Conversation ${conversationId} has no evolution_instance_id`);
         }
-        const instance = await getInstanceById(db, evolutionInstanceId);
 
-        // Media preprocessing
+        // Media preprocessing — fetch instance only when needed (text messages skip this DB call)
+        let instance: Awaited<ReturnType<typeof getInstanceById>> | undefined;
         let effectiveMessage = currentMessage;
         let imageContent: { base64: string; mimeType: string } | undefined;
+
+        if (currentMessage.media_type === "audio" || currentMessage.media_type === "image") {
+          instance = await getInstanceById(db, evolutionInstanceId);
+        }
 
         if (currentMessage.media_type === "audio") {
           effectiveMessage = await preprocessAudioMessage(
             currentMessage,
-            instance.instance_name,
+            instance!.instance_name,
             contact.phone,
             agent.provider,
             apiKey
@@ -202,16 +211,16 @@ export function startProcessMessageWorker() {
         } else if (currentMessage.media_type === "image") {
           const imgResult = await preprocessImageMessage(
             currentMessage,
-            instance.instance_name,
+            instance!.instance_name,
             contact.phone
           );
           if (imgResult) {
             imageContent = imgResult;
           } else {
-            // Image fetch failed — give agent a descriptive fallback (fix: not silent)
             effectiveMessage = {
               ...currentMessage,
               content: "[Usuário enviou uma imagem. Não foi possível carregar para processamento.]",
+              media_type: null,
             };
           }
         }
@@ -245,6 +254,10 @@ export function startProcessMessageWorker() {
           last_message_at: new Date().toISOString(),
           status: "waiting",
         });
+
+        if (!instance) {
+          instance = await getInstanceById(db, evolutionInstanceId);
+        }
 
         const sendQueue = getSendMessageQueue();
         await sendQueue.add("send-message", {

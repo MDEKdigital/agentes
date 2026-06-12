@@ -35,14 +35,18 @@ const VALIDATION_MODELS: Record<LLMProvider, string> = {
 
 const MAX_ATTEMPTS = 3;
 
-// Allowlist of models known to support vision — unknown models fall back to the vision model.
-// Conservative by default: if a model isn't listed, it gets the fallback rather than a 400.
-const VISION_CAPABLE_MODELS = new Set([
-  "gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-4-vision-preview",
-  "claude-opus-4-8", "claude-sonnet-4-6", "claude-sonnet-4-20250514",
-  "claude-haiku-4-5-20251001", "claude-haiku-4-20250414",
-  "gemini-2.0-flash", "gemini-2.0-flash-lite", "gemini-1.5-pro", "gemini-1.5-flash",
-]);
+// Prefix-based vision capability check — covers dated aliases like "gpt-4o-2024-11-20".
+// All claude- and gemini- models support vision; for OpenAI, gpt-4o* and gpt-4-turbo* do.
+// Unknown models fall back to the provider's vision model rather than failing with a 400.
+function isVisionCapable(model: string): boolean {
+  return (
+    model.startsWith("gpt-4o") ||
+    model.startsWith("gpt-4-turbo") ||
+    model === "gpt-4-vision-preview" ||
+    model.startsWith("claude-") ||
+    model.startsWith("gemini-")
+  );
+}
 
 const VISION_FALLBACK_MODELS: Record<LLMProvider, string> = {
   openai: "gpt-4o",
@@ -121,7 +125,7 @@ export async function runAgent(params: RunAgentParams): Promise<RunAgentResult> 
   const { agent, messages, currentMessage, apiKey, organizationId, imageContent } = params;
 
   const startTime = Date.now();
-  const useVisionFallback = !!imageContent && !VISION_CAPABLE_MODELS.has(agent.model);
+  const useVisionFallback = !!imageContent && !isVisionCapable(agent.model);
   const effectiveModel = useVisionFallback
     ? createModel(agent.provider, VISION_FALLBACK_MODELS[agent.provider], apiKey)
     : createModel(agent.provider, agent.model, apiKey);
