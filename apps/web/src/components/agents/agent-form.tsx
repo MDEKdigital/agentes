@@ -1,9 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { createAgentSchema } from "@aula-agente/shared";
+import { Maximize2, Minimize2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -46,6 +48,7 @@ export function AgentForm({ defaultValues, onSubmit, submitLabel }: AgentFormPro
   });
 
   const provider = form.watch("provider");
+  const [isExpanded, setIsExpanded] = useState(false);
 
   return (
     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
@@ -76,12 +79,32 @@ export function AgentForm({ defaultValues, onSubmit, submitLabel }: AgentFormPro
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="system_prompt">System Prompt</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="system_prompt">System Prompt</Label>
+              <button
+                type="button"
+                onClick={() => setIsExpanded((prev) => !prev)}
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                {isExpanded ? (
+                  <>
+                    <Minimize2 className="h-3.5 w-3.5" />
+                    Recolher
+                  </>
+                ) : (
+                  <>
+                    <Maximize2 className="h-3.5 w-3.5" />
+                    Expandir
+                  </>
+                )}
+              </button>
+            </div>
             <Textarea
               id="system_prompt"
               {...form.register("system_prompt")}
               placeholder="Você é um assistente de suporte..."
-              rows={8}
+              rows={isExpanded ? 24 : 8}
+              className="overflow-y-auto"
             />
             <p className="text-xs text-muted-foreground text-right">
               {(form.watch("system_prompt") ?? "").length}/50000
