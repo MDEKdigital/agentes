@@ -2,10 +2,16 @@
 -- "ativado via keyword match", não "criado quando o agente não tinha keywords".
 -- O guard no worker usa agent.activation_keywords.length === 0 para pular o gate,
 -- portanto is_keyword_activated=false em conversas de agentes sem keywords é seguro.
--- Isso garante que keywords adicionadas ao agente depois retroativamente se apliquem
--- a conversas abertas existentes.
--- Only reset rows set by migration 00021 (keywordless-agent backfill).
--- Scoping to WHERE is_keyword_activated = true avoids locking rows already false
--- and prevents resetting conversations legitimately activated by a keyword match
--- if this migration runs after the feature has been live.
-UPDATE conversations SET is_keyword_activated = false WHERE is_keyword_activated = true;
+--
+-- Apenas reseta conversas cujo agente NÃO tem keywords configuradas
+-- (exatamente o conjunto que foi backfillado pela migration 00021).
+-- Conversas de agentes com keywords que já foram ativadas por match real
+-- são preservadas.
+UPDATE conversations c
+SET is_keyword_activated = false
+WHERE c.is_keyword_activated = true
+  AND EXISTS (
+    SELECT 1 FROM agents a
+    WHERE a.id = c.agent_id
+      AND a.activation_keywords = '{}'
+  );
