@@ -49,3 +49,68 @@ describe("createAgentSchema", () => {
     expect(createAgentSchema.safeParse({ ...valid, temperature: 2.1 }).success).toBe(false);
   });
 });
+
+describe("activation_keywords", () => {
+  const valid = {
+    name: "Agente Teste",
+    system_prompt: "Você é um assistente.",
+    model: "gpt-4o-mini",
+    provider: "openai" as const,
+  };
+
+  it("aceita array vazio por default", () => {
+    const result = createAgentSchema.safeParse(valid);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.activation_keywords).toEqual([]);
+    }
+  });
+
+  it("aceita array de strings não-vazias", () => {
+    const result = createAgentSchema.safeParse({
+      ...valid,
+      activation_keywords: ["^oi$", "suporte"],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejeita string vazia no array", () => {
+    const result = createAgentSchema.safeParse({
+      ...valid,
+      activation_keywords: [""],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("string só com espaços passa no schema (trim é feito no worker)", () => {
+    const result = createAgentSchema.safeParse({
+      ...valid,
+      activation_keywords: ["   "],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejeita regex inválida no array de keywords", () => {
+    const result = createAgentSchema.safeParse({
+      ...valid,
+      activation_keywords: ["(unclosed"],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejeita padrão com risco de ReDoS", () => {
+    const result = createAgentSchema.safeParse({
+      ...valid,
+      activation_keywords: ["(a+)+"],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("aceita regex válida sem risco de ReDoS", () => {
+    const result = createAgentSchema.safeParse({
+      ...valid,
+      activation_keywords: ["^ajuda$", "suporte", "[0-9]+"],
+    });
+    expect(result.success).toBe(true);
+  });
+});

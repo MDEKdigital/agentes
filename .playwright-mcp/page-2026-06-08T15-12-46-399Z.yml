@@ -1,0 +1,33 @@
+- generic [ref=e2]:
+  - complementary [ref=e3]:
+    - generic [ref=e5]:
+      - img [ref=e7]
+      - generic [ref=e9]: MDEK Digital
+    - navigation [ref=e11]:
+      - link "Inbox" [ref=e12] [cursor=pointer]:
+        - /url: /inbox
+        - img [ref=e13]
+        - generic [ref=e16]: Inbox
+      - link "Agentes" [ref=e17] [cursor=pointer]:
+        - /url: /agents
+        - img [ref=e18]
+        - generic [ref=e21]: Agentes
+      - link "Instâncias" [ref=e22] [cursor=pointer]:
+        - /url: /instances
+        - img [ref=e23]
+        - generic [ref=e29]: Instâncias
+      - link "Equipe" [ref=e30] [cursor=pointer]:
+        - /url: /team
+        - img [ref=e31]
+        - generic [ref=e36]: Equipe
+      - link "Configurações" [ref=e37] [cursor=pointer]:
+        - /url: /settings
+        - img [ref=e38]
+        - generic [ref=e41]: Configurações
+    - button "MD mdekdigital.agentes@gmail.com Online" [ref=e43] [cursor=pointer]:
+      - generic [ref=e44]: MD
+      - generic:
+        - generic: mdekdigital.agentes@gmail.com
+        - generic [ref=e49]: Online
+  - main [ref=e50]:
+    - generic [ref=e51]: Carregando...

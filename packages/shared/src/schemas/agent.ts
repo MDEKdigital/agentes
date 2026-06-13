@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isValidRegex } from "../utils/keyword";
 
 export const toolsConfigSchema = z.object({
   search_knowledge: z.boolean().default(true),
@@ -15,6 +16,9 @@ export const createAgentSchema = z.object({
   max_tokens: z.number().int().min(1).max(16384).default(1024),
   max_steps: z.number().int().min(1).max(20).default(5),
   tools_config: toolsConfigSchema.default({ search_knowledge: true, search_faq: true }),
+  activation_keywords: z.array(
+    z.string().min(1).refine(isValidRegex, { message: "Regex inválida ou com risco de ReDoS" })
+  ).default([]),
 });
 
 export const updateAgentSchema = createAgentSchema.partial();

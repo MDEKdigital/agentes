@@ -1,0 +1,99 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - complementary [ref=e3]:
+      - generic [ref=e5]:
+        - img [ref=e7]
+        - generic [ref=e9]: MDEK Digital
+      - button "Mdek Digital" [ref=e78] [cursor=pointer]:
+        - img [ref=e80]
+        - generic: Mdek Digital
+        - img [ref=e84]
+      - navigation [ref=e11]:
+        - link "Inbox" [ref=e12] [cursor=pointer]:
+          - /url: /inbox
+          - img [ref=e13]
+          - generic [ref=e16]: Inbox
+        - link "Agentes" [ref=e17] [cursor=pointer]:
+          - /url: /agents
+          - img [ref=e18]
+          - generic [ref=e21]: Agentes
+        - link "Instâncias" [ref=e22] [cursor=pointer]:
+          - /url: /instances
+          - img [ref=e23]
+          - generic [ref=e29]: Instâncias
+        - link "Equipe" [ref=e30] [cursor=pointer]:
+          - /url: /team
+          - img [ref=e31]
+          - generic [ref=e36]: Equipe
+        - link "Configurações" [ref=e37] [cursor=pointer]:
+          - /url: /settings
+          - img [ref=e38]
+          - generic [ref=e41]: Configurações
+      - button "MD mdekdigital.agentes@gmail.com Online" [ref=e43] [cursor=pointer]:
+        - generic [ref=e44]: MD
+        - generic:
+          - generic: mdekdigital.agentes@gmail.com
+          - generic [ref=e49]: Online
+    - main [ref=e50]:
+      - generic [ref=e123]:
+        - generic [ref=e124]:
+          - link [ref=e125] [cursor=pointer]:
+            - /url: /instances
+            - button [ref=e126]:
+              - img
+          - heading "agentes" [level=1] [ref=e127]
+          - generic [ref=e128]:
+            - generic [ref=e129]: disconnected
+            - button [ref=e130] [cursor=pointer]:
+              - img
+        - generic [ref=e131]:
+          - generic [ref=e132]:
+            - button "Conexão" [ref=e133] [cursor=pointer]
+            - button "Configurações" [ref=e134] [cursor=pointer]
+            - button "Privacidade" [ref=e135] [cursor=pointer]
+            - button "Avançado" [ref=e136] [cursor=pointer]
+          - generic [ref=e139]:
+            - generic [ref=e140]:
+              - paragraph [ref=e141]: Telefone
+              - paragraph [ref=e142]: Não conectado
+            - button "Conectar via QR Code" [ref=e144] [cursor=pointer]:
+              - img
+              - text: Conectar via QR Code
+        - generic [ref=e146]:
+          - paragraph [ref=e147]: Agente Vinculado
+          - combobox [ref=e148] [cursor=pointer]:
+            - generic: assistente de suporte
+            - img [ref=e149]
+          - paragraph [ref=e151]: O agente vinculado atenderá as mensagens recebidas nesta instância
+        - generic [ref=e152]:
+          - heading "Perfil do WhatsApp Instância desconectada" [level=3] [ref=e154]:
+            - text: Perfil do WhatsApp
+            - generic [ref=e155]: Instância desconectada
+          - generic [ref=e156]:
+            - generic:
+              - generic:
+                - button [disabled]:
+                  - img
+                  - generic:
+                    - img
+                - generic:
+                  - paragraph: Clique na foto para alterar
+                  - paragraph: PNG, JPG ou WEBP — máx. 5MB
+              - generic:
+                - generic:
+                  - generic: Nome de exibição
+                  - generic: 0/25
+                - textbox "Nome do bot" [disabled]
+              - generic:
+                - generic:
+                  - generic: Bio / Status
+                  - generic: 0/139
+                - textbox "Status de exibição no WhatsApp" [disabled]
+              - generic:
+                - button "Salvar Perfil" [disabled]
+        - button "Excluir Instância" [ref=e158] [cursor=pointer]:
+          - img
+          - text: Excluir Instância
+  - button "Open Next.js Dev Tools" [ref=e119] [cursor=pointer]:
+    - img [ref=e120]
+  - alert [ref=e77]

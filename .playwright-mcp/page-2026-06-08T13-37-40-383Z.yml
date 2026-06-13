@@ -1,0 +1,119 @@
+- generic:
+  - generic:
+    - complementary:
+      - generic:
+        - generic:
+          - generic:
+            - img
+          - generic: MDEK Digital
+      - generic:
+        - button:
+          - generic:
+            - img
+          - img
+      - navigation:
+        - link:
+          - /url: /inbox
+          - img
+          - generic: Inbox
+        - link:
+          - /url: /agents
+          - img
+          - generic: Agentes
+        - link:
+          - /url: /instances
+          - img
+          - generic: Instâncias
+        - link:
+          - /url: /team
+          - img
+          - generic: Equipe
+        - link:
+          - /url: /settings
+          - img
+          - generic: Configurações
+      - generic:
+        - button:
+          - generic: MD
+          - generic:
+            - generic: Online
+    - main:
+      - generic:
+        - heading [level=1]: Novo Agente
+        - generic:
+          - generic:
+            - generic:
+              - heading [level=3]: Informações Básicas
+            - generic:
+              - generic:
+                - text: Nome
+                - textbox:
+                  - /placeholder: Assistente de Suporte
+              - generic:
+                - text: Descrição
+                - textbox:
+                  - /placeholder: Agente para atendimento ao cliente
+              - generic:
+                - text: System Prompt
+                - textbox:
+                  - /placeholder: Você é um assistente de suporte...
+              - generic:
+                - switch [checked]
+                - checkbox [checked]
+                - generic: Agente ativo
+          - generic:
+            - generic:
+              - heading [level=3]: Modelo
+            - generic:
+              - generic:
+                - generic:
+                  - text: Provider
+                  - combobox:
+                    - generic: OpenAI
+                    - img
+                  - combobox
+                - generic:
+                  - text: Modelo
+                  - combobox [expanded]:
+                    - generic: gpt-4.1-mini
+                    - img
+                  - combobox
+              - generic:
+                - generic:
+                  - generic: Temperatura (0.7)
+                  - slider: "0.7"
+                - generic:
+                  - text: Max Tokens
+                  - spinbutton: "1024"
+          - generic:
+            - generic:
+              - heading [level=3]: Tools
+            - generic:
+              - generic:
+                - generic:
+                  - paragraph: Busca na Base de Conhecimento
+                  - paragraph: Permite ao agente buscar em documentos enviados
+                - switch [checked]
+                - checkbox [checked]
+              - generic:
+                - generic:
+                  - paragraph: Busca de FAQs
+                  - paragraph: Permite ao agente consultar perguntas frequentes
+                - switch [checked]
+                - checkbox [checked]
+          - button: Criar Agente
+  - button "Open Next.js Dev Tools" [ref=e119] [cursor=pointer]:
+    - img [ref=e120]
+  - alert
+  - listbox [ref=e124]:
+    - option "gpt-4.1" [ref=e125]:
+      - generic [ref=e127]: gpt-4.1
+    - option "gpt-4.1-mini" [active] [selected] [ref=e128]:
+      - img [ref=e131]
+      - generic [ref=e133]: gpt-4.1-mini
+    - option "gpt-4.1-nano" [ref=e134]:
+      - generic [ref=e136]: gpt-4.1-nano
+    - option "gpt-4o" [ref=e137]:
+      - generic [ref=e139]: gpt-4o
+    - option "gpt-4o-mini" [ref=e140]:
+      - generic [ref=e142]: gpt-4o-mini

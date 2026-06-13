@@ -1,0 +1,48 @@
+- generic [ref=e2]:
+  - complementary [ref=e3]:
+    - generic [ref=e5]:
+      - img [ref=e7]
+      - generic [ref=e9]: MDEK Digital
+    - navigation [ref=e11]:
+      - link "Inbox" [ref=e12] [cursor=pointer]:
+        - /url: /inbox
+        - img [ref=e13]
+        - generic [ref=e16]: Inbox
+      - link "Agentes" [ref=e17] [cursor=pointer]:
+        - /url: /agents
+        - img [ref=e18]
+        - generic [ref=e21]: Agentes
+      - link "Instâncias" [ref=e22] [cursor=pointer]:
+        - /url: /instances
+        - img [ref=e23]
+        - generic [ref=e29]: Instâncias
+      - link "Equipe" [ref=e30] [cursor=pointer]:
+        - /url: /team
+        - img [ref=e31]
+        - generic [ref=e36]: Equipe
+      - link "Configurações" [ref=e37] [cursor=pointer]:
+        - /url: /settings
+        - img [ref=e38]
+        - generic [ref=e41]: Configurações
+    - button "MD mdekdigital.agentes@gmail.com Online" [ref=e43] [cursor=pointer]:
+      - generic [ref=e44]: MD
+      - generic:
+        - generic: mdekdigital.agentes@gmail.com
+        - generic [ref=e49]: Online
+  - main [ref=e50]:
+    - generic [ref=e51]:
+      - generic [ref=e52]:
+        - generic [ref=e54]:
+          - img [ref=e55]
+          - textbox "Buscar conversa..." [ref=e58]
+        - generic [ref=e59]:
+          - button "Todas" [ref=e60] [cursor=pointer]
+          - button "Abertas" [ref=e61] [cursor=pointer]
+          - button "Aguardando" [ref=e62] [cursor=pointer]
+          - button "Resolvidas" [ref=e63] [cursor=pointer]
+          - button "Fechadas" [ref=e64] [cursor=pointer]
+      - generic [ref=e98]:
+        - img [ref=e100]
+        - generic [ref=e102]:
+          - paragraph [ref=e103]: Nenhuma conversa selecionada
+          - paragraph [ref=e104]: Selecione uma conversa à esquerda

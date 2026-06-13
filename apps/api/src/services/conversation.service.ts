@@ -46,6 +46,7 @@ export async function ensureConversation(params: EnsureConversationParams) {
     assigned_to: null,
     tags: [],
     last_message_at: new Date().toISOString(),
+    is_keyword_activated: false,
   });
 
   return { conversation, contact, isNew: true };

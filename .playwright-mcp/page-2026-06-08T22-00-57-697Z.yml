@@ -1,0 +1,13 @@
+- generic [ref=e2]:
+  - img [ref=e3]
+  - generic [ref=e6]: Service is not reachable
+  - generic [ref=e7]: Make sure the service is running and healthy.
+  - generic [ref=e8]:
+    - link "Website" [ref=e9] [cursor=pointer]:
+      - /url: https://easypanel.io
+    - link "Documentation" [ref=e10] [cursor=pointer]:
+      - /url: https://easypanel.io/docs
+    - link "Twitter" [ref=e11] [cursor=pointer]:
+      - /url: https://twitter.com/easypanel_io
+    - link "Discord" [ref=e12] [cursor=pointer]:
+      - /url: https://discord.gg/9bcDSXcZQ7

@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
+const { mockAcquireConversationLock, mockReleaseConversationLock } = vi.hoisted(() => ({
+  mockAcquireConversationLock: vi.fn(async () => "lock-value"),
+  mockReleaseConversationLock: vi.fn(async () => {}),
+}));
+
 vi.mock("bullmq", () => ({
   Worker: vi.fn().mockImplementation((_name: string, processor: Function) => ({
     on: vi.fn(),
@@ -18,13 +23,14 @@ vi.mock("@aula-agente/database", () => ({
 vi.mock("@aula-agente/queue", () => ({
   getSendMessageQueue: vi.fn(() => ({ add: vi.fn() })),
 }));
-vi.mock("@aula-agente/shared", () => ({
-  QUEUE_NAMES: { PROCESS_MESSAGE: "process-message" },
-}));
+vi.mock("@aula-agente/shared", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@aula-agente/shared")>();
+  return { ...actual, QUEUE_NAMES: { PROCESS_MESSAGE: "process-message" } };
+});
 vi.mock("../../lib/redis", () => ({ getConnectionOptions: vi.fn(() => ({})) }));
 vi.mock("../../lib/lock", () => ({
-  acquireConversationLock: vi.fn(async () => "lock-value"),
-  releaseConversationLock: vi.fn(async () => {}),
+  acquireConversationLock: mockAcquireConversationLock,
+  releaseConversationLock: mockReleaseConversationLock,
 }));
 vi.mock("../../lib/vault", () => ({ resolveApiKey: vi.fn(async () => "sk-test") }));
 vi.mock("../../agents/agent-runner", () => ({
@@ -64,11 +70,13 @@ const activeAgent = {
   max_steps: 5,
   tools_config: { search_knowledge: false, search_faq: false },
   is_active: true,
+  activation_keywords: [],
 };
 
 const conversation = {
   id: "conv-1",
   is_human_takeover: false,
+  is_keyword_activated: true,
   evolution_instance_id: "inst-1",
   contacts: { phone: "5511999999999" },
 };
@@ -124,9 +132,62 @@ describe("startProcessMessageWorker", () => {
 
   it("libera o lock mesmo em caso de erro", async () => {
     vi.mocked(getConversationById).mockRejectedValue(new Error("DB error"));
-    const { releaseConversationLock } = await import("../../lib/lock");
 
     await expect(runJob()).rejects.toThrow("DB error");
-    expect(releaseConversationLock).toHaveBeenCalled();
+    expect(mockReleaseConversationLock).toHaveBeenCalled();
+  });
+});
+
+describe("keyword gate", () => {
+  it("não filtra quando agente não tem keywords", async () => {
+    await runJob();
+    expect(createMessage).toHaveBeenCalled();
+  });
+
+  it("não filtra quando conversa já está ativada", async () => {
+    vi.mocked(getAgentById).mockResolvedValue({
+      ...activeAgent,
+      activation_keywords: ["suporte"],
+    } as never);
+    vi.mocked(getConversationById).mockResolvedValue({
+      ...conversation,
+      is_keyword_activated: true,
+    } as never);
+    await runJob();
+    expect(createMessage).toHaveBeenCalled();
+  });
+
+  it("filtra silenciosamente quando keyword não faz match", async () => {
+    vi.mocked(getAgentById).mockResolvedValue({
+      ...activeAgent,
+      activation_keywords: ["^suporte$"],
+    } as never);
+    vi.mocked(getConversationById).mockResolvedValue({
+      ...conversation,
+      is_keyword_activated: false,
+    } as never);
+    await runJob();
+    expect(createMessage).not.toHaveBeenCalled();
+  });
+
+  it("ativa conversa e processa quando keyword faz match", async () => {
+    const { updateConversation } = await import("@aula-agente/database");
+    vi.mocked(getAgentById).mockResolvedValue({
+      ...activeAgent,
+      activation_keywords: ["olá"],
+    } as never);
+    vi.mocked(getConversationById).mockResolvedValue({
+      ...conversation,
+      is_keyword_activated: false,
+    } as never);
+    await runJob();
+    // is_keyword_activated is now committed together with last_message_at/status
+    // after createMessage succeeds, not before runAgent.
+    expect(updateConversation).toHaveBeenCalledWith(
+      expect.anything(),
+      "conv-1",
+      expect.objectContaining({ is_keyword_activated: true })
+    );
+    expect(createMessage).toHaveBeenCalled();
   });
 });

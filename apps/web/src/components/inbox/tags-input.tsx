@@ -1,9 +1,7 @@
 "use client";
 
-import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { Input } from "@/components/ui/input";
-import { X } from "lucide-react";
+import { ChipsInput } from "@/components/ui/chips-input";
 
 interface TagsInputProps {
   conversationId: string;
@@ -12,49 +10,24 @@ interface TagsInputProps {
 }
 
 export function TagsInput({ conversationId, tags, onUpdate }: TagsInputProps) {
-  const [input, setInput] = useState("");
-
-  const handleAdd = async () => {
-    if (!input.trim() || tags.includes(input.trim())) return;
-    const newTags = [...tags, input.trim()];
+  const handleChange = (newTags: string[]) => {
     const supabase = createClient();
-    await supabase.from("conversations").update({ tags: newTags }).eq("id", conversationId);
-    setInput("");
-    onUpdate();
-  };
-
-  const handleRemove = async (tag: string) => {
-    const newTags = tags.filter((t) => t !== tag);
-    const supabase = createClient();
-    await supabase.from("conversations").update({ tags: newTags }).eq("id", conversationId);
-    onUpdate();
+    supabase
+      .from("conversations")
+      .update({ tags: newTags })
+      .eq("id", conversationId)
+      .then(() => onUpdate())
+      .catch((err) => {
+        console.error("[tags-input] Falha ao atualizar tags:", err);
+        onUpdate(); // refresh from DB to revert the optimistic chip change
+      });
   };
 
   return (
-    <div className="space-y-2">
-      <div className="flex flex-wrap gap-1.5">
-        {tags.map((tag) => (
-          <span
-            key={tag}
-            className="flex items-center gap-1 rounded-md border border-border bg-elevated px-2 py-0.5 text-[11px] font-medium text-foreground"
-          >
-            {tag}
-            <button
-              onClick={() => handleRemove(tag)}
-              className="text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <X className="h-2.5 w-2.5" />
-            </button>
-          </span>
-        ))}
-      </div>
-      <Input
-        value={input}
-        onChange={(e) => setInput(e.target.value)}
-        onKeyDown={(e) => e.key === "Enter" && handleAdd()}
-        placeholder="Adicionar tag..."
-        className="h-7 bg-muted border-border text-xs placeholder:text-muted-foreground"
-      />
-    </div>
+    <ChipsInput
+      value={tags}
+      onChange={handleChange}
+      placeholder="Adicionar tag..."
+    />
   );
 }

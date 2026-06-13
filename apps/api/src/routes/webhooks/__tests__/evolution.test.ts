@@ -1,27 +1,30 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import Fastify from "fastify";
 
+const { mockEnsureConversation, mockSaveMessage, mockEnqueueProcessMessage } = vi.hoisted(() => ({
+  mockEnsureConversation: vi.fn(),
+  mockSaveMessage: vi.fn(),
+  mockEnqueueProcessMessage: vi.fn(),
+}));
+
 vi.mock("@aula-agente/database", () => ({
   getAdminClient: vi.fn(() => ({})),
   getInstanceByInstanceId: vi.fn(),
 }));
 vi.mock("../../../services/conversation.service", () => ({
-  ensureConversation: vi.fn(),
+  ensureConversation: mockEnsureConversation,
 }));
 vi.mock("../../../services/message.service", () => ({
-  saveMessage: vi.fn(),
+  saveMessage: mockSaveMessage,
 }));
 vi.mock("../../../lib/queue", () => ({
-  enqueueProcessMessage: vi.fn(),
+  enqueueProcessMessage: mockEnqueueProcessMessage,
 }));
 vi.mock("../../../middleware/webhook-verify", () => ({
   webhookVerifyMiddleware: vi.fn(async () => {}),
 }));
 
 import { getInstanceByInstanceId } from "@aula-agente/database";
-import { ensureConversation } from "../../../services/conversation.service";
-import { saveMessage } from "../../../services/message.service";
-import { enqueueProcessMessage } from "../../../lib/queue";
 import evolutionWebhookRoutes from "../evolution";
 
 const validPayload = {
@@ -85,21 +88,21 @@ describe("POST /webhooks/evolution", () => {
 
   it("retorna 200 skipped quando human takeover está ativo", async () => {
     vi.mocked(getInstanceByInstanceId).mockResolvedValue(activeInstance as never);
-    vi.mocked(ensureConversation).mockResolvedValue({ conversation: { id: "conv-1", is_human_takeover: true } } as never);
-    vi.mocked(saveMessage).mockResolvedValue({ id: "msg-1" } as never);
+    mockEnsureConversation.mockResolvedValue({ conversation: { id: "conv-1", is_human_takeover: true } } as never);
+    mockSaveMessage.mockResolvedValue({ id: "msg-1" } as never);
     const app = await buildApp();
 
     const res = await app.inject({ method: "POST", url: "/webhooks/evolution", payload: validPayload });
 
     expect(res.statusCode).toBe(200);
     expect(JSON.parse(res.body).skipped).toBe("human_takeover");
-    expect(enqueueProcessMessage).not.toHaveBeenCalled();
+    expect(mockEnqueueProcessMessage).not.toHaveBeenCalled();
   });
 
   it("caminho feliz: 200 com messageId e job enfileirado", async () => {
     vi.mocked(getInstanceByInstanceId).mockResolvedValue(activeInstance as never);
-    vi.mocked(ensureConversation).mockResolvedValue({ conversation: { id: "conv-1", is_human_takeover: false } } as never);
-    vi.mocked(saveMessage).mockResolvedValue({ id: "msg-saved-1" } as never);
+    mockEnsureConversation.mockResolvedValue({ conversation: { id: "conv-1", is_human_takeover: false } } as never);
+    mockSaveMessage.mockResolvedValue({ id: "msg-saved-1" } as never);
     const app = await buildApp();
 
     const res = await app.inject({ method: "POST", url: "/webhooks/evolution", payload: validPayload });
@@ -108,7 +111,7 @@ describe("POST /webhooks/evolution", () => {
     const body = JSON.parse(res.body);
     expect(body.ok).toBe(true);
     expect(body.messageId).toBe("msg-saved-1");
-    expect(enqueueProcessMessage).toHaveBeenCalledWith(
+    expect(mockEnqueueProcessMessage).toHaveBeenCalledWith(
       expect.objectContaining({ conversationId: "conv-1", agentId: "agent-1" })
     );
   });
