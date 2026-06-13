@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
+const { mockBuildToolsForAgent } = vi.hoisted(() => ({
+  mockBuildToolsForAgent: vi.fn(() => ({})),
+}));
+
 vi.mock("ai", () => ({
   generateText: vi.fn(),
 }));
@@ -13,13 +17,12 @@ vi.mock("@ai-sdk/google", () => ({
   createGoogleGenerativeAI: vi.fn(() => vi.fn(() => "google-model-instance")),
 }));
 vi.mock("../tools/registry", () => ({
-  buildToolsForAgent: vi.fn(() => ({})),
+  buildToolsForAgent: mockBuildToolsForAgent,
 }));
 
 import { generateText } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 import { runAgent } from "../agent-runner";
-import { buildToolsForAgent } from "../tools/registry";
 
 const baseAgent = {
   id: "agent-1",
@@ -99,7 +102,7 @@ describe("runAgent", () => {
       organizationId: "org-1",
     });
 
-    expect(buildToolsForAgent).toHaveBeenCalledWith(
+    expect(mockBuildToolsForAgent).toHaveBeenCalledWith(
       expect.objectContaining({
         toolsConfig: { search_knowledge: true, search_faq: false },
       })

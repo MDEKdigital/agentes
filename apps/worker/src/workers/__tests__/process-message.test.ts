@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
+const { mockAcquireConversationLock, mockReleaseConversationLock } = vi.hoisted(() => ({
+  mockAcquireConversationLock: vi.fn(async () => "lock-value"),
+  mockReleaseConversationLock: vi.fn(async () => {}),
+}));
+
 vi.mock("bullmq", () => ({
   Worker: vi.fn().mockImplementation((_name: string, processor: Function) => ({
     on: vi.fn(),
@@ -24,8 +29,8 @@ vi.mock("@aula-agente/shared", async (importOriginal) => {
 });
 vi.mock("../../lib/redis", () => ({ getConnectionOptions: vi.fn(() => ({})) }));
 vi.mock("../../lib/lock", () => ({
-  acquireConversationLock: vi.fn(async () => "lock-value"),
-  releaseConversationLock: vi.fn(async () => {}),
+  acquireConversationLock: mockAcquireConversationLock,
+  releaseConversationLock: mockReleaseConversationLock,
 }));
 vi.mock("../../lib/vault", () => ({ resolveApiKey: vi.fn(async () => "sk-test") }));
 vi.mock("../../agents/agent-runner", () => ({
@@ -127,10 +132,9 @@ describe("startProcessMessageWorker", () => {
 
   it("libera o lock mesmo em caso de erro", async () => {
     vi.mocked(getConversationById).mockRejectedValue(new Error("DB error"));
-    const { releaseConversationLock } = await import("../../lib/lock");
 
     await expect(runJob()).rejects.toThrow("DB error");
-    expect(releaseConversationLock).toHaveBeenCalled();
+    expect(mockReleaseConversationLock).toHaveBeenCalled();
   });
 });
 
