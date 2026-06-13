@@ -32,16 +32,35 @@ export default function EditAgentPage() {
       alert(`Erro ao salvar: ${error.message}`);
       throw error;
     }
-    // When keywords are first added to a previously keywordless agent, activate all
-    // existing open conversations so they aren't silently gated by the new keyword check.
+
     const newKeywords = values.activation_keywords as string[] | undefined;
-    if (agent && agent.activation_keywords.length === 0 && newKeywords && newKeywords.length > 0) {
-      await supabase
-        .from("conversations")
-        .update({ is_keyword_activated: true })
-        .eq("agent_id", agentId)
-        .in("status", ["open", "waiting"]);
+    const hadKeywords = agent ? agent.activation_keywords.length > 0 : false;
+    const hasKeywords = newKeywords ? newKeywords.length > 0 : false;
+
+    if (agent) {
+      if (!hadKeywords && hasKeywords) {
+        const { error: convError } = await supabase
+          .from("conversations")
+          .update({ is_keyword_activated: true })
+          .eq("agent_id", agentId)
+          .in("status", ["open", "waiting"]);
+        if (convError) {
+          alert(`Agente salvo, mas não foi possível ativar conversas existentes: ${convError.message}`);
+          return;
+        }
+      } else if (hadKeywords && !hasKeywords) {
+        const { error: convError } = await supabase
+          .from("conversations")
+          .update({ is_keyword_activated: false })
+          .eq("agent_id", agentId)
+          .in("status", ["open", "waiting"]);
+        if (convError) {
+          alert(`Agente salvo, mas não foi possível resetar conversas existentes: ${convError.message}`);
+          return;
+        }
+      }
     }
+
     router.push("/agents");
   };
 
