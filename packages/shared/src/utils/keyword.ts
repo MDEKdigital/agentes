@@ -24,6 +24,10 @@ function getCachedRegex(keyword: string): RegExp | null {
  * Rejects:
  *   1. Groups with an internal quantifier followed by an outer quantifier: (a+)+
  *   2. Groups with alternation followed by an outer quantifier: (a|aa)+
+ *   3. Nested groups where an inner group has a quantifier and the outer group also quantifies: ((a+))+
+ *
+ * Uses iterative group peeling with markers (\x01 for quantified, \x02 for plain) to detect
+ * nested quantified patterns that single-pass regex heuristics would miss.
  */
 export function isValidRegex(pattern: string): boolean {
   try {
@@ -31,13 +35,25 @@ export function isValidRegex(pattern: string): boolean {
   } catch {
     return false;
   }
-  // Heuristic 1: internal quantifier + outer quantifier → (a+)+
-  if (/\([^)]*(?:[+*]|\{\d+)[^)]*\)[+*{]/.test(pattern)) {
-    return false;
-  }
-  // Heuristic 2: alternation inside group + outer quantifier → (a|aa)+
-  if (/\([^)]*\|[^)]*\)[+*{]/.test(pattern)) {
-    return false;
+
+  // Iteratively peel innermost groups to detect nested ReDoS like ((a+))+.
+  // \x01 marks a stripped group that contained a quantifier.
+  // \x02 marks a stripped group that did not.
+  let s = pattern;
+  for (let pass = 0; pass < 10; pass++) {
+    // Heuristic 1: (a+)+ — group with internal quantifier and outer quantifier
+    if (/\([^()]*(?:[+*]|\{\d+)[^()]*\)[+*{]/.test(s)) return false;
+    // Heuristic 2: (a|aa)+ — alternation inside group with outer quantifier
+    if (/\([^()]*\|[^()]*\)[+*{]/.test(s)) return false;
+    // After stripping, \x01 is a formerly-quantified group; outer quantifier = nested ReDoS
+    if (/\x01[+*{]/.test(s)) return false;
+
+    const next = s.replace(/\([^()]*\)/g, (m) => {
+      const inner = m.slice(1, -1);
+      return /[+*]|\{\d+/.test(inner) || inner.includes('\x01') ? '\x01' : '\x02';
+    });
+    if (next === s) break; // no more groups to strip
+    s = next;
   }
   return true;
 }

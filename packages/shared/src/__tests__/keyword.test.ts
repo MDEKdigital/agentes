@@ -85,6 +85,14 @@ describe("isValidRegex — padrões de alternação (ReDoS)", () => {
   it("aceita quantificador ? em grupo (não é ReDoS)", () => {
     expect(isValidRegex("(a+)?")).toBe(true);
   });
+
+  it("rejeita grupo aninhado com quantificador externo (ReDoS): ((a+))+", () => {
+    expect(isValidRegex("((a+))+")).toBe(false);
+  });
+
+  it("aceita grupo aninhado sem quantificador interno: ((abc))+", () => {
+    expect(isValidRegex("((abc))+")).toBe(true);
+  });
 });
 
 describe("matchesKeyword — não cacheia null para regex inválida", () => {
