@@ -40,7 +40,7 @@ export function isValidRegex(pattern: string): boolean {
   // \x01 marks a stripped group that contained a quantifier.
   // \x02 marks a stripped group that did not.
   let s = pattern;
-  for (let pass = 0; pass < 10; pass++) {
+  for (let pass = 0; pass < pattern.length; pass++) {
     // Heuristic 1: (a+)+ — group with internal quantifier and outer quantifier
     if (/\([^()]*(?:[+*]|\{\d+)[^()]*\)[+*{]/.test(s)) return false;
     // Heuristic 2: (a|aa)+ — alternation inside group with outer quantifier
