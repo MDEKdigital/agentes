@@ -1,26 +1,29 @@
 const CACHE_MAX_SIZE = 500;
-const regexCache = new Map<string, RegExp | null>();
+// Cache stores only valid RegExp instances — null is never stored.
+const regexCache = new Map<string, RegExp>();
 
 function getCachedRegex(keyword: string): RegExp | null {
-  if (regexCache.has(keyword)) return regexCache.get(keyword) ?? null;
+  const cached = regexCache.get(keyword);
+  if (cached !== undefined) return cached;
   if (regexCache.size >= CACHE_MAX_SIZE) {
-    // Evict oldest entry (Map insertion order)
     regexCache.delete(regexCache.keys().next().value as string);
   }
-  let compiled: RegExp | null;
   try {
-    compiled = new RegExp(keyword, "i");
+    const compiled = new RegExp(keyword, "i");
+    regexCache.set(keyword, compiled);
+    return compiled;
   } catch {
-    compiled = null;
+    // Do not cache failures — invalid patterns should not reach here
+    // if isValidRegex is enforced in the Zod schema.
+    return null;
   }
-  regexCache.set(keyword, compiled);
-  return compiled;
 }
 
 /**
  * Returns true if `pattern` is a valid regex that poses no obvious ReDoS risk.
- * Rejects patterns where a group containing a quantifier is itself quantified,
- * e.g. (a+)+, (.*)*, (a|b){2,}+ — the primary source of catastrophic backtracking.
+ * Rejects:
+ *   1. Groups with an internal quantifier followed by an outer quantifier: (a+)+
+ *   2. Groups with alternation followed by an outer quantifier: (a|aa)+
  */
 export function isValidRegex(pattern: string): boolean {
   try {
@@ -28,8 +31,12 @@ export function isValidRegex(pattern: string): boolean {
   } catch {
     return false;
   }
-  // Heuristic: group with internal quantifier followed by outer quantifier
+  // Heuristic 1: internal quantifier + outer quantifier → (a+)+
   if (/\([^)]*(?:[+*]|\{\d)[^)]*\)[+*?{]/.test(pattern)) {
+    return false;
+  }
+  // Heuristic 2: alternation inside group + outer quantifier → (a|aa)+
+  if (/\([^)]*\|[^)]*\)[+*{]/.test(pattern)) {
     return false;
   }
   return true;

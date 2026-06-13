@@ -64,3 +64,34 @@ describe("isValidRegex", () => {
     expect(isValidRegex("(\\w+)\\s+(\\d+)")).toBe(true);
   });
 });
+
+describe("isValidRegex — padrões de alternação (ReDoS)", () => {
+  it("rejeita alternação em grupo com quantificador externo (a|aa)+", () => {
+    expect(isValidRegex("(a|aa)+")).toBe(false);
+  });
+
+  it("rejeita alternação com quantificadores internos (a+|b+)*", () => {
+    expect(isValidRegex("(a+|b+)*")).toBe(false);
+  });
+
+  it("aceita alternação simples sem quantificador externo (sim|não)", () => {
+    expect(isValidRegex("(sim|não)")).toBe(true);
+  });
+
+  it("aceita alternação com quantificador interno mas sem outer quant (a+|b)", () => {
+    expect(isValidRegex("(a+|b)")).toBe(true);
+  });
+});
+
+describe("matchesKeyword — não cacheia null para regex inválida", () => {
+  it("retorna false para keyword inválida sem lançar exceção", () => {
+    const result = matchesKeyword("mensagem qualquer", ["[invalido"]);
+    expect(result).toBe(false);
+  });
+
+  it("segunda chamada com mesma keyword inválida continua retornando false", () => {
+    matchesKeyword("msg", ["[invalido2"]);
+    const result2 = matchesKeyword("msg", ["[invalido2"]);
+    expect(result2).toBe(false);
+  });
+});
