@@ -158,28 +158,20 @@ export function startProcessMessageWorker() {
       try {
         const db = getAdminClient();
 
-        const agent = await getAgentById(db, agentId);
+        // Fix #9: Parallelize agent + conversation fetch
+        const [agent, conversation] = (await Promise.all([
+          getAgentById(db, agentId),
+          getConversationById(db, conversationId),
+        ])) as [Awaited<ReturnType<typeof getAgentById>>, ConversationRow];
+
         if (!agent.is_active) {
           console.log(`Agent ${agentId} is inactive, skipping`);
           return;
         }
-
-        const conversation = (await getConversationById(db, conversationId)) as ConversationRow;
         if (conversation.is_human_takeover) {
           console.log(`Conversation ${conversationId} is in human takeover, skipping`);
           return;
         }
-
-        const apiKey = await resolveApiKey(organizationId, agent.provider);
-
-        const recentMessages = await getRecentMessages(db, conversationId, 20);
-
-        const currentMessage = recentMessages.find((m) => m.id === messageId);
-        if (!currentMessage) {
-          throw new Error(`Message ${messageId} not found`);
-        }
-
-        const history = recentMessages.filter((m) => m.id !== messageId);
 
         const contact = conversation.contacts;
         if (!contact?.phone) {
@@ -190,19 +182,27 @@ export function startProcessMessageWorker() {
           throw new Error(`Conversation ${conversationId} has no evolution_instance_id`);
         }
 
-        // Media preprocessing — fetch instance only when needed (text messages skip this DB call)
-        let instance: Awaited<ReturnType<typeof getInstanceById>> | undefined;
+        // Fix #9 + #8: Parallelize apiKey + recentMessages + instance (always fetched up front)
+        const [apiKey, recentMessages, instance] = await Promise.all([
+          resolveApiKey(organizationId, agent.provider),
+          getRecentMessages(db, conversationId, 20),
+          getInstanceById(db, evolutionInstanceId),
+        ]);
+
+        const currentMessage = recentMessages.find((m) => m.id === messageId);
+        if (!currentMessage) {
+          throw new Error(`Message ${messageId} not found`);
+        }
+
+        const history = recentMessages.filter((m) => m.id !== messageId);
+
         let effectiveMessage = currentMessage;
         let imageContent: { base64: string; mimeType: string } | undefined;
-
-        if (currentMessage.media_type === "audio" || currentMessage.media_type === "image") {
-          instance = await getInstanceById(db, evolutionInstanceId);
-        }
 
         if (currentMessage.media_type === "audio") {
           effectiveMessage = await preprocessAudioMessage(
             currentMessage,
-            instance!.instance_name,
+            instance.instance_name,
             contact.phone,
             agent.provider,
             apiKey
@@ -210,7 +210,7 @@ export function startProcessMessageWorker() {
         } else if (currentMessage.media_type === "image") {
           const imgResult = await preprocessImageMessage(
             currentMessage,
-            instance!.instance_name,
+            instance.instance_name,
             contact.phone
           );
           if (imgResult) {
@@ -224,21 +224,31 @@ export function startProcessMessageWorker() {
           }
         }
 
+        // Fix #4: Prevent failed-media placeholders from matching keywords.
+        // Placeholders are injected by preprocessing when transcription/fetch fails.
+        const isMediaFallback =
+          currentMessage.media_type !== null &&
+          effectiveMessage.content !== currentMessage.content &&
+          effectiveMessage.content.startsWith("[");
+
         // Keyword activation guard — runs after preprocessing so audio/image keywords
         // are matched against transcribed/resolved content, not raw placeholders.
-        // activatesKeyword is committed after createMessage so retries stay correct
-        // if runAgent fails before a response is saved.
         let activatesKeyword = false;
         if (
           agent.activation_keywords.length > 0 &&
           !conversation.is_keyword_activated
         ) {
-          if (!matchesKeyword(effectiveMessage.content, agent.activation_keywords)) {
+          if (isMediaFallback || !matchesKeyword(effectiveMessage.content, agent.activation_keywords)) {
             console.log(`[keyword-gate] Conversa ${conversationId} aguardando keyword — mensagem ignorada`);
             return;
           }
           activatesKeyword = true;
           console.log(`[keyword-gate] Conversa ${conversationId} ativada por keyword`);
+        }
+
+        // Fix #5: Commit activation before runAgent so BullMQ retries are idempotent.
+        if (activatesKeyword) {
+          await updateConversation(db, conversationId, { is_keyword_activated: true });
         }
 
         const result = await runAgent({
@@ -269,12 +279,8 @@ export function startProcessMessageWorker() {
         await updateConversation(db, conversationId, {
           last_message_at: new Date().toISOString(),
           status: "waiting",
-          ...(activatesKeyword ? { is_keyword_activated: true } : {}),
+          // is_keyword_activated already committed above when needed
         });
-
-        if (!instance) {
-          instance = await getInstanceById(db, evolutionInstanceId);
-        }
 
         const sendQueue = getSendMessageQueue();
         await sendQueue.add("send-message", {

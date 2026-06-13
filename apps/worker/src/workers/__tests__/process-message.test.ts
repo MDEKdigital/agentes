@@ -5,6 +5,16 @@ const { mockAcquireConversationLock, mockReleaseConversationLock } = vi.hoisted(
   mockReleaseConversationLock: vi.fn(async () => {}),
 }));
 
+const { mockRunAgent } = vi.hoisted(() => ({
+  mockRunAgent: vi.fn(async () => ({
+    text: "Resposta do agente",
+    model: "gpt-4o-mini",
+    tokensUsed: 50,
+    latencyMs: 100,
+    toolCalls: [],
+  })),
+}));
+
 vi.mock("bullmq", () => ({
   Worker: vi.fn().mockImplementation((_name: string, processor: Function) => ({
     on: vi.fn(),
@@ -33,14 +43,11 @@ vi.mock("../../lib/lock", () => ({
   releaseConversationLock: mockReleaseConversationLock,
 }));
 vi.mock("../../lib/vault", () => ({ resolveApiKey: vi.fn(async () => "sk-test") }));
+vi.mock("../../lib/evolution", () => ({
+  evolutionPostJson: vi.fn(async () => { throw new Error("Evolution API not available in tests"); }),
+}));
 vi.mock("../../agents/agent-runner", () => ({
-  runAgent: vi.fn(async () => ({
-    text: "Resposta do agente",
-    model: "gpt-4o-mini",
-    tokensUsed: 50,
-    latencyMs: 100,
-    toolCalls: [],
-  })),
+  runAgent: mockRunAgent,
 }));
 
 import {
@@ -48,6 +55,7 @@ import {
   getConversationById,
   getRecentMessages,
   createMessage,
+  updateConversation,
   getInstanceById,
 } from "@aula-agente/database";
 import { getSendMessageQueue } from "@aula-agente/queue";
@@ -87,6 +95,13 @@ const messages = [
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockRunAgent.mockResolvedValue({
+    text: "Resposta do agente",
+    model: "gpt-4o-mini",
+    tokensUsed: 50,
+    latencyMs: 100,
+    toolCalls: [],
+  });
   vi.mocked(getAgentById).mockResolvedValue(activeAgent as never);
   vi.mocked(getConversationById).mockResolvedValue(conversation as never);
   vi.mocked(getRecentMessages).mockResolvedValue(messages as never);
@@ -181,13 +196,80 @@ describe("keyword gate", () => {
       is_keyword_activated: false,
     } as never);
     await runJob();
-    // is_keyword_activated is now committed together with last_message_at/status
-    // after createMessage succeeds, not before runAgent.
+    // is_keyword_activated is now committed before runAgent for retry idempotency.
     expect(updateConversation).toHaveBeenCalledWith(
       expect.anything(),
       "conv-1",
       expect.objectContaining({ is_keyword_activated: true })
     );
     expect(createMessage).toHaveBeenCalled();
+  });
+
+  it("não ativa keyword quando mídia falhou na transcrição (placeholder)", async () => {
+    vi.mocked(getAgentById).mockResolvedValue({
+      ...activeAgent,
+      activation_keywords: ["processar"],
+    } as never);
+    vi.mocked(getConversationById).mockResolvedValue({
+      ...conversation,
+      is_keyword_activated: false,
+    } as never);
+    // Audio message with original content (not the placeholder)
+    // preprocessAudioMessage will fail (evolution mock throws) and return the placeholder
+    // which contains "processar" — but isMediaFallback should block keyword match
+    vi.mocked(getRecentMessages).mockResolvedValue([
+      {
+        id: "msg-1",
+        conversation_id: "conv-1",
+        organization_id: "org-1",
+        role: "contact" as const,
+        content: "audio_original_content",
+        media_type: "audio",
+        media_url: null,
+        evolution_message_id: "evo-1",
+        metadata: {},
+        created_at: new Date().toISOString(),
+      },
+    ] as never);
+
+    await runJob();
+
+    expect(createMessage).not.toHaveBeenCalled();
+  });
+
+  it("persiste is_keyword_activated antes de runAgent para sobreviver a retry", async () => {
+    vi.mocked(getAgentById).mockResolvedValue({
+      ...activeAgent,
+      activation_keywords: ["suporte"],
+    } as never);
+    vi.mocked(getConversationById).mockResolvedValue({
+      ...conversation,
+      is_keyword_activated: false,
+    } as never);
+    vi.mocked(getRecentMessages).mockResolvedValue([
+      {
+        id: "msg-1",
+        conversation_id: "conv-1",
+        organization_id: "org-1",
+        role: "contact" as const,
+        content: "suporte",
+        media_type: null,
+        media_url: null,
+        evolution_message_id: null,
+        metadata: {},
+        created_at: new Date().toISOString(),
+      },
+    ] as never);
+
+    mockRunAgent.mockRejectedValueOnce(new Error("LLM timeout"));
+
+    await expect(runJob()).rejects.toThrow("LLM timeout");
+
+    // is_keyword_activated must be committed BEFORE runAgent throws
+    expect(updateConversation).toHaveBeenCalledWith(
+      expect.anything(),
+      "conv-1",
+      expect.objectContaining({ is_keyword_activated: true })
+    );
   });
 });
