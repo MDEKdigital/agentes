@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import Fastify from "fastify";
 
-const { mockEnsureConversation, mockSaveMessage } = vi.hoisted(() => ({
+const { mockEnsureConversation, mockSaveMessage, mockEnqueueProcessMessage } = vi.hoisted(() => ({
   mockEnsureConversation: vi.fn(),
   mockSaveMessage: vi.fn(),
+  mockEnqueueProcessMessage: vi.fn(),
 }));
 
 vi.mock("@aula-agente/database", () => ({
@@ -17,14 +18,13 @@ vi.mock("../../../services/message.service", () => ({
   saveMessage: mockSaveMessage,
 }));
 vi.mock("../../../lib/queue", () => ({
-  enqueueProcessMessage: vi.fn(),
+  enqueueProcessMessage: mockEnqueueProcessMessage,
 }));
 vi.mock("../../../middleware/webhook-verify", () => ({
   webhookVerifyMiddleware: vi.fn(async () => {}),
 }));
 
 import { getInstanceByInstanceId } from "@aula-agente/database";
-import { enqueueProcessMessage } from "../../../lib/queue";
 import evolutionWebhookRoutes from "../evolution";
 
 const validPayload = {
@@ -96,7 +96,7 @@ describe("POST /webhooks/evolution", () => {
 
     expect(res.statusCode).toBe(200);
     expect(JSON.parse(res.body).skipped).toBe("human_takeover");
-    expect(enqueueProcessMessage).not.toHaveBeenCalled();
+    expect(mockEnqueueProcessMessage).not.toHaveBeenCalled();
   });
 
   it("caminho feliz: 200 com messageId e job enfileirado", async () => {
@@ -111,7 +111,7 @@ describe("POST /webhooks/evolution", () => {
     const body = JSON.parse(res.body);
     expect(body.ok).toBe(true);
     expect(body.messageId).toBe("msg-saved-1");
-    expect(enqueueProcessMessage).toHaveBeenCalledWith(
+    expect(mockEnqueueProcessMessage).toHaveBeenCalledWith(
       expect.objectContaining({ conversationId: "conv-1", agentId: "agent-1" })
     );
   });
