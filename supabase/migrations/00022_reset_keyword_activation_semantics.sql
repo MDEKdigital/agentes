@@ -4,4 +4,8 @@
 -- portanto is_keyword_activated=false em conversas de agentes sem keywords é seguro.
 -- Isso garante que keywords adicionadas ao agente depois retroativamente se apliquem
 -- a conversas abertas existentes.
-UPDATE conversations SET is_keyword_activated = false;
+-- Only reset rows set by migration 00021 (keywordless-agent backfill).
+-- Scoping to WHERE is_keyword_activated = true avoids locking rows already false
+-- and prevents resetting conversations legitimately activated by a keyword match
+-- if this migration runs after the feature has been live.
+UPDATE conversations SET is_keyword_activated = false WHERE is_keyword_activated = true;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 
@@ -12,6 +12,7 @@ interface ChipsInputProps {
 
 export function ChipsInput({ value, onChange, placeholder = "Adicionar..." }: ChipsInputProps) {
   const [input, setInput] = useState("");
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const add = () => {
     const trimmed = input.trim();
@@ -25,7 +26,7 @@ export function ChipsInput({ value, onChange, placeholder = "Adicionar..." }: Ch
   };
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2" ref={containerRef}>
       <div className="flex flex-wrap gap-1.5">
         {value.map((chip) => (
           <span
@@ -49,7 +50,12 @@ export function ChipsInput({ value, onChange, placeholder = "Adicionar..." }: Ch
         onKeyDown={(e) => {
           if (e.key === "Enter") { e.preventDefault(); add(); }
         }}
-        onBlur={add}
+        onBlur={(e) => {
+          // Don't commit partial input if focus is moving to a chip's remove button
+          // inside this same component (blur fires before click in browser event order).
+          if (containerRef.current?.contains(e.relatedTarget as Node)) return;
+          add();
+        }}
         placeholder={placeholder}
         className="h-7 bg-muted border-border text-xs placeholder:text-muted-foreground"
       />

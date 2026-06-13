@@ -225,7 +225,10 @@ export function startProcessMessageWorker() {
         }
 
         // Keyword activation guard — runs after preprocessing so audio/image keywords
-        // are matched against transcribed/resolved content, not raw placeholders
+        // are matched against transcribed/resolved content, not raw placeholders.
+        // activatesKeyword is committed after createMessage so retries stay correct
+        // if runAgent fails before a response is saved.
+        let activatesKeyword = false;
         if (
           agent.activation_keywords.length > 0 &&
           !conversation.is_keyword_activated
@@ -234,7 +237,7 @@ export function startProcessMessageWorker() {
             console.log(`[keyword-gate] Conversa ${conversationId} aguardando keyword — mensagem ignorada`);
             return;
           }
-          await updateConversation(db, conversationId, { is_keyword_activated: true });
+          activatesKeyword = true;
           console.log(`[keyword-gate] Conversa ${conversationId} ativada por keyword`);
         }
 
@@ -266,6 +269,7 @@ export function startProcessMessageWorker() {
         await updateConversation(db, conversationId, {
           last_message_at: new Date().toISOString(),
           status: "waiting",
+          ...(activatesKeyword ? { is_keyword_activated: true } : {}),
         });
 
         if (!instance) {

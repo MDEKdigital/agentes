@@ -89,4 +89,28 @@ describe("activation_keywords", () => {
     });
     expect(result.success).toBe(true);
   });
+
+  it("rejeita regex inválida no array de keywords", () => {
+    const result = createAgentSchema.safeParse({
+      ...valid,
+      activation_keywords: ["(unclosed"],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejeita padrão com risco de ReDoS", () => {
+    const result = createAgentSchema.safeParse({
+      ...valid,
+      activation_keywords: ["(a+)+"],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("aceita regex válida sem risco de ReDoS", () => {
+    const result = createAgentSchema.safeParse({
+      ...valid,
+      activation_keywords: ["^ajuda$", "suporte", "[0-9]+"],
+    });
+    expect(result.success).toBe(true);
+  });
 });

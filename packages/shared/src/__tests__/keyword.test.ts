@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { matchesKeyword } from "../utils/keyword";
+import { matchesKeyword, isValidRegex } from "../utils/keyword";
 
 describe("matchesKeyword", () => {
   it("retorna false quando array de keywords está vazio", () => {
@@ -38,5 +38,29 @@ describe("matchesKeyword", () => {
   it("reutiliza regex compilada (cache) sem alterar resultado", () => {
     expect(matchesKeyword("suporte", ["suporte"])).toBe(true);
     expect(matchesKeyword("outro", ["suporte"])).toBe(false);
+  });
+});
+
+describe("isValidRegex", () => {
+  it("aceita regex simples", () => {
+    expect(isValidRegex("suporte")).toBe(true);
+    expect(isValidRegex("^oi$")).toBe(true);
+    expect(isValidRegex("[a-z]+")).toBe(true);
+  });
+
+  it("rejeita regex inválida (sintaxe incorreta)", () => {
+    expect(isValidRegex("[abc")).toBe(false);
+    expect(isValidRegex("(unclosed")).toBe(false);
+  });
+
+  it("rejeita padrões com quantificadores aninhados (risco de ReDoS)", () => {
+    expect(isValidRegex("(a+)+")).toBe(false);
+    expect(isValidRegex("(.*)* ")).toBe(false);
+    expect(isValidRegex("(a+){2,}")).toBe(false);
+  });
+
+  it("aceita grupos com quantificador mas sem repetição do grupo", () => {
+    expect(isValidRegex("(a+)b")).toBe(true);
+    expect(isValidRegex("(\\w+)\\s+(\\d+)")).toBe(true);
   });
 });

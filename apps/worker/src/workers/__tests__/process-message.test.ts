@@ -177,10 +177,12 @@ describe("keyword gate", () => {
       is_keyword_activated: false,
     } as never);
     await runJob();
+    // is_keyword_activated is now committed together with last_message_at/status
+    // after createMessage succeeds, not before runAgent.
     expect(updateConversation).toHaveBeenCalledWith(
       expect.anything(),
       "conv-1",
-      { is_keyword_activated: true }
+      expect.objectContaining({ is_keyword_activated: true })
     );
     expect(createMessage).toHaveBeenCalled();
   });
