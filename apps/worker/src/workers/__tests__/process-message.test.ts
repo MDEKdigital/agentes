@@ -235,6 +235,11 @@ describe("keyword gate", () => {
     await runJob();
 
     expect(createMessage).not.toHaveBeenCalled();
+    expect(updateConversation).not.toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.objectContaining({ is_keyword_activated: true })
+    );
   });
 
   it("persiste is_keyword_activated antes de runAgent para sobreviver a retry", async () => {

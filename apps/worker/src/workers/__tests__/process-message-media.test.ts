@@ -159,7 +159,8 @@ describe("preprocessAudioMessage", () => {
       "sk-key"
     );
 
-    expect(result.content).toBe("mensagem transcrita");
+    expect(result.message.content).toBe("mensagem transcrita");
+    expect(result.failed).toBe(false);
   });
 
   it("retorna fallback textual para provider não-openai", async () => {
@@ -171,9 +172,10 @@ describe("preprocessAudioMessage", () => {
       "sk-ant-key"
     );
 
-    expect(result.content).toBe(
+    expect(result.message.content).toBe(
       "[Usuário enviou um áudio. Transcrição não disponível para este agente.]"
     );
+    expect(result.failed).toBe(true);
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
@@ -188,13 +190,15 @@ describe("preprocessAudioMessage", () => {
       "sk-key"
     );
 
-    expect(result.content).toBe("[Usuário enviou um áudio. Não foi possível processar.]");
+    expect(result.message.content).toBe("[Usuário enviou um áudio. Não foi possível processar.]");
+    expect(result.failed).toBe(true);
   });
 
   it("retorna mensagem original se evolution_message_id for null", async () => {
     const msg = { ...audioMessage, evolution_message_id: null };
     const result = await preprocessAudioMessage(msg, "inst", "5511", "openai", "sk");
-    expect(result).toBe(msg);
+    expect(result.message).toBe(msg);
+    expect(result.failed).toBe(false);
     expect(mockFetch).not.toHaveBeenCalled();
   });
 });

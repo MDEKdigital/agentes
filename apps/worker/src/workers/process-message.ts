@@ -90,16 +90,19 @@ export async function preprocessAudioMessage(
   phone: string,
   provider: LLMProvider,
   apiKey: string
-): Promise<Message> {
-  if (!message.evolution_message_id) return message;
+): Promise<{ message: Message; failed: boolean }> {
+  if (!message.evolution_message_id) return { message, failed: false };
 
   const remoteJid = `${phone}@s.whatsapp.net`;
 
   if (provider !== "openai") {
     return {
-      ...message,
-      content: "[Usuário enviou um áudio. Transcrição não disponível para este agente.]",
-      media_type: null,
+      message: {
+        ...message,
+        content: "[Usuário enviou um áudio. Transcrição não disponível para este agente.]",
+        media_type: null,
+      },
+      failed: true,
     };
   }
 
@@ -111,13 +114,16 @@ export async function preprocessAudioMessage(
       "audioMessage"
     );
     const transcription = await transcribeAudio(base64, mimeType, apiKey);
-    return { ...message, content: transcription, media_type: null };
+    return { message: { ...message, content: transcription, media_type: null }, failed: false };
   } catch (err) {
     console.warn("[process-message] Falha ao processar áudio:", (err as Error).message);
     return {
-      ...message,
-      content: "[Usuário enviou um áudio. Não foi possível processar.]",
-      media_type: null,
+      message: {
+        ...message,
+        content: "[Usuário enviou um áudio. Não foi possível processar.]",
+        media_type: null,
+      },
+      failed: true,
     };
   }
 }
@@ -198,15 +204,18 @@ export function startProcessMessageWorker() {
 
         let effectiveMessage = currentMessage;
         let imageContent: { base64: string; mimeType: string } | undefined;
+        let isMediaFallback = false;
 
         if (currentMessage.media_type === "audio") {
-          effectiveMessage = await preprocessAudioMessage(
+          const { message: processed, failed } = await preprocessAudioMessage(
             currentMessage,
             instance.instance_name,
             contact.phone,
             agent.provider,
             apiKey
           );
+          effectiveMessage = processed;
+          isMediaFallback = failed;
         } else if (currentMessage.media_type === "image") {
           const imgResult = await preprocessImageMessage(
             currentMessage,
@@ -216,6 +225,7 @@ export function startProcessMessageWorker() {
           if (imgResult) {
             imageContent = imgResult;
           } else {
+            isMediaFallback = true;
             effectiveMessage = {
               ...currentMessage,
               content: "[Usuário enviou uma imagem. Não foi possível carregar para processamento.]",
@@ -223,13 +233,6 @@ export function startProcessMessageWorker() {
             };
           }
         }
-
-        // Fix #4: Prevent failed-media placeholders from matching keywords.
-        // Placeholders are injected by preprocessing when transcription/fetch fails.
-        const isMediaFallback =
-          currentMessage.media_type !== null &&
-          effectiveMessage.content !== currentMessage.content &&
-          effectiveMessage.content.startsWith("[");
 
         // Keyword activation guard — runs after preprocessing so audio/image keywords
         // are matched against transcribed/resolved content, not raw placeholders.
