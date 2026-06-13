@@ -1,6 +1,6 @@
 import { Worker } from "bullmq";
-import { QUEUE_NAMES } from "@aula-agente/shared";
-import type { LLMProvider, Message } from "@aula-agente/shared";
+import { QUEUE_NAMES, matchesKeyword } from "@aula-agente/shared";
+import type { LLMProvider, Message, Conversation } from "@aula-agente/shared";
 import type { ProcessMessageJobData } from "@aula-agente/queue";
 import { getSendMessageQueue } from "@aula-agente/queue";
 import { getConnectionOptions } from "../lib/redis";
@@ -18,17 +18,7 @@ import { acquireConversationLock, releaseConversationLock } from "../lib/lock";
 import { resolveApiKey } from "../lib/vault";
 import { runAgent } from "../agents/agent-runner";
 
-export function matchesKeyword(content: string, keywords: string[]): boolean {
-  const valid = keywords.filter((k) => k.trim().length > 0);
-  return valid.some((keyword) => {
-    try {
-      return new RegExp(keyword, "i").test(content);
-    } catch {
-      console.warn(`[keyword-gate] regex inválida ignorada: ${keyword}`);
-      return false;
-    }
-  });
-}
+type ConversationRow = Conversation & { contacts: { phone: string } | null };
 
 const AUDIO_EXTENSION_MAP: Record<string, string> = {
   "audio/ogg": "ogg",
@@ -174,10 +164,7 @@ export function startProcessMessageWorker() {
           return;
         }
 
-        const conversation = (await getConversationById(db, conversationId)) as Record<
-          string,
-          unknown
-        >;
+        const conversation = (await getConversationById(db, conversationId)) as ConversationRow;
         if (conversation.is_human_takeover) {
           console.log(`Conversation ${conversationId} is in human takeover, skipping`);
           return;
@@ -194,24 +181,11 @@ export function startProcessMessageWorker() {
 
         const history = recentMessages.filter((m) => m.id !== messageId);
 
-        // Keyword activation guard
-        if (
-          agent.activation_keywords.length > 0 &&
-          !(conversation as unknown as { is_keyword_activated: boolean }).is_keyword_activated
-        ) {
-          if (!matchesKeyword(currentMessage.content, agent.activation_keywords)) {
-            console.log(`[keyword-gate] Conversa ${conversationId} aguardando keyword — mensagem ignorada`);
-            return;
-          }
-          await updateConversation(db, conversationId, { is_keyword_activated: true });
-          console.log(`[keyword-gate] Conversa ${conversationId} ativada por keyword`);
-        }
-
-        const contact = conversation.contacts as { phone: string } | null;
+        const contact = conversation.contacts;
         if (!contact?.phone) {
           throw new Error(`Contact phone not found for conversation ${conversationId}`);
         }
-        const evolutionInstanceId = conversation.evolution_instance_id as string | null;
+        const evolutionInstanceId = conversation.evolution_instance_id;
         if (!evolutionInstanceId) {
           throw new Error(`Conversation ${conversationId} has no evolution_instance_id`);
         }
@@ -248,6 +222,20 @@ export function startProcessMessageWorker() {
               media_type: null,
             };
           }
+        }
+
+        // Keyword activation guard — runs after preprocessing so audio/image keywords
+        // are matched against transcribed/resolved content, not raw placeholders
+        if (
+          agent.activation_keywords.length > 0 &&
+          !conversation.is_keyword_activated
+        ) {
+          if (!matchesKeyword(effectiveMessage.content, agent.activation_keywords)) {
+            console.log(`[keyword-gate] Conversa ${conversationId} aguardando keyword — mensagem ignorada`);
+            return;
+          }
+          await updateConversation(db, conversationId, { is_keyword_activated: true });
+          console.log(`[keyword-gate] Conversa ${conversationId} ativada por keyword`);
         }
 
         const result = await runAgent({

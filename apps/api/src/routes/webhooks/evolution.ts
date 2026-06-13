@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { evolutionWebhookPayloadSchema } from "@aula-agente/shared";
-import { getAdminClient, getInstanceByInstanceId, getAgentById } from "@aula-agente/database";
+import { getAdminClient, getInstanceByInstanceId } from "@aula-agente/database";
 import { webhookVerifyMiddleware } from "../../middleware/webhook-verify";
 import { ensureConversation } from "../../services/conversation.service";
 import { saveMessage } from "../../services/message.service";
@@ -103,9 +103,6 @@ export default async function evolutionWebhookRoutes(app: FastifyInstance) {
       const agentId = instance.active_agent_id;
 
       try {
-        // Fetch agent to compute initial keyword activation state
-        const agent = await getAgentById(getAdminClient(), agentId);
-
         // Ensure conversation exists
         const { conversation } = await ensureConversation({
           organizationId,
@@ -114,7 +111,6 @@ export default async function evolutionWebhookRoutes(app: FastifyInstance) {
           phone,
           contactName,
           contactPhotoUrl: null,
-          isKeywordActivated: agent.activation_keywords.length === 0,
         });
 
         // Extract message content

@@ -1,0 +1,22 @@
+- generic [ref=e3]:
+  - generic [ref=e4]:
+    - img [ref=e6]
+    - generic [ref=e8]:
+      - paragraph [ref=e9]: MDEK Digital
+      - paragraph [ref=e10]: Agentes de IA
+  - generic [ref=e12]:
+    - generic [ref=e13]:
+      - heading "Entrar" [level=3] [ref=e14]
+      - paragraph [ref=e15]: Entre com seu email e senha
+    - generic [ref=e17]:
+      - generic [ref=e18]:
+        - text: Email
+        - textbox "Email" [ref=e19]
+      - generic [ref=e20]:
+        - text: Senha
+        - textbox "Senha" [ref=e21]
+      - button "Entrar" [ref=e22] [cursor=pointer]
+      - paragraph [ref=e23]:
+        - text: Não tem conta?
+        - link "Criar conta" [ref=e24] [cursor=pointer]:
+          - /url: /register

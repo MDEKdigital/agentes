@@ -18,9 +18,10 @@ vi.mock("@aula-agente/database", () => ({
 vi.mock("@aula-agente/queue", () => ({
   getSendMessageQueue: vi.fn(() => ({ add: vi.fn() })),
 }));
-vi.mock("@aula-agente/shared", () => ({
-  QUEUE_NAMES: { PROCESS_MESSAGE: "process-message" },
-}));
+vi.mock("@aula-agente/shared", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@aula-agente/shared")>();
+  return { ...actual, QUEUE_NAMES: { PROCESS_MESSAGE: "process-message" } };
+});
 vi.mock("../../lib/redis", () => ({ getConnectionOptions: vi.fn(() => ({})) }));
 vi.mock("../../lib/lock", () => ({
   acquireConversationLock: vi.fn(async () => "lock-value"),
@@ -45,7 +46,7 @@ import {
   getInstanceById,
 } from "@aula-agente/database";
 import { getSendMessageQueue } from "@aula-agente/queue";
-import { startProcessMessageWorker, matchesKeyword } from "../process-message";
+import { startProcessMessageWorker } from "../process-message";
 
 const jobData = {
   conversationId: "conv-1",
@@ -94,41 +95,6 @@ async function runJob() {
   const workerInstance = vi.mocked(Worker).mock.results[0].value;
   await workerInstance._processor({ data: jobData });
 }
-
-describe("matchesKeyword", () => {
-  it("retorna false quando array de keywords está vazio", () => {
-    expect(matchesKeyword("oi", [])).toBe(false);
-  });
-
-  it("retorna true quando mensagem faz match com uma keyword", () => {
-    expect(matchesKeyword("Preciso de suporte urgente", ["suporte"])).toBe(true);
-  });
-
-  it("matching é case-insensitive", () => {
-    expect(matchesKeyword("SUPORTE", ["suporte"])).toBe(true);
-  });
-
-  it("suporta regex completa", () => {
-    expect(matchesKeyword("oi", ["^oi$"])).toBe(true);
-    expect(matchesKeyword("oioi", ["^oi$"])).toBe(false);
-  });
-
-  it("retorna false quando mensagem não faz match com nenhuma keyword", () => {
-    expect(matchesKeyword("bom dia", ["suporte", "ajuda"])).toBe(false);
-  });
-
-  it("ignora silenciosamente regex inválida e continua com as válidas", () => {
-    expect(matchesKeyword("preciso de ajuda", ["[abc", "ajuda"])).toBe(true);
-  });
-
-  it("ignora regex inválida e retorna false se nenhuma válida fizer match", () => {
-    expect(matchesKeyword("oi", ["[abc"])).toBe(false);
-  });
-
-  it("filtra keywords com apenas espaços antes de testar", () => {
-    expect(matchesKeyword("oi", ["   "])).toBe(false);
-  });
-});
 
 describe("startProcessMessageWorker", () => {
   it("não processa se agente estiver inativo", async () => {

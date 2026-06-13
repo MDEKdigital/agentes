@@ -48,8 +48,8 @@ export function ChipsInput({ value, onChange, placeholder = "Adicionar..." }: Ch
         onChange={(e) => setInput(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === "Enter") { e.preventDefault(); add(); }
-          if (e.key === ",") { e.preventDefault(); add(); }
         }}
+        onBlur={add}
         placeholder={placeholder}
         className="h-7 bg-muted border-border text-xs placeholder:text-muted-foreground"
       />

@@ -4,7 +4,6 @@ import Fastify from "fastify";
 vi.mock("@aula-agente/database", () => ({
   getAdminClient: vi.fn(() => ({})),
   getInstanceByInstanceId: vi.fn(),
-  getAgentById: vi.fn(),
 }));
 vi.mock("../../../services/conversation.service", () => ({
   ensureConversation: vi.fn(),
@@ -19,7 +18,7 @@ vi.mock("../../../middleware/webhook-verify", () => ({
   webhookVerifyMiddleware: vi.fn(async () => {}),
 }));
 
-import { getInstanceByInstanceId, getAgentById } from "@aula-agente/database";
+import { getInstanceByInstanceId } from "@aula-agente/database";
 import { ensureConversation } from "../../../services/conversation.service";
 import { saveMessage } from "../../../services/message.service";
 import { enqueueProcessMessage } from "../../../lib/queue";
@@ -51,7 +50,6 @@ async function buildApp() {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(getAgentById).mockResolvedValue({ activation_keywords: [] } as never);
 });
 
 describe("POST /webhooks/evolution", () => {

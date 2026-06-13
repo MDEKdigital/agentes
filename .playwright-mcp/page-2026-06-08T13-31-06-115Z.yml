@@ -1,0 +1,91 @@
+- generic [ref=e2]:
+  - complementary [ref=e3]:
+    - generic [ref=e5]:
+      - img [ref=e7]
+      - generic [ref=e9]: MDEK Digital
+    - navigation [ref=e11]:
+      - link "Inbox" [ref=e12] [cursor=pointer]:
+        - /url: /inbox
+        - img [ref=e13]
+        - generic [ref=e16]: Inbox
+      - link "Agentes" [ref=e17] [cursor=pointer]:
+        - /url: /agents
+        - img [ref=e18]
+        - generic [ref=e21]: Agentes
+      - link "Instâncias" [ref=e22] [cursor=pointer]:
+        - /url: /instances
+        - img [ref=e23]
+        - generic [ref=e29]: Instâncias
+      - link "Equipe" [ref=e30] [cursor=pointer]:
+        - /url: /team
+        - img [ref=e31]
+        - generic [ref=e36]: Equipe
+      - link "Configurações" [ref=e37] [cursor=pointer]:
+        - /url: /settings
+        - img [ref=e38]
+        - generic [ref=e41]: Configurações
+    - button "MD mdekdigital.agentes@gmail.com Online" [ref=e43] [cursor=pointer]:
+      - generic [ref=e44]: MD
+      - generic:
+        - generic: mdekdigital.agentes@gmail.com
+        - generic [ref=e49]: Online
+  - main [ref=e50]:
+    - generic [ref=e51]:
+      - heading "Novo Agente" [level=1] [ref=e52]
+      - generic [ref=e53]:
+        - generic [ref=e54]:
+          - heading "Informações Básicas" [level=3] [ref=e56]
+          - generic [ref=e57]:
+            - generic [ref=e58]:
+              - text: Nome
+              - textbox "Nome" [ref=e59]:
+                - /placeholder: Assistente de Suporte
+            - generic [ref=e60]:
+              - text: Descrição
+              - textbox "Descrição" [ref=e61]:
+                - /placeholder: Agente para atendimento ao cliente
+            - generic [ref=e62]:
+              - text: System Prompt
+              - textbox "System Prompt" [ref=e63]:
+                - /placeholder: Você é um assistente de suporte...
+            - generic [ref=e64]:
+              - switch [checked] [ref=e65] [cursor=pointer]
+              - checkbox [checked]
+              - generic [ref=e66]: Agente ativo
+        - generic [ref=e67]:
+          - heading "Modelo" [level=3] [ref=e69]
+          - generic [ref=e70]:
+            - generic [ref=e71]:
+              - generic [ref=e72]:
+                - text: Provider
+                - combobox [ref=e73] [cursor=pointer]:
+                  - img [ref=e74]
+                - combobox [ref=e76]
+              - generic [ref=e77]:
+                - text: Modelo
+                - combobox [ref=e78] [cursor=pointer]:
+                  - img [ref=e79]
+                - combobox [ref=e81]
+            - generic [ref=e82]:
+              - generic [ref=e83]:
+                - generic [ref=e84]: Temperatura (0.7)
+                - slider [ref=e85]: "1"
+              - generic [ref=e86]:
+                - text: Max Tokens
+                - spinbutton [ref=e87]
+        - generic [ref=e88]:
+          - heading "Tools" [level=3] [ref=e90]
+          - generic [ref=e91]:
+            - generic [ref=e92]:
+              - generic [ref=e93]:
+                - paragraph [ref=e94]: Busca na Base de Conhecimento
+                - paragraph [ref=e95]: Permite ao agente buscar em documentos enviados
+              - switch [checked] [ref=e96] [cursor=pointer]
+              - checkbox [checked]
+            - generic [ref=e97]:
+              - generic [ref=e98]:
+                - paragraph [ref=e99]: Busca de FAQs
+                - paragraph [ref=e100]: Permite ao agente consultar perguntas frequentes
+              - switch [checked] [ref=e101] [cursor=pointer]
+              - checkbox [checked]
+        - button "Criar Agente" [ref=e102] [cursor=pointer]

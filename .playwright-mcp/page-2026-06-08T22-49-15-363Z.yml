@@ -1,0 +1,47 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - complementary [ref=e3]:
+      - generic [ref=e5]:
+        - img [ref=e7]
+        - generic [ref=e9]: MDEK Digital
+      - navigation [ref=e11]:
+        - link "Inbox" [ref=e12] [cursor=pointer]:
+          - /url: /inbox
+          - img [ref=e13]
+          - generic [ref=e16]: Inbox
+        - link "Agentes" [ref=e17] [cursor=pointer]:
+          - /url: /agents
+          - img [ref=e18]
+          - generic [ref=e21]: Agentes
+        - link "Instâncias" [ref=e22] [cursor=pointer]:
+          - /url: /instances
+          - img [ref=e23]
+          - generic [ref=e29]: Instâncias
+        - link "Equipe" [ref=e30] [cursor=pointer]:
+          - /url: /team
+          - img [ref=e31]
+          - generic [ref=e36]: Equipe
+        - link "Configurações" [ref=e37] [cursor=pointer]:
+          - /url: /settings
+          - img [ref=e38]
+          - generic [ref=e41]: Configurações
+      - button "AG agenteiamarceloburgues@gmail.com Online" [ref=e43] [cursor=pointer]:
+        - generic [ref=e44]: AG
+        - generic:
+          - generic: agenteiamarceloburgues@gmail.com
+          - generic [ref=e49]: Online
+    - main [ref=e50]:
+      - generic [ref=e51]:
+        - generic [ref=e52]:
+          - generic [ref=e53]:
+            - heading "Instâncias WhatsApp" [level=1] [ref=e54]
+            - paragraph [ref=e55]: 0 instâncias configuradas
+          - button "Nova Instância" [ref=e56] [cursor=pointer]:
+            - img [ref=e57]
+            - text: Nova Instância
+        - generic [ref=e58]:
+          - img [ref=e60]
+          - generic [ref=e66]:
+            - heading "Nenhuma instância" [level=3] [ref=e67]
+            - paragraph [ref=e68]: Conecte seu WhatsApp criando uma instância
+  - alert [ref=e69]
