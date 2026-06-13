@@ -51,9 +51,8 @@ export function ChipsInput({ value, onChange, placeholder = "Adicionar..." }: Ch
           if (e.key === "Enter") { e.preventDefault(); add(); }
         }}
         onBlur={(e) => {
-          // Don't commit partial input if focus is moving to a chip's remove button
-          // inside this same component (blur fires before click in browser event order).
-          if (containerRef.current?.contains(e.relatedTarget as Node)) return;
+          if (containerRef.current?.contains(e.relatedTarget as Node | null)) return;
+          if (!e.relatedTarget) return;
           add();
         }}
         placeholder={placeholder}
