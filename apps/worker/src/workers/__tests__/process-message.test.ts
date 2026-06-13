@@ -45,7 +45,7 @@ import {
   getInstanceById,
 } from "@aula-agente/database";
 import { getSendMessageQueue } from "@aula-agente/queue";
-import { startProcessMessageWorker } from "../process-message";
+import { startProcessMessageWorker, matchesKeyword } from "../process-message";
 
 const jobData = {
   conversationId: "conv-1",
@@ -64,11 +64,13 @@ const activeAgent = {
   max_steps: 5,
   tools_config: { search_knowledge: false, search_faq: false },
   is_active: true,
+  activation_keywords: [],
 };
 
 const conversation = {
   id: "conv-1",
   is_human_takeover: false,
+  is_keyword_activated: true,
   evolution_instance_id: "inst-1",
   contacts: { phone: "5511999999999" },
 };
@@ -92,6 +94,41 @@ async function runJob() {
   const workerInstance = vi.mocked(Worker).mock.results[0].value;
   await workerInstance._processor({ data: jobData });
 }
+
+describe("matchesKeyword", () => {
+  it("retorna false quando array de keywords está vazio", () => {
+    expect(matchesKeyword("oi", [])).toBe(false);
+  });
+
+  it("retorna true quando mensagem faz match com uma keyword", () => {
+    expect(matchesKeyword("Preciso de suporte urgente", ["suporte"])).toBe(true);
+  });
+
+  it("matching é case-insensitive", () => {
+    expect(matchesKeyword("SUPORTE", ["suporte"])).toBe(true);
+  });
+
+  it("suporta regex completa", () => {
+    expect(matchesKeyword("oi", ["^oi$"])).toBe(true);
+    expect(matchesKeyword("oioi", ["^oi$"])).toBe(false);
+  });
+
+  it("retorna false quando mensagem não faz match com nenhuma keyword", () => {
+    expect(matchesKeyword("bom dia", ["suporte", "ajuda"])).toBe(false);
+  });
+
+  it("ignora silenciosamente regex inválida e continua com as válidas", () => {
+    expect(matchesKeyword("preciso de ajuda", ["[abc", "ajuda"])).toBe(true);
+  });
+
+  it("ignora regex inválida e retorna false se nenhuma válida fizer match", () => {
+    expect(matchesKeyword("oi", ["[abc"])).toBe(false);
+  });
+
+  it("filtra keywords com apenas espaços antes de testar", () => {
+    expect(matchesKeyword("oi", ["   "])).toBe(false);
+  });
+});
 
 describe("startProcessMessageWorker", () => {
   it("não processa se agente estiver inativo", async () => {
@@ -128,5 +165,57 @@ describe("startProcessMessageWorker", () => {
 
     await expect(runJob()).rejects.toThrow("DB error");
     expect(releaseConversationLock).toHaveBeenCalled();
+  });
+});
+
+describe("keyword gate", () => {
+  it("não filtra quando agente não tem keywords", async () => {
+    await runJob();
+    expect(createMessage).toHaveBeenCalled();
+  });
+
+  it("não filtra quando conversa já está ativada", async () => {
+    vi.mocked(getAgentById).mockResolvedValue({
+      ...activeAgent,
+      activation_keywords: ["suporte"],
+    } as never);
+    vi.mocked(getConversationById).mockResolvedValue({
+      ...conversation,
+      is_keyword_activated: true,
+    } as never);
+    await runJob();
+    expect(createMessage).toHaveBeenCalled();
+  });
+
+  it("filtra silenciosamente quando keyword não faz match", async () => {
+    vi.mocked(getAgentById).mockResolvedValue({
+      ...activeAgent,
+      activation_keywords: ["^suporte$"],
+    } as never);
+    vi.mocked(getConversationById).mockResolvedValue({
+      ...conversation,
+      is_keyword_activated: false,
+    } as never);
+    await runJob();
+    expect(createMessage).not.toHaveBeenCalled();
+  });
+
+  it("ativa conversa e processa quando keyword faz match", async () => {
+    const { updateConversation } = await import("@aula-agente/database");
+    vi.mocked(getAgentById).mockResolvedValue({
+      ...activeAgent,
+      activation_keywords: ["olá"],
+    } as never);
+    vi.mocked(getConversationById).mockResolvedValue({
+      ...conversation,
+      is_keyword_activated: false,
+    } as never);
+    await runJob();
+    expect(updateConversation).toHaveBeenCalledWith(
+      expect.anything(),
+      "conv-1",
+      { is_keyword_activated: true }
+    );
+    expect(createMessage).toHaveBeenCalled();
   });
 });

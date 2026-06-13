@@ -18,6 +18,18 @@ import { acquireConversationLock, releaseConversationLock } from "../lib/lock";
 import { resolveApiKey } from "../lib/vault";
 import { runAgent } from "../agents/agent-runner";
 
+export function matchesKeyword(content: string, keywords: string[]): boolean {
+  const valid = keywords.filter((k) => k.trim().length > 0);
+  return valid.some((keyword) => {
+    try {
+      return new RegExp(keyword, "i").test(content);
+    } catch {
+      console.warn(`[keyword-gate] regex inválida ignorada: ${keyword}`);
+      return false;
+    }
+  });
+}
+
 const AUDIO_EXTENSION_MAP: Record<string, string> = {
   "audio/ogg": "ogg",
   "audio/mp4": "mp4",
@@ -181,6 +193,19 @@ export function startProcessMessageWorker() {
         }
 
         const history = recentMessages.filter((m) => m.id !== messageId);
+
+        // Keyword activation guard
+        if (
+          agent.activation_keywords.length > 0 &&
+          !(conversation as unknown as { is_keyword_activated: boolean }).is_keyword_activated
+        ) {
+          if (!matchesKeyword(currentMessage.content, agent.activation_keywords)) {
+            console.log(`[keyword-gate] Conversa ${conversationId} aguardando keyword — mensagem ignorada`);
+            return;
+          }
+          await updateConversation(db, conversationId, { is_keyword_activated: true });
+          console.log(`[keyword-gate] Conversa ${conversationId} ativada por keyword`);
+        }
 
         const contact = conversation.contacts as { phone: string } | null;
         if (!contact?.phone) {
