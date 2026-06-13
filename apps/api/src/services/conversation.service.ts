@@ -13,6 +13,7 @@ interface EnsureConversationParams {
   phone: string;
   contactName: string | null;
   contactPhotoUrl: string | null;
+  isKeywordActivated: boolean;
 }
 
 export async function ensureConversation(params: EnsureConversationParams) {
@@ -46,6 +47,7 @@ export async function ensureConversation(params: EnsureConversationParams) {
     assigned_to: null,
     tags: [],
     last_message_at: new Date().toISOString(),
+    is_keyword_activated: params.isKeywordActivated,
   });
 
   return { conversation, contact, isNew: true };
