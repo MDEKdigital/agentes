@@ -32,7 +32,7 @@ export function isValidRegex(pattern: string): boolean {
     return false;
   }
   // Heuristic 1: internal quantifier + outer quantifier → (a+)+
-  if (/\([^)]*(?:[+*]|\{\d)[^)]*\)[+*?{]/.test(pattern)) {
+  if (/\([^)]*(?:[+*]|\{\d+)[^)]*\)[+*{]/.test(pattern)) {
     return false;
   }
   // Heuristic 2: alternation inside group + outer quantifier → (a|aa)+

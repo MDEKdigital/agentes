@@ -35,7 +35,7 @@ describe("matchesKeyword", () => {
     expect(matchesKeyword("oi", ["   "])).toBe(false);
   });
 
-  it("reutiliza regex compilada (cache) sem alterar resultado", () => {
+  it("retorna o mesmo resultado em chamadas repetidas", () => {
     expect(matchesKeyword("suporte", ["suporte"])).toBe(true);
     expect(matchesKeyword("outro", ["suporte"])).toBe(false);
   });
@@ -80,6 +80,10 @@ describe("isValidRegex — padrões de alternação (ReDoS)", () => {
 
   it("aceita alternação com quantificador interno mas sem outer quant (a+|b)", () => {
     expect(isValidRegex("(a+|b)")).toBe(true);
+  });
+
+  it("aceita quantificador ? em grupo (não é ReDoS)", () => {
+    expect(isValidRegex("(a+)?")).toBe(true);
   });
 });
 
