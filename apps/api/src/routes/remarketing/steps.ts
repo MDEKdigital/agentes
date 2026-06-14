@@ -57,7 +57,7 @@ export default async function remarketingStepRoutes(app: FastifyInstance) {
 
   app.post<{
     Params: { id: string };
-    Body: { step_order: number; wait_minutes: number; message_type: string; message_content: string };
+    Body: { step_order: number; delay_value: number; delay_unit: string; message_type: string; message_content: string };
   }>("/remarketing/flows/:id/steps", async (request, reply) => {
     const orgId = request.headers["x-organization-id"] as string;
     const membership = request.user.memberships.find(
@@ -69,10 +69,10 @@ export default async function remarketingStepRoutes(app: FastifyInstance) {
     const flow = await resolveFlow(db, request.params.id, orgId);
     if (!flow) return reply.status(404).send({ error: "Fluxo não encontrado" });
 
-    const { step_order, wait_minutes, message_type, message_content } = request.body;
+    const { step_order, delay_value, delay_unit, message_type, message_content } = request.body;
     const { data, error } = await db
       .from("remarketing_steps")
-      .insert({ flow_id: request.params.id, step_order, wait_minutes, message_type, message_content })
+      .insert({ flow_id: request.params.id, step_order, delay_value, delay_unit, message_type, message_content })
       .select()
       .single();
 
@@ -82,7 +82,7 @@ export default async function remarketingStepRoutes(app: FastifyInstance) {
 
   app.put<{
     Params: { id: string; stepId: string };
-    Body: { step_order?: number; wait_minutes?: number; message_type?: string; message_content?: string; is_active?: boolean };
+    Body: { step_order?: number; delay_value?: number; delay_unit?: string; message_type?: string; message_content?: string; is_active?: boolean };
   }>("/remarketing/flows/:id/steps/:stepId", async (request, reply) => {
     const orgId = request.headers["x-organization-id"] as string;
     const membership = request.user.memberships.find(
@@ -97,9 +97,9 @@ export default async function remarketingStepRoutes(app: FastifyInstance) {
     const step = await resolveStep(db, request.params.stepId, request.params.id);
     if (!step) return reply.status(404).send({ error: "Etapa não encontrada" });
 
-    const { step_order, wait_minutes, message_type, message_content, is_active } = request.body;
+    const { step_order, delay_value, delay_unit, message_type, message_content, is_active } = request.body;
     const safeUpdate = Object.fromEntries(
-      Object.entries({ step_order, wait_minutes, message_type, message_content, is_active })
+      Object.entries({ step_order, delay_value, delay_unit, message_type, message_content, is_active })
         .filter(([, v]) => v !== undefined)
     );
     const { data, error } = await db

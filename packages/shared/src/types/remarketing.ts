@@ -1,6 +1,7 @@
 export type RemarketingFlowStatus = 'active' | 'inactive';
 export type RemarketingMessageType = 'text' | 'audio' | 'image';
 export type RemarketingEnrollmentStatus = 'active' | 'completed' | 'cancelled';
+export type RemarketingDelayUnit = 'minutes' | 'hours' | 'days';
 
 export interface RemarketingFlow {
   id: string;
@@ -24,7 +25,8 @@ export interface RemarketingStep {
   id: string;
   flow_id: string;
   step_order: number;
-  wait_minutes: number;
+  delay_value: number;
+  delay_unit: RemarketingDelayUnit;
   message_type: RemarketingMessageType;
   message_content: string;
   is_active: boolean;

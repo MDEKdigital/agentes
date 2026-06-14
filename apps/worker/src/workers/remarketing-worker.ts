@@ -22,6 +22,12 @@ import {
   returnConversationToAgent,
 } from "@aula-agente/database";
 
+function toMinutes(value: number, unit: string): number {
+  if (unit === 'hours') return value * 60;
+  if (unit === 'days') return value * 60 * 24;
+  return value;
+}
+
 async function processRemarketingCycle() {
   const db = getAdminClient();
 
@@ -72,7 +78,7 @@ async function processRemarketingCycle() {
 
       // Verificar timer
       const reference = enrollment.last_step_sent_at ?? enrollment.enrolled_at;
-      const readyAt = new Date(reference).getTime() + step.wait_minutes * 60 * 1000;
+      const readyAt = new Date(reference).getTime() + toMinutes(step.delay_value, step.delay_unit) * 60 * 1000;
       if (Date.now() < readyAt) continue;
 
       // ── Verificar regras de cancelamento ──────────────────────────────────

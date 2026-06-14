@@ -11,7 +11,7 @@ import type { RemarketingFlow, RemarketingStep } from "@aula-agente/shared";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL!;
 
-type StepDraft = Omit<RemarketingStep, "id" | "flow_id" | "created_at"> & { _tempId?: string; id?: string };
+type StepDraft = Omit<RemarketingStep, "id" | "flow_id" | "created_at"> & { _tempId?: string; id?: string; step_order: number };
 
 const DEFAULT_FLOW: Partial<RemarketingFlow> = {
   name: "",
