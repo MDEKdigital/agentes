@@ -55,4 +55,34 @@ export default async function conversationRoutes(app: FastifyInstance) {
       return reply.status(204).send();
     }
   );
+
+  app.delete<{ Params: { conversationId: string } }>(
+    "/conversations/:conversationId",
+    async (request, reply) => {
+      const { conversationId } = request.params;
+      const db = getAdminClient();
+
+      const { data: conv } = await db
+        .from("conversations")
+        .select("organization_id")
+        .eq("id", conversationId)
+        .single();
+
+      if (!conv) return reply.status(404).send({ error: "Conversa não encontrada" });
+
+      const membership = request.user.memberships.find(
+        (m) => m.organization_id === conv.organization_id
+      );
+      if (!membership) return reply.status(403).send({ error: "Acesso negado" });
+
+      const { error } = await db
+        .from("conversations")
+        .delete()
+        .eq("id", conversationId)
+        .eq("organization_id", conv.organization_id);
+
+      if (error) return reply.status(500).send({ error: "Falha ao deletar conversa" });
+      return reply.status(204).send();
+    }
+  );
 }
