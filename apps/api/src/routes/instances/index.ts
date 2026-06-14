@@ -512,16 +512,20 @@ export default async function instanceRoutes(app: FastifyInstance) {
         return reply.status(500).send({ error: "Erro ao iniciar conexão na Evolution API" });
       }
 
+      // Brief wait for the Evolution API to fully enter qrcode state
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+
       const fullNumber = `55${phone}`;
       let result: { code?: unknown };
       try {
         result = await requestPairingCode(instance.instance_name, fullNumber) as { code?: unknown };
       } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
         request.log.warn({ err }, "requestPairingCode failed on Evolution API");
-        return reply.status(500).send({ error: "Erro ao solicitar código na Evolution API" });
+        return reply.status(500).send({ error: `Erro ao solicitar código na Evolution API: ${message}` });
       }
       if (typeof result.code !== "string") {
-        return reply.status(500).send({ error: "Resposta inesperada da Evolution API" });
+        return reply.status(500).send({ error: `Resposta inesperada da Evolution API: ${JSON.stringify(result)}` });
       }
       return { code: result.code };
     }
