@@ -44,7 +44,8 @@ CREATE TABLE remarketing_enrollments (
   status            text NOT NULL DEFAULT 'active'
                       CHECK (status IN ('active', 'completed', 'cancelled')),
   cancel_reason     text,
-  created_at        timestamptz NOT NULL DEFAULT now()
+  created_at        timestamptz NOT NULL DEFAULT now(),
+  updated_at        timestamptz NOT NULL DEFAULT now()
 );
 
 -- ─── Constraints ──────────────────────────────────────────────────────────────
@@ -66,6 +67,10 @@ CREATE INDEX idx_messages_conversation_role_created
 -- ─── Trigger updated_at ───────────────────────────────────────────────────────
 CREATE TRIGGER trg_remarketing_flows_updated_at
   BEFORE UPDATE ON remarketing_flows
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+CREATE TRIGGER trg_remarketing_enrollments_updated_at
+  BEFORE UPDATE ON remarketing_enrollments
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
 -- ─── RLS ──────────────────────────────────────────────────────────────────────
