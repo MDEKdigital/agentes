@@ -23,3 +23,7 @@ export interface ProcessDocumentJobData {
 export interface TakeoverTimeoutJobData {
   // no data needed — scans all expired takeovers
 }
+
+export interface RemarketingJobData {
+  // sem dados — o worker varre todos os enrollments ativos
+}

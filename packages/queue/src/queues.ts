@@ -5,6 +5,7 @@ import type {
   SendMessageJobData,
   ProcessDocumentJobData,
   TakeoverTimeoutJobData,
+  RemarketingJobData,
 } from "./types";
 
 function getConnectionOptions() {
@@ -73,4 +74,16 @@ export function getTakeoverTimeoutQueue() {
     });
   }
   return takeoverTimeoutQueue;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let remarketingQueue: Queue<RemarketingJobData, any, string> | null = null;
+
+export function getRemarketingQueue() {
+  if (!remarketingQueue) {
+    remarketingQueue = new Queue<RemarketingJobData>(QUEUE_NAMES.REMARKETING, {
+      connection: getConnectionOptions(),
+    });
+  }
+  return remarketingQueue;
 }
