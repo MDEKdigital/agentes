@@ -37,4 +37,5 @@ export const QUEUE_NAMES = {
   SEND_MESSAGE: "send-message",
   PROCESS_DOCUMENT: "process-document",
   TAKEOVER_TIMEOUT: "takeover-timeout",
+  REMARKETING: "remarketing",
 } as const;
