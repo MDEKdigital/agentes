@@ -504,16 +504,24 @@ export default async function instanceRoutes(app: FastifyInstance) {
         return reply.status(400).send({ error: "Número inválido. Informe DDD + número (10 ou 11 dígitos, apenas números)" });
       }
 
+      // Put the instance in connecting state so pairingCode endpoint accepts the request
+      try {
+        await getInstanceQrCode(instance.instance_name);
+      } catch (err) {
+        request.log.warn({ err }, "connect before pairing-code failed");
+        return reply.status(500).send({ error: "Erro ao iniciar conexão na Evolution API" });
+      }
+
       const fullNumber = `55${phone}`;
       let result: { code?: unknown };
       try {
         result = await requestPairingCode(instance.instance_name, fullNumber) as { code?: unknown };
       } catch (err) {
         request.log.warn({ err }, "requestPairingCode failed on Evolution API");
-        return reply.status(502).send({ error: "Erro ao solicitar código na Evolution API" });
+        return reply.status(500).send({ error: "Erro ao solicitar código na Evolution API" });
       }
       if (typeof result.code !== "string") {
-        return reply.status(502).send({ error: "Resposta inesperada da Evolution API" });
+        return reply.status(500).send({ error: "Resposta inesperada da Evolution API" });
       }
       return { code: result.code };
     }
