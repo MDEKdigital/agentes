@@ -11,7 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { apiFetch } from "@/lib/api";
-import { Phone, User } from "lucide-react";
+import { Phone, User, Trash2 } from "lucide-react";
 import type { ConversationStatus } from "@aula-agente/shared";
 
 interface SidePanelProps {
@@ -25,6 +25,7 @@ interface SidePanelProps {
     contacts: { phone: string; name: string | null };
   };
   onUpdate: () => void;
+  onDelete: () => void;
 }
 
 function SectionHeader({ children }: { children: React.ReactNode }) {
@@ -35,7 +36,7 @@ function SectionHeader({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function SidePanel({ conversation, onUpdate }: SidePanelProps) {
+export function SidePanel({ conversation, onUpdate, onDelete }: SidePanelProps) {
   const handleStatusChange = async (status: string) => {
     try {
       await apiFetch(`/conversations/${conversation.id}/status`, {
@@ -110,12 +111,23 @@ export function SidePanel({ conversation, onUpdate }: SidePanelProps) {
       </div>
 
       {/* Notas */}
-      <div className="p-4">
+      <div className="border-b border-border p-4">
         <SectionHeader>Notas Internas</SectionHeader>
         <NotesPanel
           conversationId={conversation.id}
           organizationId={conversation.organization_id}
         />
+      </div>
+
+      {/* Apagar conversa */}
+      <div className="p-4 mt-auto">
+        <button
+          onClick={onDelete}
+          className="flex w-full items-center justify-center gap-2 rounded-md border border-destructive/30 px-3 py-2 text-xs font-medium text-destructive hover:bg-destructive/10 transition-colors"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+          Apagar conversa
+        </button>
       </div>
     </div>
   );
