@@ -5,3 +5,4 @@ export * from "./conversations";
 export * from "./messages";
 export * from "./evolution-instances";
 export * from "./knowledge";
+export * from "./remarketing";
