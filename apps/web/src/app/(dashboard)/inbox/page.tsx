@@ -10,6 +10,7 @@ import { ChatPanel } from "@/components/inbox/chat-panel";
 import { Input } from "@/components/ui/input";
 import { Search, MessageSquare, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { apiFetch } from "@/lib/api";
 
 interface ConversationRow {
   id: string;
@@ -122,6 +123,28 @@ function InboxContent() {
     router.push(`/inbox?id=${id}`);
   };
 
+  const handleDelete = useCallback(async (id: string) => {
+    try {
+      await apiFetch(`/conversations/${id}`, { method: "DELETE" });
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Erro ao apagar conversa");
+      return;
+    }
+
+    setConversations((prev) => {
+      const idx = prev.findIndex((c) => c.id === id);
+      const next = prev[idx + 1] ?? prev[idx - 1] ?? null;
+      if (id === selectedId) {
+        if (next) {
+          router.push(`/inbox?id=${next.id}`);
+        } else {
+          router.push("/inbox");
+        }
+      }
+      return prev.filter((c) => c.id !== id);
+    });
+  }, [selectedId, router]);
+
   const filtered = search
     ? conversations.filter((c) => {
         const lower = search.toLowerCase();
@@ -166,6 +189,7 @@ function InboxContent() {
         conversations={filtered}
         selectedId={selectedId}
         onSelect={handleSelect}
+        onDelete={handleDelete}
       />
     );
   };
@@ -212,7 +236,7 @@ function InboxContent() {
       {/* Coluna direita — chat */}
       <div className="flex flex-1 overflow-hidden">
         {selectedId ? (
-          <ChatPanel conversationId={selectedId} />
+          <ChatPanel conversationId={selectedId} onDelete={() => handleDelete(selectedId!)} />
         ) : (
           <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
             <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-muted">

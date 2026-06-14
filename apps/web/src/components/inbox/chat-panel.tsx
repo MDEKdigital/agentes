@@ -14,9 +14,10 @@ import type { Message } from "@aula-agente/shared";
 
 interface ChatPanelProps {
   conversationId: string;
+  onDelete: () => void;
 }
 
-export function ChatPanel({ conversationId }: ChatPanelProps) {
+export function ChatPanel({ conversationId, onDelete }: ChatPanelProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -160,7 +161,7 @@ export function ChatPanel({ conversationId }: ChatPanelProps) {
 
       {/* Painel lateral */}
       {conversation && (
-        <SidePanel conversation={conversation} onUpdate={fetchConversation} />
+        <SidePanel conversation={conversation} onUpdate={fetchConversation} onDelete={onDelete} />
       )}
     </div>
   );
