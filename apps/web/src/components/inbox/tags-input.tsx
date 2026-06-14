@@ -12,14 +12,13 @@ interface TagsInputProps {
 export function TagsInput({ conversationId, tags, onUpdate }: TagsInputProps) {
   const handleChange = (newTags: string[]) => {
     const supabase = createClient();
-    supabase
-      .from("conversations")
-      .update({ tags: newTags })
-      .eq("id", conversationId)
+    void Promise.resolve(
+      supabase.from("conversations").update({ tags: newTags }).eq("id", conversationId)
+    )
       .then(() => onUpdate())
       .catch((err) => {
         console.error("[tags-input] Falha ao atualizar tags:", err);
-        onUpdate(); // refresh from DB to revert the optimistic chip change
+        onUpdate();
       });
   };
 
