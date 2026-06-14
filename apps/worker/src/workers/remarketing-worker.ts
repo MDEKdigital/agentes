@@ -1,7 +1,7 @@
 import { Worker, type Job } from "bullmq";
 import { QUEUE_NAMES } from "@aula-agente/shared";
 import type { RemarketingJobData } from "@aula-agente/queue";
-import { getRemarketingQueue } from "@aula-agente/queue";
+import { getRemarketingQueue, getSendMessageQueue } from "@aula-agente/queue";
 import { getConnectionOptions } from "../lib/redis";
 import {
   getAdminClient,
@@ -20,12 +20,22 @@ import {
   isOptOutMessage,
   isConversationResolved,
   returnConversationToAgent,
+  getConversationById,
 } from "@aula-agente/database";
 
 function toMinutes(value: number, unit: string): number {
-  if (unit === 'hours') return value * 60;
-  if (unit === 'days') return value * 60 * 24;
+  if (unit === "hours") return value * 60;
+  if (unit === "days") return value * 60 * 24;
   return value;
+}
+
+async function getFlowById(db: ReturnType<typeof getAdminClient>, flowId: string) {
+  const { data } = await db
+    .from("remarketing_flows")
+    .select("*")
+    .eq("id", flowId)
+    .maybeSingle();
+  return data;
 }
 
 async function processRemarketingCycle() {
@@ -49,7 +59,6 @@ async function processRemarketingCycle() {
           });
           console.log(`[remarketing] Enrolled conversation ${conv.id} in flow ${flow.id}`);
         } catch (err: unknown) {
-          // Unique constraint violation: conversa já foi enrollada por execução concorrente
           const msg = err instanceof Error ? err.message : String(err);
           if (msg.includes("unique") || msg.includes("duplicate")) {
             console.log(`[remarketing] Skipping duplicate enrollment for conversation ${conv.id}`);
@@ -78,12 +87,17 @@ async function processRemarketingCycle() {
 
       // Verificar timer
       const reference = enrollment.last_step_sent_at ?? enrollment.enrolled_at;
-      const readyAt = new Date(reference).getTime() + toMinutes(step.delay_value, step.delay_unit) * 60 * 1000;
+      const readyAt =
+        new Date(reference).getTime() +
+        toMinutes(step.delay_value, step.delay_unit) * 60 * 1000;
       if (Date.now() < readyAt) continue;
+
+      // Buscar o fluxo diretamente do banco para ter dados sempre atualizados
+      // (o array `flows` do Passo 1 só contém fluxos ativos no momento da varredura)
+      const flow = await getFlowById(db, enrollment.flow_id);
 
       // ── Verificar regras de cancelamento ──────────────────────────────────
 
-      // Conversa resolvida/fechada
       const resolved = await isConversationResolved(db, enrollment.conversation_id);
       if (resolved) {
         await cancelEnrollment(db, enrollment.id, "resolved");
@@ -91,8 +105,6 @@ async function processRemarketingCycle() {
         continue;
       }
 
-      // Cliente respondeu após o enrollment
-      const flow = flows.find((f) => f.id === enrollment.flow_id);
       if (flow?.cancel_on_reply) {
         const replied = await hasContactRepliedSince(
           db,
@@ -101,13 +113,14 @@ async function processRemarketingCycle() {
         );
         if (replied) {
           await cancelEnrollment(db, enrollment.id, "reply");
-          await returnConversationToAgent(db, enrollment.conversation_id, flow.agent_id);
+          if (flow.agent_id) {
+            await returnConversationToAgent(db, enrollment.conversation_id, flow.agent_id);
+          }
           console.log(`[remarketing] Cancelled enrollment ${enrollment.id}: client replied`);
           continue;
         }
       }
 
-      // Cliente pediu opt-out (última mensagem do contato)
       if (flow?.cancel_on_opt_out) {
         const lastMsg = await getLastContactMessage(db, enrollment.conversation_id);
         if (lastMsg && isOptOutMessage(lastMsg.content)) {
@@ -117,22 +130,54 @@ async function processRemarketingCycle() {
         }
       }
 
-      // ── Enviar mensagem ────────────────────────────────────────────────────
-      const { error: msgError } = await db.from("messages").insert({
-        conversation_id: enrollment.conversation_id,
-        organization_id: enrollment.organization_id,
-        role: "agent",
-        content: step.message_content,
-        ...(step.message_type !== "text" && {
-          media_url: step.message_content,
-          media_type: step.message_type,
-        }),
-      });
+      // ── Buscar conversa e telefone do contato ─────────────────────────────
+      const conversation = await getConversationById(db, enrollment.conversation_id);
+      if (!conversation) {
+        console.error(`[remarketing] Conversation ${enrollment.conversation_id} not found, skipping`);
+        continue;
+      }
+
+      const contact = conversation.contacts as { phone: string } | null;
+      if (!contact?.phone) {
+        console.error(`[remarketing] No phone for conversation ${enrollment.conversation_id}, skipping`);
+        continue;
+      }
+
+      const instanceId = flow?.instance_id;
+      if (!instanceId) {
+        console.error(`[remarketing] No instance_id for flow ${enrollment.flow_id}, skipping`);
+        continue;
+      }
+
+      // ── Inserir mensagem no histórico ──────────────────────────────────────
+      const { data: insertedMsg, error: msgError } = await db
+        .from("messages")
+        .insert({
+          conversation_id: enrollment.conversation_id,
+          organization_id: enrollment.organization_id,
+          role: "agent",
+          content: step.message_content,
+          media_url: step.message_type !== "text" ? step.message_content : null,
+          media_type: step.message_type !== "text" ? step.message_type : null,
+        })
+        .select("id")
+        .single();
 
       if (msgError) throw msgError;
 
+      // ── Enfileirar envio real via WhatsApp ────────────────────────────────
+      const sendQueue = getSendMessageQueue();
+      await sendQueue.add("send-message", {
+        conversationId: enrollment.conversation_id,
+        messageId: insertedMsg.id,
+        instanceId,
+        phone: contact.phone,
+        content: step.message_content,
+        organizationId: enrollment.organization_id,
+      });
+
       console.log(
-        `[remarketing] Sent step ${step.step_order} to conversation ${enrollment.conversation_id}`
+        `[remarketing] Queued step ${step.step_order} → conversation ${enrollment.conversation_id} (phone ${contact.phone})`
       );
 
       // ── Avançar para próxima etapa ─────────────────────────────────────────
