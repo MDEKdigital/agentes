@@ -103,7 +103,13 @@ export default async function remarketingFlowRoutes(app: FastifyInstance) {
       .maybeSingle();
     if (!flow) return reply.status(404).send({ error: "Fluxo não encontrado" });
 
-    const updates = request.body;
+    const { name, product_campaign, agent_id, instance_id, entry_silence_minutes,
+            cancel_on_reply, cancel_on_resolved, cancel_on_opt_out } = request.body;
+    const updates = Object.fromEntries(
+      Object.entries({ name, product_campaign, agent_id, instance_id, entry_silence_minutes,
+                       cancel_on_reply, cancel_on_resolved, cancel_on_opt_out })
+        .filter(([, v]) => v !== undefined)
+    );
 
     if (updates.agent_id) {
       const { data: agent } = await db.from("agents").select("id")

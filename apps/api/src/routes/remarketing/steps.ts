@@ -69,9 +69,10 @@ export default async function remarketingStepRoutes(app: FastifyInstance) {
     const flow = await resolveFlow(db, request.params.id, orgId);
     if (!flow) return reply.status(404).send({ error: "Fluxo não encontrado" });
 
+    const { step_order, wait_minutes, message_type, message_content } = request.body;
     const { data, error } = await db
       .from("remarketing_steps")
-      .insert({ flow_id: request.params.id, ...request.body })
+      .insert({ flow_id: request.params.id, step_order, wait_minutes, message_type, message_content })
       .select()
       .single();
 
@@ -96,9 +97,14 @@ export default async function remarketingStepRoutes(app: FastifyInstance) {
     const step = await resolveStep(db, request.params.stepId, request.params.id);
     if (!step) return reply.status(404).send({ error: "Etapa não encontrada" });
 
+    const { step_order, wait_minutes, message_type, message_content, is_active } = request.body;
+    const safeUpdate = Object.fromEntries(
+      Object.entries({ step_order, wait_minutes, message_type, message_content, is_active })
+        .filter(([, v]) => v !== undefined)
+    );
     const { data, error } = await db
       .from("remarketing_steps")
-      .update(request.body)
+      .update(safeUpdate)
       .eq("id", request.params.stepId)
       .eq("flow_id", request.params.id)
       .select()
