@@ -3,7 +3,7 @@
 import type { RemarketingFlow } from "@aula-agente/shared";
 
 interface Agent { id: string; name: string }
-interface Instance { id: string; name: string }
+interface Instance { id: string; instance_name: string }
 
 interface FlowFormProps {
   data: Partial<RemarketingFlow>;
@@ -58,7 +58,7 @@ export function FlowForm({ data, agents, instances, onChange }: FlowFormProps) {
         >
           <option value="">Selecione uma instância</option>
           {instances.map((i) => (
-            <option key={i.id} value={i.id}>{i.name}</option>
+            <option key={i.id} value={i.id}>{i.instance_name}</option>
           ))}
         </select>
       </div>
@@ -95,6 +95,22 @@ export function FlowForm({ data, agents, instances, onChange }: FlowFormProps) {
             </label>
           ))}
         </div>
+      </div>
+
+      <div>
+        <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+          System Prompt do agente de remarketing
+        </label>
+        <textarea
+          rows={5}
+          value={data.system_prompt ?? ""}
+          onChange={(e) => onChange({ system_prompt: e.target.value })}
+          placeholder="Ex: Você é um assistente de vendas especializado em reengajar clientes que pararam de responder. Seja cordial, objetivo e não seja insistente..."
+          className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-blue-electric-400 resize-none"
+        />
+        <p className="mt-1 text-xs text-muted-foreground">
+          Este prompt substitui o prompt do agente principal durante o remarketing.
+        </p>
       </div>
 
       <div className="flex items-center justify-between pt-2 border-t border-border">

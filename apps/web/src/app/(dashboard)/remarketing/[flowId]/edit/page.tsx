@@ -32,7 +32,7 @@ export default function FlowEditPage() {
   const [flowData, setFlowData] = useState<Partial<RemarketingFlow>>(DEFAULT_FLOW);
   const [steps, setSteps] = useState<StepDraft[]>([]);
   const [agents, setAgents] = useState<{ id: string; name: string }[]>([]);
-  const [instances, setInstances] = useState<{ id: string; name: string }[]>([]);
+  const [instances, setInstances] = useState<{ id: string; instance_name: string }[]>([]);
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
 
@@ -52,7 +52,7 @@ export default function FlowEditPage() {
 
     Promise.all([
       supabase.from("agents").select("id, name").eq("organization_id", currentOrg.id),
-      supabase.from("evolution_instances").select("id, name").eq("organization_id", currentOrg.id),
+      supabase.from("evolution_instances").select("id, instance_name").eq("organization_id", currentOrg.id),
     ]).then(([{ data: ag }, { data: inst }]) => {
       setAgents(ag ?? []);
       setInstances(inst ?? []);

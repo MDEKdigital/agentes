@@ -33,6 +33,7 @@ export default async function remarketingFlowRoutes(app: FastifyInstance) {
       cancel_on_reply?: boolean;
       cancel_on_resolved?: boolean;
       cancel_on_opt_out?: boolean;
+      system_prompt?: string;
     };
   }>("/remarketing/flows", async (request, reply) => {
     const orgId = request.headers["x-organization-id"] as string;
@@ -44,7 +45,8 @@ export default async function remarketingFlowRoutes(app: FastifyInstance) {
     if (!membership) return reply.status(403).send({ error: "Acesso de administrador necessário" });
 
     const { name, product_campaign, agent_id, instance_id, entry_silence_minutes,
-            cancel_on_reply = true, cancel_on_resolved = true, cancel_on_opt_out = true } = request.body;
+            cancel_on_reply = true, cancel_on_resolved = true, cancel_on_opt_out = true,
+            system_prompt = "" } = request.body;
 
     const db = getAdminClient();
 
@@ -67,7 +69,8 @@ export default async function remarketingFlowRoutes(app: FastifyInstance) {
     const { data, error } = await db
       .from("remarketing_flows")
       .insert({ organization_id: orgId, name, product_campaign, agent_id, instance_id,
-                entry_silence_minutes, cancel_on_reply, cancel_on_resolved, cancel_on_opt_out })
+                entry_silence_minutes, cancel_on_reply, cancel_on_resolved, cancel_on_opt_out,
+                system_prompt })
       .select()
       .single();
 
@@ -86,6 +89,7 @@ export default async function remarketingFlowRoutes(app: FastifyInstance) {
       cancel_on_reply?: boolean;
       cancel_on_resolved?: boolean;
       cancel_on_opt_out?: boolean;
+      system_prompt?: string;
     };
   }>("/remarketing/flows/:id", async (request, reply) => {
     const orgId = request.headers["x-organization-id"] as string;
@@ -104,10 +108,10 @@ export default async function remarketingFlowRoutes(app: FastifyInstance) {
     if (!flow) return reply.status(404).send({ error: "Fluxo não encontrado" });
 
     const { name, product_campaign, agent_id, instance_id, entry_silence_minutes,
-            cancel_on_reply, cancel_on_resolved, cancel_on_opt_out } = request.body;
+            cancel_on_reply, cancel_on_resolved, cancel_on_opt_out, system_prompt } = request.body;
     const updates = Object.fromEntries(
       Object.entries({ name, product_campaign, agent_id, instance_id, entry_silence_minutes,
-                       cancel_on_reply, cancel_on_resolved, cancel_on_opt_out })
+                       cancel_on_reply, cancel_on_resolved, cancel_on_opt_out, system_prompt })
         .filter(([, v]) => v !== undefined)
     );
 
