@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import Fastify from "fastify";
 
-// Use vi.hoisted to define mocks outside of the mock factory
 const { mockGetInstanceById, mockRequestPairingCode, mockAuthMiddleware } = vi.hoisted(() => ({
   mockGetInstanceById: vi.fn(),
   mockRequestPairingCode: vi.fn(),

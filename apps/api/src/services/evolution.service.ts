@@ -139,5 +139,13 @@ export async function restartInstance(instanceName: string) {
 }
 
 export async function requestPairingCode(instanceName: string, phoneNumber: string) {
+  // Restart to ensure instance is in clean close state — if stuck in qrcode state
+  // from a previous attempt, connect returns pairingCode: null without restarting.
+  try {
+    await restartInstance(instanceName);
+  } catch {
+    // Non-fatal: proceed even if restart fails
+  }
+  await new Promise((resolve) => setTimeout(resolve, 3000));
   return evolutionFetch(`/instance/connect/${encodeURIComponent(instanceName)}?number=${encodeURIComponent(phoneNumber)}`);
 }
