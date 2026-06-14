@@ -139,8 +139,5 @@ export async function restartInstance(instanceName: string) {
 }
 
 export async function requestPairingCode(instanceName: string, phoneNumber: string) {
-  return evolutionFetch(`/instance/pairingCode/${encodeURIComponent(instanceName)}`, {
-    method: "POST",
-    body: JSON.stringify({ number: phoneNumber }),
-  });
+  return evolutionFetch(`/instance/connect/${encodeURIComponent(instanceName)}?number=${encodeURIComponent(phoneNumber)}`);
 }

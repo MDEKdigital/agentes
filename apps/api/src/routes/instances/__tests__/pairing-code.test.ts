@@ -2,10 +2,9 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import Fastify from "fastify";
 
 // Use vi.hoisted to define mocks outside of the mock factory
-const { mockGetInstanceById, mockRequestPairingCode, mockGetInstanceQrCode, mockAuthMiddleware } = vi.hoisted(() => ({
+const { mockGetInstanceById, mockRequestPairingCode, mockAuthMiddleware } = vi.hoisted(() => ({
   mockGetInstanceById: vi.fn(),
   mockRequestPairingCode: vi.fn(),
-  mockGetInstanceQrCode: vi.fn(),
   mockAuthMiddleware: vi.fn(async (request: { user: unknown }) => {
     request.user = {
       memberships: [{ organization_id: "org-1", role: "admin" }],
@@ -19,7 +18,6 @@ vi.mock("@aula-agente/database", () => ({
 }));
 
 vi.mock("../../../services/evolution.service", () => ({
-  getInstanceQrCode: mockGetInstanceQrCode,
   requestPairingCode: mockRequestPairingCode,
 }));
 
@@ -45,13 +43,12 @@ async function buildApp() {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockGetInstanceQrCode.mockResolvedValue({});
 });
 
 describe("POST /instances/:instanceId/pairing-code", () => {
   it("retorna código quando número válido (11 dígitos)", async () => {
     mockGetInstanceById.mockResolvedValue(mockInstance as never);
-    mockRequestPairingCode.mockResolvedValue({ code: "ABCD-EFGH" });
+    mockRequestPairingCode.mockResolvedValue({ pairingCode: "ABCD-EFGH" });
 
     const app = await buildApp();
     const res = await app.inject({
@@ -67,7 +64,7 @@ describe("POST /instances/:instanceId/pairing-code", () => {
 
   it("retorna código quando número válido (10 dígitos)", async () => {
     mockGetInstanceById.mockResolvedValue(mockInstance as never);
-    mockRequestPairingCode.mockResolvedValue({ code: "WXYZ-1234" });
+    mockRequestPairingCode.mockResolvedValue({ pairingCode: "WXYZ-1234" });
 
     const app = await buildApp();
     const res = await app.inject({
@@ -135,20 +132,6 @@ describe("POST /instances/:instanceId/pairing-code", () => {
   it("retorna 500 quando requestPairingCode falha na Evolution API", async () => {
     mockGetInstanceById.mockResolvedValue(mockInstance);
     mockRequestPairingCode.mockRejectedValue(new Error("Evolution down"));
-
-    const app = await buildApp();
-    const res = await app.inject({
-      method: "POST",
-      url: "/instances/inst-1/pairing-code",
-      payload: { phone_number: "11999999999" },
-    });
-
-    expect(res.statusCode).toBe(500);
-  });
-
-  it("retorna 500 quando connect (getInstanceQrCode) falha na Evolution API", async () => {
-    mockGetInstanceById.mockResolvedValue(mockInstance);
-    mockGetInstanceQrCode.mockRejectedValue(new Error("Evolution connect down"));
 
     const app = await buildApp();
     const res = await app.inject({
