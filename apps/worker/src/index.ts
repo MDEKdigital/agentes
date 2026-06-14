@@ -27,6 +27,7 @@ import { startProcessMessageWorker } from "./workers/process-message";
 import { startSendMessageWorker } from "./workers/send-message";
 import { startProcessDocumentWorker } from "./workers/process-document";
 import { startTakeoverTimeoutWorker } from "./workers/takeover-timeout";
+import { startRemarketingWorker } from "./workers/remarketing-worker";
 
 async function main() {
   console.log("Starting workers...");
@@ -36,6 +37,7 @@ async function main() {
     startSendMessageWorker(),
     startProcessDocumentWorker(),
     startTakeoverTimeoutWorker(),
+    startRemarketingWorker(),
   ];
 
   console.log(`${workers.length} workers started successfully`);
