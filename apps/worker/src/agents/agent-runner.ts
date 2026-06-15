@@ -36,6 +36,12 @@ const VALIDATION_MODELS: Record<LLMProvider, string> = {
 
 const MAX_ATTEMPTS = 3;
 
+const CLOSE_CONVERSATION_INSTRUCTION = `[REGRA DE ENCERRAMENTO — SEMPRE ATIVA]
+Quando o cliente demonstrar que não precisa de mais ajuda (ex: "obrigado", "valeu", "era só isso", "tudo certo", "resolveu", "já comprei", "pode encerrar", "não tenho mais dúvidas"), responda de forma natural e pergunte: "Posso ajudar em mais alguma coisa, ou posso finalizar seu atendimento?"
+Se o cliente confirmar o encerramento, envie uma mensagem de despedida natural E chame a ferramenta close_conversation.
+Se o cliente ainda tiver dúvidas, continue o atendimento normalmente sem chamar close_conversation.
+Quando uma conversa for reaberta (o histórico mostra mensagens anteriores encerradas), não repita a saudação inicial — retome diretamente.`.trim();
+
 // Prefix-based vision capability check — covers dated aliases like "gpt-4o-2024-11-20".
 // All claude- and gemini- models support vision; for OpenAI, gpt-4o* and gpt-4-turbo* do.
 // Unknown models fall back to the provider's vision model rather than failing with a 400.
@@ -152,12 +158,6 @@ export async function runAgent(params: RunAgentParams): Promise<RunAgentResult> 
   let totalTokens = 0;
   let allToolCalls: string[] = [];
   let lastText = "";
-  const CLOSE_CONVERSATION_INSTRUCTION = `[REGRA DE ENCERRAMENTO — SEMPRE ATIVA]
-Quando o cliente demonstrar que não precisa de mais ajuda (ex: "obrigado", "valeu", "era só isso", "tudo certo", "resolveu", "já comprei", "pode encerrar", "não tenho mais dúvidas"), responda de forma natural e pergunte: "Posso ajudar em mais alguma coisa, ou posso finalizar seu atendimento?"
-Se o cliente confirmar o encerramento, envie uma mensagem de despedida natural E chame a ferramenta close_conversation.
-Se o cliente ainda tiver dúvidas, continue o atendimento normalmente sem chamar close_conversation.
-Quando uma conversa for reaberta (o histórico mostra mensagens anteriores encerradas), não repita a saudação inicial — retome diretamente.`.trim();
-
   const effectiveBasePrompt = `${agent.system_prompt}\n\n${CLOSE_CONVERSATION_INSTRUCTION}`;
   let systemPrompt = effectiveBasePrompt;
 
