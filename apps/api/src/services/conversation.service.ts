@@ -31,6 +31,10 @@ export async function ensureConversation(params: EnsureConversationParams) {
   const existing = await findOpenConversation(db, contact.id, params.agentId);
 
   if (existing) {
+    if (existing.status === "resolved") {
+      const reopened = await updateConversation(db, existing.id, { status: "open" });
+      return { conversation: reopened, contact, isNew: false };
+    }
     return { conversation: existing, contact, isNew: false };
   }
 

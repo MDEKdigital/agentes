@@ -41,7 +41,7 @@ export async function findOpenConversation(
     .select("*")
     .eq("contact_id", contactId)
     .eq("agent_id", agentId)
-    .in("status", ["open", "waiting"])
+    .in("status", ["open", "waiting", "resolved"])
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
