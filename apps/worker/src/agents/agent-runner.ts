@@ -11,6 +11,7 @@ interface RunAgentParams {
   currentMessage: Message;
   apiKey: string;
   organizationId: string;
+  conversationId: string;
   imageContent?: { base64: string; mimeType: string };
 }
 
@@ -122,7 +123,7 @@ ou
 }
 
 export async function runAgent(params: RunAgentParams): Promise<RunAgentResult> {
-  const { agent, messages, currentMessage, apiKey, organizationId, imageContent } = params;
+  const { agent, messages, currentMessage, apiKey, organizationId, conversationId, imageContent } = params;
 
   const startTime = Date.now();
   const useVisionFallback = !!imageContent && !isVisionCapable(agent.model);
@@ -134,6 +135,7 @@ export async function runAgent(params: RunAgentParams): Promise<RunAgentResult> 
     agentId: agent.id,
     toolsConfig: agent.tools_config,
     apiKey,
+    conversationId,
   });
   const history = formatHistoryForLLM(messages);
 
@@ -150,7 +152,14 @@ export async function runAgent(params: RunAgentParams): Promise<RunAgentResult> 
   let totalTokens = 0;
   let allToolCalls: string[] = [];
   let lastText = "";
-  let systemPrompt = agent.system_prompt;
+  const CLOSE_CONVERSATION_INSTRUCTION = `[REGRA DE ENCERRAMENTO — SEMPRE ATIVA]
+Quando o cliente demonstrar que não precisa de mais ajuda (ex: "obrigado", "valeu", "era só isso", "tudo certo", "resolveu", "já comprei", "pode encerrar", "não tenho mais dúvidas"), responda de forma natural e pergunte: "Posso ajudar em mais alguma coisa, ou posso finalizar seu atendimento?"
+Se o cliente confirmar o encerramento, envie uma mensagem de despedida natural E chame a ferramenta close_conversation.
+Se o cliente ainda tiver dúvidas, continue o atendimento normalmente sem chamar close_conversation.
+Quando uma conversa for reaberta (o histórico mostra mensagens anteriores encerradas), não repita a saudação inicial — retome diretamente.`.trim();
+
+  const effectiveBasePrompt = `${agent.system_prompt}\n\n${CLOSE_CONVERSATION_INSTRUCTION}`;
+  let systemPrompt = effectiveBasePrompt;
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     const result = await generateText({
@@ -173,7 +182,7 @@ export async function runAgent(params: RunAgentParams): Promise<RunAgentResult> 
     lastText = result.text;
 
     const validation = await validateResponse({
-      systemPrompt: agent.system_prompt,
+      systemPrompt: effectiveBasePrompt,
       response: result.text,
       provider: agent.provider,
       apiKey,
@@ -193,7 +202,7 @@ export async function runAgent(params: RunAgentParams): Promise<RunAgentResult> 
     const sanitizedViolation = (validation.violation ?? "")
       .slice(0, 200)
       .replace(/[\x00-\x1F\x7F`\[\]"']/g, "");
-    systemPrompt = `${agent.system_prompt}\n\n[ATENCAO: sua resposta anterior violou uma regra do sistema. Detalhe: ${sanitizedViolation}. Corrija na proxima resposta.]`;
+    systemPrompt = `${effectiveBasePrompt}\n\n[ATENCAO: sua resposta anterior violou uma regra do sistema. Detalhe: ${sanitizedViolation}. Corrija na proxima resposta.]`;
   }
 
   return {

@@ -72,6 +72,7 @@ describe("runAgent", () => {
       currentMessage,
       apiKey: "sk-test",
       organizationId: "org-1",
+      conversationId: "conv-1",
     });
 
     expect(result.text).toBe("Olá! Como posso ajudar?");
@@ -87,6 +88,7 @@ describe("runAgent", () => {
       currentMessage,
       apiKey: "sk-test",
       organizationId: "org-1",
+      conversationId: "conv-1",
     });
 
     const call = vi.mocked(generateText).mock.calls[0][0];
@@ -100,6 +102,7 @@ describe("runAgent", () => {
       currentMessage,
       apiKey: "sk-test",
       organizationId: "org-1",
+      conversationId: "conv-1",
     });
 
     expect(mockBuildToolsForAgent).toHaveBeenCalledWith(
@@ -120,6 +123,7 @@ describe("runAgent", () => {
       currentMessage,
       apiKey: "sk-test",
       organizationId: "org-1",
+      conversationId: "conv-1",
     });
 
     const call = vi.mocked(generateText).mock.calls[0][0];
@@ -148,6 +152,7 @@ describe("runAgent", () => {
       currentMessage,
       apiKey: "sk-test",
       organizationId: "org-1",
+      conversationId: "conv-1",
     });
 
     expect(result.text).toBe("Resposta ok");
@@ -183,6 +188,7 @@ describe("runAgent", () => {
       currentMessage,
       apiKey: "sk-test",
       organizationId: "org-1",
+      conversationId: "conv-1",
     });
 
     expect(result.text).toBe("Resposta corrigida");
@@ -208,6 +214,7 @@ describe("runAgent", () => {
       currentMessage,
       apiKey: "sk-test",
       organizationId: "org-1",
+      conversationId: "conv-1",
     });
 
     expect(result.text).toBe("Ruim 3");
@@ -226,6 +233,7 @@ describe("runAgent", () => {
       currentMessage,
       apiKey: "sk-test",
       organizationId: "org-1",
+      conversationId: "conv-1",
     });
 
     expect(result.text).toBe("Resposta ok");
@@ -245,11 +253,62 @@ describe("runAgent", () => {
       currentMessage,
       apiKey: "sk-test",
       organizationId: "org-1",
+      conversationId: "conv-1",
     });
 
     // A 3ª chamada ao generateText é a retentativa — o system deve incluir a violation
     const retryCall = vi.mocked(generateText).mock.calls[2][0];
     expect((retryCall as { system: string }).system).toContain("mencionou concorrente X");
+  });
+
+  it("passa conversationId para buildToolsForAgent", async () => {
+    await runAgent({
+      agent: baseAgent,
+      messages: [],
+      currentMessage,
+      apiKey: "sk-test",
+      organizationId: "org-1",
+      conversationId: "conv-xyz",
+    });
+
+    expect(mockBuildToolsForAgent).toHaveBeenCalledWith(
+      expect.objectContaining({ conversationId: "conv-xyz" })
+    );
+  });
+
+  it("inclui instrução REGRA DE ENCERRAMENTO no system prompt enviado ao LLM", async () => {
+    await runAgent({
+      agent: baseAgent,
+      messages: [],
+      currentMessage,
+      apiKey: "sk-test",
+      organizationId: "org-1",
+      conversationId: "conv-1",
+    });
+
+    const call = vi.mocked(generateText).mock.calls[0][0];
+    expect((call as { system: string }).system).toContain("REGRA DE ENCERRAMENTO");
+  });
+
+  it("mantém instrução de encerramento no system prompt da retentativa após violation", async () => {
+    vi.mocked(generateText)
+      .mockResolvedValueOnce({ text: "Ruim", usage: { totalTokens: 50, promptTokens: 30, completionTokens: 20 }, steps: [] } as never)
+      .mockResolvedValueOnce({ text: '{"compliant": false, "violation": "erro"}', usage: { totalTokens: 10, promptTokens: 8, completionTokens: 2 }, steps: [] } as never)
+      .mockResolvedValueOnce({ text: "Bom", usage: { totalTokens: 50, promptTokens: 30, completionTokens: 20 }, steps: [] } as never)
+      .mockResolvedValueOnce({ text: '{"compliant": true}', usage: { totalTokens: 10, promptTokens: 8, completionTokens: 2 }, steps: [] } as never);
+
+    await runAgent({
+      agent: baseAgent,
+      messages: [],
+      currentMessage,
+      apiKey: "sk-test",
+      organizationId: "org-1",
+      conversationId: "conv-1",
+    });
+
+    // 3ª chamada = retentativa — system prompt deve ainda conter a instrução de encerramento
+    const retryCall = vi.mocked(generateText).mock.calls[2][0];
+    expect((retryCall as { system: string }).system).toContain("REGRA DE ENCERRAMENTO");
   });
 });
 
@@ -275,6 +334,7 @@ describe("runAgent — suporte a imagem multimodal", () => {
       currentMessage: { ...currentMessage, media_type: "image", content: "[imagem]" },
       apiKey: "sk-test",
       organizationId: "org-1",
+      conversationId: "conv-1",
       imageContent,
     });
 
@@ -300,6 +360,7 @@ describe("runAgent — suporte a imagem multimodal", () => {
       currentMessage: { ...currentMessage, media_type: "image", content: "[imagem]" },
       apiKey: "sk-test",
       organizationId: "org-1",
+      conversationId: "conv-1",
       imageContent,
     });
 
@@ -313,6 +374,7 @@ describe("runAgent — suporte a imagem multimodal", () => {
       currentMessage,
       apiKey: "sk-test",
       organizationId: "org-1",
+      conversationId: "conv-1",
     });
 
     expect(generateText).toHaveBeenCalledWith(
