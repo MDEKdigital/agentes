@@ -6,7 +6,7 @@ const { mockAcquireConversationLock, mockReleaseConversationLock } = vi.hoisted(
 }));
 
 const { mockRunAgent } = vi.hoisted(() => ({
-  mockRunAgent: vi.fn(async () => ({
+  mockRunAgent: vi.fn(async (): Promise<{ text: string; model: string; tokensUsed: number; latencyMs: number; toolCalls: string[] }> => ({
     text: "Resposta do agente",
     model: "gpt-4o-mini",
     tokensUsed: 50,
