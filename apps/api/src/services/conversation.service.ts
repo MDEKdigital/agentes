@@ -1,8 +1,8 @@
 import { getAdminClient } from "@aula-agente/database";
 import {
-  findOpenConversation,
+  findReopenableConversation,
+  reopenConversation,
   createConversation,
-  updateConversation,
   upsertContact,
 } from "@aula-agente/database";
 
@@ -27,12 +27,11 @@ export async function ensureConversation(params: EnsureConversationParams) {
     params.contactPhotoUrl
   );
 
-  // Find existing open conversation
-  const existing = await findOpenConversation(db, contact.id, params.agentId);
+  const existing = await findReopenableConversation(db, contact.id, params.agentId);
 
   if (existing) {
     if (existing.status === "resolved") {
-      const reopened = await updateConversation(db, existing.id, { status: "open" });
+      const reopened = await reopenConversation(db, existing.id);
       return { conversation: reopened, contact, isNew: false };
     }
     return { conversation: existing, contact, isNew: false };

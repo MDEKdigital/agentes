@@ -31,7 +31,7 @@ export async function getConversationById(client: SupabaseClient, id: string) {
   return data;
 }
 
-export async function findOpenConversation(
+export async function findReopenableConversation(
   client: SupabaseClient,
   contactId: string,
   agentId: string
@@ -47,6 +47,23 @@ export async function findOpenConversation(
     .maybeSingle();
   if (error) throw error;
   return data as Conversation | null;
+}
+
+export async function reopenConversation(
+  client: SupabaseClient,
+  id: string
+): Promise<Conversation> {
+  const { data, error } = await client
+    .from("conversations")
+    .update({ status: "open" })
+    .eq("id", id)
+    .eq("status", "resolved")
+    .select()
+    .maybeSingle();
+  if (error) throw error;
+  if (data) return data as Conversation;
+  // Concurrent request already reopened — return current state
+  return getConversationById(client, id);
 }
 
 export async function createConversation(

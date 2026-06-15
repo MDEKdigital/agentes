@@ -1,7 +1,7 @@
 import type { ToolsConfig } from "@aula-agente/shared";
 import { createSearchKnowledgeTool } from "./search-knowledge";
 import { createSearchFaqTool } from "./search-faq";
-import { buildCloseConversationTool } from "./close-conversation";
+import { buildCloseConversationTool, CLOSE_CONVERSATION_TOOL_NAME } from "./close-conversation";
 
 interface RegistryParams {
   organizationId: string;
@@ -24,7 +24,7 @@ export function buildToolsForAgent(params: RegistryParams) {
     tools.searchFaq = createSearchFaqTool(agentId, organizationId);
   }
 
-  tools.close_conversation = buildCloseConversationTool(conversationId);
+  tools[CLOSE_CONVERSATION_TOOL_NAME] = buildCloseConversationTool(conversationId);
 
   return tools;
 }

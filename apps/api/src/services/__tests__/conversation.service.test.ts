@@ -1,21 +1,21 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const {
-  mockFindOpenConversation,
-  mockUpdateConversation,
+  mockFindReopenableConversation,
+  mockReopenConversation,
   mockCreateConversation,
   mockUpsertContact,
 } = vi.hoisted(() => ({
-  mockFindOpenConversation: vi.fn(),
-  mockUpdateConversation: vi.fn(),
+  mockFindReopenableConversation: vi.fn(),
+  mockReopenConversation: vi.fn(),
   mockCreateConversation: vi.fn(),
   mockUpsertContact: vi.fn(),
 }));
 
 vi.mock("@aula-agente/database", () => ({
   getAdminClient: vi.fn(() => ({})),
-  findOpenConversation: mockFindOpenConversation,
-  updateConversation: mockUpdateConversation,
+  findReopenableConversation: mockFindReopenableConversation,
+  reopenConversation: mockReopenConversation,
   createConversation: mockCreateConversation,
   upsertContact: mockUpsertContact,
 }));
@@ -41,46 +41,42 @@ beforeEach(() => {
 describe("ensureConversation", () => {
   it("retorna conversa 'open' existente sem modificar", async () => {
     const openConv = { id: "conv-1", status: "open" };
-    mockFindOpenConversation.mockResolvedValue(openConv);
+    mockFindReopenableConversation.mockResolvedValue(openConv);
 
     const result = await ensureConversation(baseParams);
 
     expect(result.conversation).toEqual(openConv);
     expect(result.isNew).toBe(false);
-    expect(mockUpdateConversation).not.toHaveBeenCalled();
+    expect(mockReopenConversation).not.toHaveBeenCalled();
     expect(mockCreateConversation).not.toHaveBeenCalled();
   });
 
   it("retorna conversa 'waiting' existente sem modificar", async () => {
     const waitingConv = { id: "conv-1", status: "waiting" };
-    mockFindOpenConversation.mockResolvedValue(waitingConv);
+    mockFindReopenableConversation.mockResolvedValue(waitingConv);
 
     const result = await ensureConversation(baseParams);
 
     expect(result.conversation).toEqual(waitingConv);
-    expect(mockUpdateConversation).not.toHaveBeenCalled();
+    expect(mockReopenConversation).not.toHaveBeenCalled();
   });
 
-  it("reativa conversa 'resolved' para 'open' em vez de criar nova", async () => {
+  it("reativa conversa 'resolved' via reopenConversation em vez de criar nova", async () => {
     const resolvedConv = { id: "conv-resolved", status: "resolved" };
     const reopenedConv = { id: "conv-resolved", status: "open" };
-    mockFindOpenConversation.mockResolvedValue(resolvedConv);
-    mockUpdateConversation.mockResolvedValue(reopenedConv);
+    mockFindReopenableConversation.mockResolvedValue(resolvedConv);
+    mockReopenConversation.mockResolvedValue(reopenedConv);
 
     const result = await ensureConversation(baseParams);
 
-    expect(mockUpdateConversation).toHaveBeenCalledWith(
-      expect.anything(),
-      "conv-resolved",
-      { status: "open" }
-    );
+    expect(mockReopenConversation).toHaveBeenCalledWith(expect.anything(), "conv-resolved");
     expect(result.conversation).toEqual(reopenedConv);
     expect(result.isNew).toBe(false);
     expect(mockCreateConversation).not.toHaveBeenCalled();
   });
 
   it("cria nova conversa quando não existe nenhuma", async () => {
-    mockFindOpenConversation.mockResolvedValue(null);
+    mockFindReopenableConversation.mockResolvedValue(null);
     const newConv = { id: "conv-new", status: "open" };
     mockCreateConversation.mockResolvedValue(newConv);
 

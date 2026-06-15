@@ -17,6 +17,7 @@ import {
 import { acquireConversationLock, releaseConversationLock } from "../lib/lock";
 import { resolveApiKey } from "../lib/vault";
 import { runAgent } from "../agents/agent-runner";
+import { CLOSE_CONVERSATION_TOOL_NAME } from "../agents/tools/close-conversation";
 
 type ConversationRow = Conversation & { contacts: { phone: string } | null };
 
@@ -280,7 +281,7 @@ export function startProcessMessageWorker() {
           },
         });
 
-        const wasResolved = Array.isArray(result.toolCalls) && result.toolCalls.includes("close_conversation");
+        const wasResolved = result.toolCalls.includes(CLOSE_CONVERSATION_TOOL_NAME);
         await updateConversation(db, conversationId, {
           last_message_at: new Date().toISOString(),
           status: wasResolved ? "resolved" : "waiting",
