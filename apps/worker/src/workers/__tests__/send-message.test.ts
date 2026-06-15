@@ -81,6 +81,14 @@ describe("splitMessage", () => {
   it("retorna array com 1 elemento para texto com apenas \\n simples", () => {
     expect(splitMessage("linha 1\nlinha 2")).toEqual(["linha 1\nlinha 2"]);
   });
+
+  it("retorna array com string vazia para texto apenas com espaços", () => {
+    expect(splitMessage("   ")).toEqual([""]);
+  });
+
+  it("mantém quebras \\n\\n no 3º elemento ao concatenar overflow", () => {
+    expect(splitMessage("A\n\nB\n\nC\n\n\n\nD")).toEqual(["A", "B", "C\n\nD"]);
+  });
 });
 
 describe("startSendMessageWorker", () => {

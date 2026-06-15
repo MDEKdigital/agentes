@@ -7,7 +7,7 @@ import { getAdminClient, getInstanceById } from "@aula-agente/database";
 
 export function splitMessage(text: string): string[] {
   const parts = text.split(/\n\n+/).map((p) => p.trim()).filter(Boolean);
-  if (parts.length === 0) return [text];
+  if (parts.length === 0) return [text.trim()];
   if (parts.length <= 3) return parts;
   return [...parts.slice(0, 2), parts.slice(2).join("\n\n")];
 }
