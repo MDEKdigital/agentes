@@ -20,7 +20,7 @@ vi.mock("@aula-agente/shared", () => ({
 vi.mock("../../lib/redis", () => ({ getConnectionOptions: vi.fn(() => ({})) }));
 
 import { getInstanceById } from "@aula-agente/database";
-import { startSendMessageWorker } from "../send-message";
+import { startSendMessageWorker, splitMessage } from "../send-message";
 
 const jobData = {
   conversationId: "conv-1",
@@ -56,6 +56,32 @@ async function runJob() {
   await vi.runAllTimersAsync();
   return jobPromise;
 }
+
+describe("splitMessage", () => {
+  it("retorna array com 1 elemento para texto sem parágrafos", () => {
+    expect(splitMessage("Olá tudo bem?")).toEqual(["Olá tudo bem?"]);
+  });
+
+  it("divide em 2 partes por \\n\\n", () => {
+    expect(splitMessage("Parte 1\n\nParte 2")).toEqual(["Parte 1", "Parte 2"]);
+  });
+
+  it("remove partes vazias (múltiplas quebras consecutivas)", () => {
+    expect(splitMessage("Parte 1\n\n\n\nParte 2")).toEqual(["Parte 1", "Parte 2"]);
+  });
+
+  it("limita a 3 partes e concatena o restante no 3º elemento", () => {
+    expect(splitMessage("A\n\nB\n\nC\n\nD")).toEqual(["A", "B", "C\n\nD"]);
+  });
+
+  it("retorna array com 1 elemento para texto vazio", () => {
+    expect(splitMessage("")).toEqual([""]);
+  });
+
+  it("retorna array com 1 elemento para texto com apenas \\n simples", () => {
+    expect(splitMessage("linha 1\nlinha 2")).toEqual(["linha 1\nlinha 2"]);
+  });
+});
 
 describe("startSendMessageWorker", () => {
   it("envia sendPresence composing antes de enviar mensagem", async () => {

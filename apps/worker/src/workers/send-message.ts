@@ -5,6 +5,13 @@ import { getConnectionOptions } from "../lib/redis";
 import { evolutionPost } from "../lib/evolution";
 import { getAdminClient, getInstanceById } from "@aula-agente/database";
 
+export function splitMessage(text: string): string[] {
+  const parts = text.split(/\n\n+/).map((p) => p.trim()).filter(Boolean);
+  if (parts.length === 0) return [text];
+  if (parts.length <= 3) return parts;
+  return [...parts.slice(0, 2), parts.slice(2).join("\n\n")];
+}
+
 async function sendEvolutionText(instanceName: string, phone: string, text: string): Promise<void> {
   await evolutionPost(`/message/sendText/${encodeURIComponent(instanceName)}`, {
     number: phone,
