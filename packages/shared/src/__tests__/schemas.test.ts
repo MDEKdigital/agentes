@@ -50,7 +50,7 @@ describe("createAgentSchema", () => {
   });
 });
 
-describe("activation_keywords", () => {
+describe("activation_rules", () => {
   const valid = {
     name: "Agente Teste",
     system_prompt: "Você é um assistente.",
@@ -62,55 +62,75 @@ describe("activation_keywords", () => {
     const result = createAgentSchema.safeParse(valid);
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.activation_keywords).toEqual([]);
+      expect(result.data.activation_rules).toEqual([]);
     }
   });
 
-  it("aceita array de strings não-vazias", () => {
+  it("aceita single_word com regex válida", () => {
     const result = createAgentSchema.safeParse({
       ...valid,
-      activation_keywords: ["^oi$", "suporte"],
+      activation_rules: [{ type: "single_word", value: "^ajuda$" }],
     });
     expect(result.success).toBe(true);
   });
 
-  it("rejeita string vazia no array", () => {
+  it("rejeita single_word com regex inválida", () => {
     const result = createAgentSchema.safeParse({
       ...valid,
-      activation_keywords: [""],
+      activation_rules: [{ type: "single_word", value: "(unclosed" }],
     });
     expect(result.success).toBe(false);
   });
 
-  it("string só com espaços passa no schema (trim é feito no worker)", () => {
+  it("rejeita single_word com padrão ReDoS", () => {
     const result = createAgentSchema.safeParse({
       ...valid,
-      activation_keywords: ["   "],
+      activation_rules: [{ type: "single_word", value: "(a+)+" }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("aceita word_set com 2+ palavras", () => {
+    const result = createAgentSchema.safeParse({
+      ...valid,
+      activation_rules: [{ type: "word_set", words: ["suporte", "urgente"] }],
     });
     expect(result.success).toBe(true);
   });
 
-  it("rejeita regex inválida no array de keywords", () => {
+  it("rejeita word_set com menos de 2 palavras", () => {
     const result = createAgentSchema.safeParse({
       ...valid,
-      activation_keywords: ["(unclosed"],
+      activation_rules: [{ type: "word_set", words: ["suporte"] }],
     });
     expect(result.success).toBe(false);
   });
 
-  it("rejeita padrão com risco de ReDoS", () => {
+  it("aceita phrase com campos válidos", () => {
     const result = createAgentSchema.safeParse({
       ...valid,
-      activation_keywords: ["(a+)+"],
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it("aceita regex válida sem risco de ReDoS", () => {
-    const result = createAgentSchema.safeParse({
-      ...valid,
-      activation_keywords: ["^ajuda$", "suporte", "[0-9]+"],
+      activation_rules: [{ type: "phrase", intent: "Finalizar atendimento", confidence_threshold: 0.8 }],
     });
     expect(result.success).toBe(true);
+  });
+
+  it("phrase usa confidence_threshold 0.7 por default", () => {
+    const result = createAgentSchema.safeParse({
+      ...valid,
+      activation_rules: [{ type: "phrase", intent: "Finalizar atendimento" }],
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      const rule = result.data.activation_rules[0] as { type: "phrase"; confidence_threshold: number };
+      expect(rule.confidence_threshold).toBe(0.7);
+    }
+  });
+
+  it("rejeita type desconhecido", () => {
+    const result = createAgentSchema.safeParse({
+      ...valid,
+      activation_rules: [{ type: "unknown", value: "algo" }],
+    });
+    expect(result.success).toBe(false);
   });
 });

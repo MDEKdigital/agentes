@@ -13,6 +13,7 @@ export interface Conversation {
   tags: string[];
   last_message_at: string;
   is_keyword_activated: boolean;
+  awaiting_activation_confirmation: boolean;
   created_at: string;
   updated_at: string;
 }
