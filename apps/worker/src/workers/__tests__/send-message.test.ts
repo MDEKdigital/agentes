@@ -20,7 +20,7 @@ vi.mock("@aula-agente/shared", () => ({
 vi.mock("../../lib/redis", () => ({ getConnectionOptions: vi.fn(() => ({})) }));
 
 import { getInstanceById } from "@aula-agente/database";
-import { startSendMessageWorker, splitMessage } from "../send-message";
+import { startSendMessageWorker, splitMessage, typingDelay } from "../send-message";
 
 const jobData = {
   conversationId: "conv-1",
@@ -88,6 +88,41 @@ describe("splitMessage", () => {
 
   it("mantém quebras \\n\\n no 3º elemento ao concatenar overflow", () => {
     expect(splitMessage("A\n\nB\n\nC\n\n\n\nD")).toEqual(["A", "B", "C\n\nD"]);
+  });
+});
+
+describe("typingDelay", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it("delay entre 1000–2000ms para texto curto (≤ 100 chars)", async () => {
+    const spy = vi.spyOn(globalThis, "setTimeout");
+    const p = typingDelay("a".repeat(50));
+    vi.runAllTimers();
+    await p;
+    const delay = spy.mock.calls[0][1] as number;
+    expect(delay).toBeGreaterThanOrEqual(1000);
+    expect(delay).toBeLessThanOrEqual(2000);
+  });
+
+  it("delay entre 2000–4000ms para texto médio (101–300 chars)", async () => {
+    const spy = vi.spyOn(globalThis, "setTimeout");
+    const p = typingDelay("a".repeat(200));
+    vi.runAllTimers();
+    await p;
+    const delay = spy.mock.calls[0][1] as number;
+    expect(delay).toBeGreaterThanOrEqual(2000);
+    expect(delay).toBeLessThanOrEqual(4000);
+  });
+
+  it("delay entre 3000–5000ms para texto longo (> 300 chars)", async () => {
+    const spy = vi.spyOn(globalThis, "setTimeout");
+    const p = typingDelay("a".repeat(400));
+    vi.runAllTimers();
+    await p;
+    const delay = spy.mock.calls[0][1] as number;
+    expect(delay).toBeGreaterThanOrEqual(3000);
+    expect(delay).toBeLessThanOrEqual(5000);
   });
 });
 

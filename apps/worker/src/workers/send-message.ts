@@ -34,8 +34,22 @@ async function sendPresence(
   }
 }
 
-function randomDelay(min = 3000, max = 8000): Promise<void> {
+export function typingDelay(text: string): Promise<void> {
+  const len = text.length;
+  let min: number, max: number;
+  if (len <= 100) {
+    min = 1000; max = 2000;
+  } else if (len <= 300) {
+    min = 2000; max = 4000;
+  } else {
+    min = 3000; max = 5000;
+  }
   const ms = Math.floor(Math.random() * (max - min + 1)) + min;
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function shortPause(): Promise<void> {
+  const ms = Math.floor(Math.random() * 501) + 500;
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
@@ -52,7 +66,7 @@ export function startSendMessageWorker() {
       }
 
       await sendPresence(instance.instance_name, phone, "composing");
-      await randomDelay();
+      await typingDelay(content);
       try {
         await sendEvolutionText(instance.instance_name, phone, content);
       } finally {
