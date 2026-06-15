@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { matchesKeyword, isValidRegex } from "../utils/keyword";
+import { matchesKeyword, isValidRegex, matchesWordSet } from "../utils/keyword";
 
 describe("matchesKeyword", () => {
   it("retorna false quando array de keywords está vazio", () => {
@@ -105,5 +105,43 @@ describe("matchesKeyword — não cacheia null para regex inválida", () => {
     matchesKeyword("msg", ["[invalido2"]);
     const result2 = matchesKeyword("msg", ["[invalido2"]);
     expect(result2).toBe(false);
+  });
+});
+
+describe("matchesWordSet", () => {
+  it("retorna false quando array de palavras está vazio", () => {
+    expect(matchesWordSet("texto qualquer", [])).toBe(false);
+  });
+
+  it("retorna true quando todas as palavras estão presentes (qualquer ordem)", () => {
+    expect(matchesWordSet("Meu atendimento foi resolver.", ["resolver", "atendimento"])).toBe(true);
+  });
+
+  it("retorna true quando as palavras aparecem fora de ordem", () => {
+    expect(matchesWordSet("Pode resolver esse atendimento.", ["atendimento", "resolver"])).toBe(true);
+  });
+
+  it("retorna false quando ao menos uma palavra está ausente", () => {
+    expect(matchesWordSet("O atendimento foi ótimo.", ["resolver", "atendimento"])).toBe(false);
+  });
+
+  it("matching é case-insensitive", () => {
+    expect(matchesWordSet("RESOLVER o ATENDIMENTO.", ["resolver", "atendimento"])).toBe(true);
+  });
+
+  it("retorna false quando mensagem está vazia", () => {
+    expect(matchesWordSet("", ["resolver"])).toBe(false);
+  });
+
+  it("match de substring conta (resolve está em resolver)", () => {
+    expect(matchesWordSet("Atendimento resolve rapidamente.", ["resolve", "atendimento"])).toBe(true);
+  });
+
+  it("ignora palavras vazias no array", () => {
+    expect(matchesWordSet("ajuda aqui", ["ajuda", "   "])).toBe(false);
+  });
+
+  it("retorna true com uma única palavra (funciona como matchesKeyword)", () => {
+    expect(matchesWordSet("preciso de suporte", ["suporte"])).toBe(true);
   });
 });

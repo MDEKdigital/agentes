@@ -65,3 +65,12 @@ export function matchesKeyword(content: string, keywords: string[]): boolean {
     return regex ? regex.test(content) : false;
   });
 }
+
+export function matchesWordSet(content: string, words: string[]): boolean {
+  if (words.length === 0) return false;
+  return words.every((w) => {
+    if (!w.trim()) return false;
+    const regex = getCachedRegex(w);
+    return regex ? regex.test(content) : false;
+  });
+}
