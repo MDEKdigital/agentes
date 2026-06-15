@@ -261,6 +261,7 @@ export function startProcessMessageWorker() {
           apiKey,
           organizationId,
           imageContent,
+          conversationId,
         });
 
         const responseMessage = await createMessage(db, {
@@ -279,9 +280,10 @@ export function startProcessMessageWorker() {
           },
         });
 
+        const wasResolved = result.toolCalls.includes("close_conversation");
         await updateConversation(db, conversationId, {
           last_message_at: new Date().toISOString(),
-          status: "waiting",
+          status: wasResolved ? "resolved" : "waiting",
           // is_keyword_activated already committed above when needed
         });
 
