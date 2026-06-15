@@ -222,7 +222,7 @@ describe("startSendMessageWorker", () => {
     mockFetch.mockResolvedValue({ ok: true, json: async () => ({}) } as never);
 
     startSendMessageWorker();
-    const workerInstance = vi.mocked(Worker).mock.results[0].value;
+    const workerInstance = vi.mocked(Worker).mock.results.at(-1)!.value;
     const jobPromise = workerInstance._processor({ data: multiPartJob });
     jobPromise.catch(() => {});
     await vi.runAllTimersAsync();
@@ -230,23 +230,21 @@ describe("startSendMessageWorker", () => {
 
     const calls = mockFetch.mock.calls;
 
-    // Extrair chamadas por tipo
-    const presenceCalls = calls.filter((c) => (c[0] as string).includes("/chat/sendPresence/"));
-    const sendTextCalls = calls.filter((c) => (c[0] as string).includes("/message/sendText/"));
-
-    expect(presenceCalls.length).toBe(4); // 2 composing + 2 paused
-    expect(sendTextCalls.length).toBe(2);
+    // Verificar sequência completa: composing → sendText → paused → composing → sendText → paused
+    const allCallTypes = calls.map((c) => {
+      const url = c[0] as string;
+      if (url.includes("/chat/sendPresence/")) {
+        return JSON.parse(c[1].body as string).options.presence as string;
+      }
+      return "sendText";
+    });
+    expect(allCallTypes).toEqual(["composing", "sendText", "paused", "composing", "sendText", "paused"]);
 
     // Verificar textos enviados
+    const sendTextCalls = calls.filter((c) => (c[0] as string).includes("/message/sendText/"));
     const [firstText, secondText] = sendTextCalls.map((c) => JSON.parse(c[1].body as string).text);
     expect(firstText).toBe("Primeiro parágrafo.");
     expect(secondText).toBe("Segundo parágrafo.");
-
-    // Verificar ordem: composing antes de cada sendText
-    const allCallUrls = calls.map((c) => c[0] as string);
-    const firstComposingIdx = allCallUrls.findIndex((u) => u.includes("/chat/sendPresence/"));
-    const firstSendTextIdx = allCallUrls.findIndex((u) => u.includes("/message/sendText/"));
-    expect(firstComposingIdx).toBeLessThan(firstSendTextIdx);
   });
 
   it("mensagem sem parágrafo gera 1 composing + 1 paused + 1 sendText", async () => {
