@@ -72,6 +72,17 @@ Usar `effectiveBasePrompt` (não `agent.system_prompt`) onde quer que o prompt b
 ### Modificação: `apps/worker/src/workers/process-message.ts`
 
 - Passar `conversationId` ao chamar `runAgent`
+- Após o `runAgent`, verificar se `close_conversation` foi chamada via `result.toolCalls` e condicionar o status do `updateConversation` final:
+
+```typescript
+const wasResolved = result.toolCalls.includes("close_conversation");
+await updateConversation(db, conversationId, {
+  last_message_at: new Date().toISOString(),
+  status: wasResolved ? "resolved" : "waiting",
+});
+```
+
+Sem essa condicional, o `updateConversation` incondicional sobrescreveria o `"resolved"` gravado pela tool durante o `runAgent`, neutralizando a feature.
 
 ### Modificação: `packages/database/src/queries/conversations.ts`
 
@@ -139,6 +150,20 @@ Cliente: "oi, tenho mais uma dúvida"
 
 - Se `updateConversation` falhar dentro da tool, o erro propaga para o Vercel AI SDK, que o retorna ao agente como falha de tool. O agente pode tentar novamente ou informar o cliente. O job BullMQ não é afetado.
 - A tool nunca impede o envio da mensagem de despedida — o texto já foi gerado antes da tool executar no ciclo do AI SDK.
+
+## Correções incorporadas do code review
+
+### 1. updateConversation condicional em process-message
+O `updateConversation` final em `process-message.ts` sempre sobrescrevia o status com `"waiting"`. Corrigido: verificar `result.toolCalls.includes("close_conversation")` e definir `status: wasResolved ? "resolved" : "waiting"`.
+
+### 2. Race remarketing na janela de reabertura
+Quando `ensureConversation` reativa a conversa (`"resolved"` → `"open"`), o ciclo de remarketing (60s) pode rodar antes da mensagem do contato ser gravada, enrolando a conversa indevidamente. Mitigação: o remarketing já verifica `last_message_at` implicitamente via contagem de mensagens recentes — a janela de exposição é de até 60s. Aceitável por ora; mitigação futura: filtrar também por `last_message_at`.
+
+### 3. effectiveBasePrompt no retry loop
+Já documentado na Seção agent-runner: usar `effectiveBasePrompt` em todos os pontos onde `agent.system_prompt` é referenciado dentro de `runAgent`, inclusive na linha de reconstrução do prompt após violation.
+
+### 4. Testes com novo parâmetro conversationId
+Todos os call sites de `runAgent` e `buildToolsForAgent` nos arquivos de teste precisam receber o novo parâmetro `conversationId`. Coberto explicitamente nos testes listados abaixo.
 
 ---
 
