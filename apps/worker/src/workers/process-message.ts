@@ -280,7 +280,7 @@ export function startProcessMessageWorker() {
           },
         });
 
-        const wasResolved = result.toolCalls.includes("close_conversation");
+        const wasResolved = Array.isArray(result.toolCalls) && result.toolCalls.includes("close_conversation");
         await updateConversation(db, conversationId, {
           last_message_at: new Date().toISOString(),
           status: wasResolved ? "resolved" : "waiting",
