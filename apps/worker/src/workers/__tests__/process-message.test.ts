@@ -151,6 +151,49 @@ describe("startProcessMessageWorker", () => {
     await expect(runJob()).rejects.toThrow("DB error");
     expect(mockReleaseConversationLock).toHaveBeenCalled();
   });
+
+  it("passa conversationId para runAgent", async () => {
+    await runJob();
+    expect(mockRunAgent).toHaveBeenCalledWith(
+      expect.objectContaining({ conversationId: "conv-1" })
+    );
+  });
+
+  it("seta status 'waiting' quando agente não chamou close_conversation", async () => {
+    mockRunAgent.mockResolvedValue({
+      text: "Resposta",
+      model: "gpt-4o-mini",
+      tokensUsed: 50,
+      latencyMs: 100,
+      toolCalls: [],
+    });
+
+    await runJob();
+
+    expect(updateConversation).toHaveBeenCalledWith(
+      expect.anything(),
+      "conv-1",
+      expect.objectContaining({ status: "waiting" })
+    );
+  });
+
+  it("seta status 'resolved' quando agente chamou close_conversation", async () => {
+    mockRunAgent.mockResolvedValue({
+      text: "Até logo!",
+      model: "gpt-4o-mini",
+      tokensUsed: 50,
+      latencyMs: 100,
+      toolCalls: ["close_conversation"],
+    });
+
+    await runJob();
+
+    expect(updateConversation).toHaveBeenCalledWith(
+      expect.anything(),
+      "conv-1",
+      expect.objectContaining({ status: "resolved" })
+    );
+  });
 });
 
 describe("keyword gate", () => {
@@ -275,49 +318,6 @@ describe("keyword gate", () => {
       expect.anything(),
       "conv-1",
       expect.objectContaining({ is_keyword_activated: true })
-    );
-  });
-
-  it("passa conversationId para runAgent", async () => {
-    await runJob();
-    expect(mockRunAgent).toHaveBeenCalledWith(
-      expect.objectContaining({ conversationId: "conv-1" })
-    );
-  });
-
-  it("seta status 'waiting' quando agente não chamou close_conversation", async () => {
-    mockRunAgent.mockResolvedValue({
-      text: "Resposta",
-      model: "gpt-4o-mini",
-      tokensUsed: 50,
-      latencyMs: 100,
-      toolCalls: [],
-    });
-
-    await runJob();
-
-    expect(updateConversation).toHaveBeenCalledWith(
-      expect.anything(),
-      "conv-1",
-      expect.objectContaining({ status: "waiting" })
-    );
-  });
-
-  it("seta status 'resolved' quando agente chamou close_conversation", async () => {
-    mockRunAgent.mockResolvedValue({
-      text: "Até logo!",
-      model: "gpt-4o-mini",
-      tokensUsed: 50,
-      latencyMs: 100,
-      toolCalls: ["close_conversation"],
-    });
-
-    await runJob();
-
-    expect(updateConversation).toHaveBeenCalledWith(
-      expect.anything(),
-      "conv-1",
-      expect.objectContaining({ status: "resolved" })
     );
   });
 });
