@@ -59,7 +59,11 @@ export async function updateInstance(
   return data as EvolutionInstance;
 }
 
-export async function deleteInstance(client: SupabaseClient, id: string) {
-  const { error } = await client.from("evolution_instances").delete().eq("id", id);
+export async function deleteInstance(client: SupabaseClient, id: string, organizationId: string) {
+  const { error } = await client
+    .from("evolution_instances")
+    .delete()
+    .eq("id", id)
+    .eq("organization_id", organizationId);
   if (error) throw error;
 }

@@ -16,7 +16,11 @@ const { mockRunAgent } = vi.hoisted(() => ({
 }));
 
 const { mockEvaluateActivation } = vi.hoisted(() => ({
-  mockEvaluateActivation: vi.fn(async () => ({ action: "activate" as const })),
+  mockEvaluateActivation: vi.fn(async (): Promise<
+    | { action: "activate" }
+    | { action: "ignore" }
+    | { action: "confirm"; confirmationMessage: string }
+  > => ({ action: "activate" })),
 }));
 vi.mock("../evaluate-activation", () => ({
   evaluateActivation: mockEvaluateActivation,

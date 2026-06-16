@@ -45,7 +45,11 @@ export async function updateAgent(client: SupabaseClient, id: string, updates: P
   return data as Agent;
 }
 
-export async function deleteAgent(client: SupabaseClient, id: string) {
-  const { error } = await client.from("agents").delete().eq("id", id);
+export async function deleteAgent(client: SupabaseClient, id: string, organizationId: string) {
+  const { error } = await client
+    .from("agents")
+    .delete()
+    .eq("id", id)
+    .eq("organization_id", organizationId);
   if (error) throw error;
 }

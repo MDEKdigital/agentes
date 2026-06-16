@@ -110,7 +110,7 @@ export default async function knowledgeDocumentRoutes(app: FastifyInstance) {
         }
       }
 
-      await deleteDocument(db, doc.id);
+      await deleteDocument(db, doc.id, doc.organization_id);
       return reply.status(204).send();
     }
   );

@@ -116,7 +116,7 @@ export default async function knowledgeFaqRoutes(app: FastifyInstance) {
       );
       if (!membership) return reply.status(403).send({ error: "Acesso de administrador necessário" });
 
-      await deleteFaq(db, request.params.faqId);
+      await deleteFaq(db, request.params.faqId, faq.organization_id);
       return reply.status(204).send();
     }
   );

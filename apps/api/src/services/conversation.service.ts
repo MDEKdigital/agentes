@@ -3,6 +3,7 @@ import {
   findReopenableConversation,
   reopenConversation,
   createConversation,
+  updateConversation,
   upsertContact,
 } from "@aula-agente/database";
 
@@ -50,6 +51,7 @@ export async function ensureConversation(params: EnsureConversationParams) {
     tags: [],
     last_message_at: new Date().toISOString(),
     is_keyword_activated: false,
+    awaiting_activation_confirmation: false,
   });
 
   return { conversation, contact, isNew: true };

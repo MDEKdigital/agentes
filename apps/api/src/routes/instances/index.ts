@@ -259,9 +259,9 @@ export default async function instanceRoutes(app: FastifyInstance) {
       }
 
       const membership = request.user.memberships.find(
-        (m) => m.organization_id === instance.organization_id
+        (m) => m.organization_id === instance.organization_id && m.role !== "agent"
       );
-      if (!membership) return reply.status(403).send({ error: "Acesso negado" });
+      if (!membership) return reply.status(403).send({ error: "Acesso de administrador necessário" });
 
       const qrData = await getInstanceQrCode(instance.instance_name);
       return qrData;
@@ -323,7 +323,7 @@ export default async function instanceRoutes(app: FastifyInstance) {
         request.log.warn({ err }, "Failed to delete instance from Evolution API");
       }
 
-      await deleteInstanceRecord(db, instance.id);
+      await deleteInstanceRecord(db, instance.id, instance.organization_id);
       return reply.status(204).send();
     }
   );

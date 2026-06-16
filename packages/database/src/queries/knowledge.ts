@@ -50,10 +50,18 @@ export async function updateDocument(
   return data as KnowledgeDocument;
 }
 
-export async function deleteDocument(client: SupabaseClient, id: string) {
-  const { error: chunksError } = await client.from("knowledge_chunks").delete().eq("document_id", id);
+export async function deleteDocument(client: SupabaseClient, id: string, organizationId: string) {
+  const { error: chunksError } = await client
+    .from("knowledge_chunks")
+    .delete()
+    .eq("document_id", id)
+    .eq("organization_id", organizationId);
   if (chunksError) throw chunksError;
-  const { error } = await client.from("knowledge_documents").delete().eq("id", id);
+  const { error } = await client
+    .from("knowledge_documents")
+    .delete()
+    .eq("id", id)
+    .eq("organization_id", organizationId);
   if (error) throw error;
 }
 
@@ -129,7 +137,11 @@ export async function updateFaq(
   return data as KnowledgeFaq;
 }
 
-export async function deleteFaq(client: SupabaseClient, id: string) {
-  const { error } = await client.from("knowledge_faqs").delete().eq("id", id);
+export async function deleteFaq(client: SupabaseClient, id: string, organizationId: string) {
+  const { error } = await client
+    .from("knowledge_faqs")
+    .delete()
+    .eq("id", id)
+    .eq("organization_id", organizationId);
   if (error) throw error;
 }
