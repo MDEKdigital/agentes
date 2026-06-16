@@ -67,9 +67,14 @@ export function ActivationRulesEditor({ value, onChange }: Props) {
     <div className="space-y-3">
       <div className="flex flex-wrap gap-2">
         {value.map((rule, i) => (
-          <Badge key={i} variant={ruleVariant(rule.type)} className="gap-1 pr-1">
+          <Badge key={JSON.stringify(rule)} variant={ruleVariant(rule.type)} className="gap-1 pr-1">
             {ruleLabel(rule)}
-            <button type="button" onClick={() => removeRule(i)} className="ml-1 hover:text-destructive">
+            <button
+              type="button"
+              aria-label="Remover regra"
+              onClick={() => removeRule(i)}
+              className="ml-1 hover:text-destructive"
+            >
               <X className="h-3 w-3" />
             </button>
           </Badge>
@@ -133,7 +138,7 @@ export function ActivationRulesEditor({ value, onChange }: Props) {
           </>
         )}
 
-        <Button type="button" variant="outline" size="icon" onClick={addRule}>
+        <Button type="button" variant="outline" size="icon" aria-label="Adicionar regra" onClick={addRule}>
           <Plus className="h-4 w-4" />
         </Button>
       </div>
