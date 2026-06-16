@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { AgentForm } from "@/components/agents/agent-form";
 import { Button } from "@/components/ui/button";
 import { Trash2 } from "lucide-react";
-import type { Agent } from "@aula-agente/shared";
+import type { Agent, ActivationRule } from "@aula-agente/shared";
 import Link from "next/link";
 
 export default function EditAgentPage() {
@@ -33,29 +33,29 @@ export default function EditAgentPage() {
       throw error;
     }
 
-    const newKeywords = values.activation_keywords as string[] | undefined;
-    const hadKeywords = agent ? agent.activation_keywords.length > 0 : false;
-    const hasKeywords = newKeywords ? newKeywords.length > 0 : false;
+    const newRules = values.activation_rules as ActivationRule[] | undefined;
+    const hadRules = agent ? agent.activation_rules.length > 0 : false;
+    const hasRules = newRules ? newRules.length > 0 : false;
 
     if (agent) {
-      if (!hadKeywords && hasKeywords) {
+      if (!hadRules && hasRules) {
         const { error: convError } = await supabase
           .from("conversations")
-          .update({ is_keyword_activated: true })
-          .eq("agent_id", agentId)
-          .in("status", ["open", "waiting"]);
-        if (convError) {
-          alert(`Agente salvo, mas não foi possível ativar conversas existentes: ${convError.message}`);
-          return;
-        }
-      } else if (hadKeywords && !hasKeywords) {
-        const { error: convError } = await supabase
-          .from("conversations")
-          .update({ is_keyword_activated: false })
+          .update({ is_keyword_activated: false, awaiting_activation_confirmation: false })
           .eq("agent_id", agentId)
           .in("status", ["open", "waiting"]);
         if (convError) {
           alert(`Agente salvo, mas não foi possível resetar conversas existentes: ${convError.message}`);
+          return;
+        }
+      } else if (hadRules && !hasRules) {
+        const { error: convError } = await supabase
+          .from("conversations")
+          .update({ is_keyword_activated: true, awaiting_activation_confirmation: false })
+          .eq("agent_id", agentId)
+          .in("status", ["open", "waiting"]);
+        if (convError) {
+          alert(`Agente salvo, mas não foi possível ativar conversas existentes: ${convError.message}`);
           return;
         }
       }

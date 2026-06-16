@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ChipsInput } from "@/components/ui/chips-input";
+import { ActivationRulesEditor } from "@/components/agents/activation-rules-editor";
 
 const agentFormSchema = createAgentSchema.extend({ is_active: z.boolean().default(true) });
 type AgentFormValues = z.infer<typeof agentFormSchema>;
@@ -43,7 +43,7 @@ export function AgentForm({ defaultValues, onSubmit, submitLabel }: AgentFormPro
       max_tokens: 1024,
       max_steps: 5,
       tools_config: { search_knowledge: true, search_faq: true },
-      activation_keywords: [],
+      activation_rules: [],
       is_active: true,
       ...defaultValues,
     },
@@ -81,16 +81,11 @@ export function AgentForm({ defaultValues, onSubmit, submitLabel }: AgentFormPro
           </div>
 
           <div className="space-y-2">
-            <Label>Ativação por Palavra-chave</Label>
-            <ChipsInput
-              value={form.watch("activation_keywords") ?? []}
-              onChange={(v) => form.setValue("activation_keywords", v, { shouldDirty: true })}
-              placeholder="Digite uma regex e pressione Enter..."
+            <Label>Regras de Ativação</Label>
+            <ActivationRulesEditor
+              value={form.watch("activation_rules") ?? []}
+              onChange={(v) => form.setValue("activation_rules", v, { shouldDirty: true })}
             />
-            <p className="text-xs text-muted-foreground">
-              Deixe vazio para o agente sempre responder. Cada entrada é uma regex (case-insensitive).
-              Evite padrões que matchem placeholders de mídia como <code>[áudio]</code>.
-            </p>
           </div>
 
           <div className="space-y-2">
