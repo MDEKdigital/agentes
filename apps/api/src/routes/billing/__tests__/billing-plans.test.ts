@@ -135,4 +135,18 @@ describe("GET /billing/plans", () => {
     expect(mockGetActivePlans).toHaveBeenCalledOnce();
     expect(mockGetActivePlans).toHaveBeenCalledWith(expect.anything());
   });
+
+  it("cenário 3: erro no banco → retorna 500", async () => {
+    mockGetActivePlans.mockRejectedValue(new Error("db error"));
+
+    const app = await buildApp();
+    const res = await app.inject({
+      method: "GET",
+      url: "/billing/plans",
+      headers: { authorization: "Bearer token-x" },
+    });
+
+    expect(res.statusCode).toBe(500);
+    expect(JSON.parse(res.body).error).toMatch(/Failed to fetch plans/);
+  });
 });
