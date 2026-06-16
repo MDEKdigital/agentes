@@ -2,19 +2,33 @@
 
 import { useEffect, useState } from "react";
 import { useOrganization } from "@/providers/organization-provider";
-import { createClient } from "@/lib/supabase/client";
-import { CreditCard, CheckCircle, AlertTriangle, Clock } from "lucide-react";
+import { apiFetch } from "@/lib/api";
+import { CreditCard, CheckCircle, AlertTriangle, Clock, Activity, Receipt } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { Subscription, Plan } from "@aula-agente/shared";
+import type { Subscription, Plan, BillingEvent } from "@aula-agente/shared";
 
-type SubscriptionWithPlan = Subscription & { plans: Plan };
+interface BillingData {
+  subscription: Subscription | null;
+  plan: Plan | null;
+  usage: { agents_used: number; members_used: number; instances_used: number };
+  limits: { max_agents: number; max_members: number; max_instances: number } | null;
+  recentEvents: BillingEvent[];
+}
 
 const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
-  active:    { label: "Ativa",           color: "text-green-400 bg-green-400/10 border-green-400/30" },
-  trial:     { label: "Trial",           color: "text-blue-400 bg-blue-400/10 border-blue-400/30" },
+  active:    { label: "Ativa",              color: "text-green-400 bg-green-400/10 border-green-400/30" },
+  trial:     { label: "Trial",              color: "text-blue-400 bg-blue-400/10 border-blue-400/30" },
   past_due:  { label: "Pagamento Pendente", color: "text-amber-400 bg-amber-400/10 border-amber-400/30" },
-  paused:    { label: "Pausada",         color: "text-orange-400 bg-orange-400/10 border-orange-400/30" },
-  cancelled: { label: "Cancelada",       color: "text-destructive bg-destructive/10 border-destructive/30" },
+  paused:    { label: "Pausada",            color: "text-orange-400 bg-orange-400/10 border-orange-400/30" },
+  cancelled: { label: "Cancelada",          color: "text-destructive bg-destructive/10 border-destructive/30" },
+};
+
+const EVENT_STATUS_CONFIG: Record<string, { label: string; color: string }> = {
+  processed:  { label: "Processado", color: "text-green-400 bg-green-400/10 border-green-400/30" },
+  pending:    { label: "Pendente",   color: "text-amber-400 bg-amber-400/10 border-amber-400/30" },
+  processing: { label: "Processando", color: "text-amber-400 bg-amber-400/10 border-amber-400/30" },
+  failed:     { label: "Falhou",     color: "text-destructive bg-destructive/10 border-destructive/30" },
+  ignored:    { label: "Ignorado",   color: "text-muted-foreground bg-muted border-border" },
 };
 
 function formatDate(iso: string | null) {
@@ -22,43 +36,119 @@ function formatDate(iso: string | null) {
   return new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" });
 }
 
+function formatDateTime(iso: string) {
+  return new Date(iso).toLocaleString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
 }
 
+function UsageBar({ used, max, label }: { used: number; max: number; label: string }) {
+  const pct = max > 0 ? Math.min(100, Math.round((used / max) * 100)) : 0;
+  const barColor =
+    pct >= 100
+      ? "bg-destructive"
+      : pct >= 80
+        ? "bg-amber-fire-400"
+        : "bg-blue-electric-400";
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-medium text-foreground">{label}</span>
+        <span className="text-xs text-muted-foreground">{pct}%</span>
+      </div>
+      <div className="h-2 rounded-full bg-muted overflow-hidden">
+        <div
+          className={cn("h-full rounded-full transition-all", barColor)}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <p className="text-xs text-muted-foreground">
+        {used} / {max} {label.toLowerCase()}
+      </p>
+    </div>
+  );
+}
+
 export default function BillingPage() {
-  const { currentOrg } = useOrganization();
-  const [sub, setSub] = useState<SubscriptionWithPlan | null>(null);
+  const { currentOrg, loading: orgLoading } = useOrganization();
+  const [data, setData] = useState<BillingData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!currentOrg) return;
-    const supabase = createClient();
-    supabase
-      .from("subscriptions")
-      .select("*, plans(*)")
-      .eq("organization_id", currentOrg.id)
-      .maybeSingle()
-      .then(({ data }) => {
-        setSub(data as SubscriptionWithPlan | null);
+    if (orgLoading) return;
+    if (!currentOrg) {
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    apiFetch("/billing/subscription", {
+      headers: { "x-organization-id": currentOrg.id },
+    })
+      .then((res) => {
+        setData(res as BillingData);
+        setLoading(false);
+      })
+      .catch((err: Error) => {
+        setError(err.message);
         setLoading(false);
       });
-  }, [currentOrg]);
+  }, [currentOrg, orgLoading]);
 
-  if (loading) {
+  if (loading || orgLoading) {
     return (
       <div className="mx-auto max-w-2xl space-y-6">
         <div className="h-7 w-36 animate-pulse rounded-lg bg-muted" />
-        <div className="rounded-xl border border-border bg-card p-6 space-y-4">
-          {[...Array(4)].map((_, i) => (
-            <div key={i} className="h-5 animate-pulse rounded bg-muted" />
-          ))}
+        <div className="rounded-xl border border-border bg-card overflow-hidden">
+          <div className="border-b border-border px-6 py-4">
+            <div className="h-4 w-24 animate-pulse rounded bg-muted" />
+          </div>
+          <div className="p-6 space-y-4">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="h-5 animate-pulse rounded bg-muted" />
+            ))}
+          </div>
+        </div>
+        <div className="rounded-xl border border-border bg-card overflow-hidden">
+          <div className="border-b border-border px-6 py-4">
+            <div className="h-4 w-28 animate-pulse rounded bg-muted" />
+          </div>
+          <div className="p-6 space-y-4">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="h-8 animate-pulse rounded bg-muted" />
+            ))}
+          </div>
         </div>
       </div>
     );
   }
 
-  const plan = sub?.plans;
+  if (error) {
+    return (
+      <div className="mx-auto max-w-2xl">
+        <div className="rounded-xl border border-border bg-card p-6 flex items-center gap-2 text-destructive">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <p className="text-sm">{error}</p>
+        </div>
+      </div>
+    );
+  }
+
+  const sub = data?.subscription ?? null;
+  const plan = data?.plan ?? null;
+  const usage = data?.usage ?? { agents_used: 0, members_used: 0, instances_used: 0 };
+  const limits = data?.limits ?? null;
+  const recentEvents = data?.recentEvents ?? [];
   const statusConfig = STATUS_CONFIG[sub?.status ?? ""] ?? null;
 
   return (
@@ -138,6 +228,18 @@ export default function BillingPage() {
               </div>
             )}
 
+            {/* Current usage */}
+            {limits && (
+              <div className="space-y-3">
+                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Utilização atual</p>
+                <div className="space-y-4">
+                  <UsageBar used={usage.agents_used} max={limits.max_agents} label="Agentes" />
+                  <UsageBar used={usage.members_used} max={limits.max_members} label="Membros" />
+                  <UsageBar used={usage.instances_used} max={limits.max_instances} label="Instâncias WhatsApp" />
+                </div>
+              </div>
+            )}
+
             {/* Billing period */}
             {(sub.current_period_start || sub.current_period_end) && (
               <div className="space-y-2">
@@ -175,6 +277,87 @@ export default function BillingPage() {
                 )}
               </p>
             )}
+
+            {/* Organization ID */}
+            {currentOrg && (
+              <p className="text-xs text-muted-foreground border-t border-border pt-4">
+                ID da Organização:{" "}
+                <span className="font-mono">{currentOrg.id}</span>
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Usage card — shown even when there's no subscription */}
+      {!sub && limits && (
+        <div className="rounded-xl border border-border bg-card overflow-hidden">
+          <div className="flex items-center gap-2 border-b border-border px-6 py-4">
+            <Activity className="h-4 w-4 text-blue-electric-400" />
+            <h2 className="text-sm font-semibold text-foreground">Utilização atual</h2>
+          </div>
+          <div className="p-6 space-y-4">
+            <UsageBar used={usage.agents_used} max={limits.max_agents} label="Agentes" />
+            <UsageBar used={usage.members_used} max={limits.max_members} label="Membros" />
+            <UsageBar used={usage.instances_used} max={limits.max_instances} label="Instâncias WhatsApp" />
+          </div>
+        </div>
+      )}
+
+      {/* Billing events */}
+      <div className="rounded-xl border border-border bg-card overflow-hidden">
+        <div className="flex items-center gap-2 border-b border-border px-6 py-4">
+          <Receipt className="h-4 w-4 text-blue-electric-400" />
+          <h2 className="text-sm font-semibold text-foreground">Histórico de billing</h2>
+        </div>
+
+        {recentEvents.length === 0 ? (
+          <div className="p-6">
+            <p className="text-sm text-muted-foreground">Nenhum evento de billing registrado.</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border bg-muted/30">
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    Data
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    Gateway
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    Tipo
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    Status
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {recentEvents.map((evt) => {
+                  const evtStatus = EVENT_STATUS_CONFIG[evt.status] ?? { label: evt.status, color: "text-muted-foreground bg-muted border-border" };
+                  return (
+                    <tr key={evt.id} className="hover:bg-muted/20 transition-colors">
+                      <td className="px-4 py-3 text-foreground whitespace-nowrap">
+                        {formatDateTime(evt.created_at)}
+                      </td>
+                      <td className="px-4 py-3 text-foreground capitalize">
+                        {evt.gateway}
+                      </td>
+                      <td className="px-4 py-3 text-foreground">
+                        {evt.event_type.replace(/_/g, " ")}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={cn("rounded-md border px-2 py-0.5 text-xs font-semibold", evtStatus.color)}>
+                          {evtStatus.label}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
