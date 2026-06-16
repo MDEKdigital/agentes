@@ -28,6 +28,7 @@ import { startSendMessageWorker } from "./workers/send-message";
 import { startProcessDocumentWorker } from "./workers/process-document";
 import { startTakeoverTimeoutWorker } from "./workers/takeover-timeout";
 import { startRemarketingWorker } from "./workers/remarketing-worker";
+import { createBillingOnboardingWorker } from "./workers/billing-onboarding";
 
 async function main() {
   console.log("Starting workers...");
@@ -38,6 +39,7 @@ async function main() {
     startProcessDocumentWorker(),
     startTakeoverTimeoutWorker(),
     startRemarketingWorker(),
+    createBillingOnboardingWorker(),
   ];
 
   console.log(`${workers.length} workers started successfully`);

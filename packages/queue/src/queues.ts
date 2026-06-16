@@ -6,6 +6,7 @@ import type {
   ProcessDocumentJobData,
   TakeoverTimeoutJobData,
   RemarketingJobData,
+  BillingOnboardingJobData,
 } from "./types";
 
 function getConnectionOptions() {
@@ -86,4 +87,22 @@ export function getRemarketingQueue() {
     });
   }
   return remarketingQueue;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let billingOnboardingQueue: Queue<BillingOnboardingJobData, any, string> | null = null;
+
+export function getBillingOnboardingQueue() {
+  if (!billingOnboardingQueue) {
+    billingOnboardingQueue = new Queue<BillingOnboardingJobData>(QUEUE_NAMES.BILLING_ONBOARDING, {
+      connection: getConnectionOptions(),
+      defaultJobOptions: {
+        attempts: 5,
+        backoff: { type: "exponential", delay: 3000 },
+        removeOnComplete: { count: 1000 },
+        removeOnFail: { count: 5000 },
+      },
+    });
+  }
+  return billingOnboardingQueue;
 }

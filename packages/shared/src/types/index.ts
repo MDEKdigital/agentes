@@ -6,3 +6,4 @@ export * from "./message";
 export * from "./evolution";
 export * from "./knowledge";
 export * from "./remarketing";
+export * from "./billing";

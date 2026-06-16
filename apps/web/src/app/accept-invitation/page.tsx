@@ -88,15 +88,25 @@ function AcceptInvitationContent() {
           {status === "unauthenticated" && (
             <>
               <p className="text-sm text-muted-foreground text-center">
-                Você precisa estar logado para aceitar este convite.
+                Para aceitar o convite, faça login ou crie uma conta com o email para o qual o convite foi enviado.
               </p>
-              <Button
-                onClick={() =>
-                  router.push(`/login?next=${encodeURIComponent(`/accept-invitation?id=${invitationId}`)}`)
-                }
-              >
-                Fazer login
-              </Button>
+              <div className="flex flex-col gap-2 w-full">
+                <Button
+                  onClick={() =>
+                    router.push(`/register?next=${encodeURIComponent(`/accept-invitation?id=${invitationId}`)}`)
+                  }
+                >
+                  Criar conta
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() =>
+                    router.push(`/login?next=${encodeURIComponent(`/accept-invitation?id=${invitationId}`)}`)
+                  }
+                >
+                  Já tenho conta — fazer login
+                </Button>
+              </div>
             </>
           )}
         </CardContent>

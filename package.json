@@ -6,6 +6,7 @@
     "build": "turbo build",
     "lint": "turbo lint",
     "test": "turbo test",
+    "test:coverage": "turbo test -- --coverage",
     "typecheck": "turbo typecheck",
     "dev:api": "turbo dev --filter=@aula-agente/api",
     "dev:worker": "turbo dev --filter=@aula-agente/worker",

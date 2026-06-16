@@ -27,3 +27,7 @@ export interface TakeoverTimeoutJobData {
 export interface RemarketingJobData {
   // sem dados — o worker varre todos os enrollments ativos
 }
+
+export interface BillingOnboardingJobData {
+  billingEventId: string;
+}

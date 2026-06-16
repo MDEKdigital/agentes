@@ -1,4 +1,4 @@
-import { getProcessMessageQueue, getSendMessageQueue } from "@aula-agente/queue";
+import { getProcessMessageQueue, getSendMessageQueue, getBillingOnboardingQueue } from "@aula-agente/queue";
 
 export function enqueueProcessMessage(data: {
   conversationId: string;
@@ -20,4 +20,9 @@ export function enqueueSendMessage(data: {
 }) {
   const queue = getSendMessageQueue();
   return queue.add("send-message", data);
+}
+
+export function enqueueBillingOnboarding(data: { billingEventId: string }) {
+  const queue = getBillingOnboardingQueue();
+  return queue.add("billing-onboarding", data);
 }

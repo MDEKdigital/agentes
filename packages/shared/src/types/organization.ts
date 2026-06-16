@@ -9,6 +9,8 @@ export interface Organization {
   name: string;
   slug: string;
   plan: OrganizationPlan;
+  plan_id: string | null;
+  onboarding_status: "pending_owner" | "active" | "suspended";
   settings: OrganizationSettings;
   created_at: string;
   updated_at: string;
@@ -33,10 +35,12 @@ export interface OrganizationInvitation {
   id: string;
   organization_id: string;
   email: string;
-  role: Exclude<MemberRole, "owner">;
-  invited_by: string;
+  role: MemberRole;
+  invited_by: string | null;
   status: InvitationStatus;
   expires_at: string;
+  accepted_at: string | null;
+  accepted_by_user_id: string | null;
   created_at: string;
 }
 

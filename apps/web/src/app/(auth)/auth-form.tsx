@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,12 +12,19 @@ interface AuthFormProps {
   mode: "login" | "register";
 }
 
-export function AuthForm({ mode }: AuthFormProps) {
+function AuthFormInner({ mode }: AuthFormProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const rawNext = searchParams.get("next") ?? "/inbox";
+  // Prevent open redirect: only allow same-origin relative paths
+  const next =
+    rawNext.startsWith("/") && !rawNext.startsWith("//") && !rawNext.startsWith("/\\")
+      ? rawNext
+      : "/inbox";
   const supabase = createClient();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -33,7 +40,7 @@ export function AuthForm({ mode }: AuthFormProps) {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
       }
-      router.push("/inbox");
+      router.push(next);
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Ocorreu um erro");
@@ -41,6 +48,8 @@ export function AuthForm({ mode }: AuthFormProps) {
       setLoading(false);
     }
   };
+
+  const nextParam = next !== "/inbox" ? `?next=${encodeURIComponent(next)}` : "";
 
   return (
     <Card>
@@ -81,13 +90,21 @@ export function AuthForm({ mode }: AuthFormProps) {
           </Button>
           <p className="text-center text-sm text-muted-foreground">
             {mode === "login" ? (
-              <>Não tem conta? <a href="/register" className="underline">Criar conta</a></>
+              <>Não tem conta? <a href={`/register${nextParam}`} className="underline">Criar conta</a></>
             ) : (
-              <>Já tem conta? <a href="/login" className="underline">Entrar</a></>
+              <>Já tem conta? <a href={`/login${nextParam}`} className="underline">Entrar</a></>
             )}
           </p>
         </form>
       </CardContent>
     </Card>
+  );
+}
+
+export function AuthForm({ mode }: AuthFormProps) {
+  return (
+    <Suspense>
+      <AuthFormInner mode={mode} />
+    </Suspense>
   );
 }

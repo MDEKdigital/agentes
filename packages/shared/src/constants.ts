@@ -38,4 +38,25 @@ export const QUEUE_NAMES = {
   PROCESS_DOCUMENT: "process-document",
   TAKEOVER_TIMEOUT: "takeover-timeout",
   REMARKETING: "remarketing",
+  BILLING_ONBOARDING: "billing-onboarding",
 } as const;
+
+export const BILLING_GATEWAYS = ["stripe", "mercadopago", "hotmart", "kiwify", "eduzz"] as const;
+
+export const SUBSCRIPTION_STATUSES = ["active", "past_due", "cancelled", "trial", "paused"] as const;
+
+export const BILLING_EVENT_STATUSES = ["pending", "processing", "processed", "failed", "ignored"] as const;
+
+export const BILLING_EVENT_TYPES = [
+  "subscription.activated",
+  "subscription.renewed",
+  "subscription.cancelled",
+  "subscription.past_due",
+  "subscription.reactivated",
+  "refund.processed",
+  "unknown",
+] as const;
+
+export const ONBOARDING_STATUSES = ["pending_owner", "active", "suspended"] as const;
+
+export const BILLING_INTERVALS = ["monthly", "yearly", "lifetime", "manual"] as const;
