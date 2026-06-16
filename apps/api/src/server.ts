@@ -39,6 +39,7 @@ import conversationRoutes from "./routes/conversations/index";
 import organizationRoutes from "./routes/organizations/index";
 import remarketingRoutes from "./routes/remarketing/index";
 import billingWebhookRoutes from "./routes/webhooks/billing/index";
+import billingRoutes from "./routes/billing/index";
 
 const server = Fastify({ logger: true });
 
@@ -82,6 +83,7 @@ server.register(conversationRoutes);
 server.register(organizationRoutes);
 server.register(remarketingRoutes);
 server.register(billingWebhookRoutes);
+server.register(billingRoutes);
 
 // Start
 const start = async () => {
