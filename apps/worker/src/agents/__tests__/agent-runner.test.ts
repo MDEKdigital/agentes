@@ -36,7 +36,7 @@ const baseAgent = {
   max_tokens: 1024,
   max_steps: 3,
   tools_config: { search_knowledge: false, search_faq: false },
-  activation_keywords: [],
+  activation_rules: [],
   is_active: true,
   created_at: "",
   updated_at: "",

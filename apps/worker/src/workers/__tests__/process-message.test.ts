@@ -217,7 +217,7 @@ describe("keyword gate", () => {
   it("não filtra quando conversa já está ativada", async () => {
     vi.mocked(getAgentById).mockResolvedValue({
       ...activeAgent,
-      activation_rules: [{ type: "keyword", keywords: ["suporte"] }],
+      activation_rules: [{ type: "single_word", value: "suporte" }],
     } as never);
     vi.mocked(getConversationById).mockResolvedValue({
       ...conversation,
@@ -232,7 +232,7 @@ describe("keyword gate", () => {
     mockEvaluateActivation.mockResolvedValue({ action: "ignore" as const });
     vi.mocked(getAgentById).mockResolvedValue({
       ...activeAgent,
-      activation_rules: [{ type: "keyword", keywords: ["suporte"] }],
+      activation_rules: [{ type: "single_word", value: "suporte" }],
     } as never);
     vi.mocked(getConversationById).mockResolvedValue({
       ...conversation,
@@ -248,7 +248,7 @@ describe("keyword gate", () => {
     mockEvaluateActivation.mockResolvedValue({ action: "activate" as const });
     vi.mocked(getAgentById).mockResolvedValue({
       ...activeAgent,
-      activation_rules: [{ type: "keyword", keywords: ["olá"] }],
+      activation_rules: [{ type: "single_word", value: "olá" }],
     } as never);
     vi.mocked(getConversationById).mockResolvedValue({
       ...conversation,
@@ -268,7 +268,7 @@ describe("keyword gate", () => {
   it("não ativa quando mídia falhou na transcrição (isMediaFallback)", async () => {
     vi.mocked(getAgentById).mockResolvedValue({
       ...activeAgent,
-      activation_rules: [{ type: "keyword", keywords: ["processar"] }],
+      activation_rules: [{ type: "single_word", value: "processar" }],
     } as never);
     vi.mocked(getConversationById).mockResolvedValue({
       ...conversation,
@@ -304,7 +304,7 @@ describe("keyword gate", () => {
   it("persiste is_keyword_activated antes de runAgent para sobreviver a retry", async () => {
     vi.mocked(getAgentById).mockResolvedValue({
       ...activeAgent,
-      activation_rules: [{ type: "keyword", keywords: ["suporte"] }],
+      activation_rules: [{ type: "single_word", value: "suporte" }],
     } as never);
     vi.mocked(getConversationById).mockResolvedValue({
       ...conversation,
