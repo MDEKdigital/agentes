@@ -1,5 +1,5 @@
 import { Worker } from "bullmq";
-import { QUEUE_NAMES, matchesKeyword } from "@aula-agente/shared";
+import { QUEUE_NAMES } from "@aula-agente/shared";
 import type { LLMProvider, Message, Conversation } from "@aula-agente/shared";
 import type { ProcessMessageJobData } from "@aula-agente/queue";
 import { getSendMessageQueue } from "@aula-agente/queue";
@@ -17,6 +17,7 @@ import {
 import { acquireConversationLock, releaseConversationLock } from "../lib/lock";
 import { resolveApiKey } from "../lib/vault";
 import { runAgent } from "../agents/agent-runner";
+import { evaluateActivation } from "./evaluate-activation";
 import { CLOSE_CONVERSATION_TOOL_NAME } from "../agents/tools/close-conversation";
 
 type ConversationRow = Conversation & { contacts: { phone: string } | null };
@@ -235,24 +236,67 @@ export function startProcessMessageWorker() {
           }
         }
 
-        // Keyword activation guard — runs after preprocessing so audio/image keywords
-        // are matched against transcribed/resolved content, not raw placeholders.
+        // Activation gate — runs after preprocessing so audio content is matched
+        // against transcribed text, not raw placeholders.
         let activatesKeyword = false;
-        if (
-          agent.activation_keywords.length > 0 &&
-          !conversation.is_keyword_activated
-        ) {
-          if (isMediaFallback || !matchesKeyword(effectiveMessage.content, agent.activation_keywords)) {
-            console.log(`[keyword-gate] Conversa ${conversationId} aguardando keyword — mensagem ignorada`);
+        if (agent.activation_rules.length > 0 && !conversation.is_keyword_activated) {
+          if (isMediaFallback) {
+            console.log(`[activation-gate] Conversa ${conversationId} — mídia sem transcrição, ignorando`);
             return;
           }
+
+          const evalResult = await evaluateActivation({
+            messageContent: effectiveMessage.content,
+            activationRules: agent.activation_rules,
+            provider: agent.provider,
+            apiKey,
+            awaitingConfirmation: conversation.awaiting_activation_confirmation,
+          });
+
+          if (evalResult.action === "ignore") {
+            console.log(`[activation-gate] Conversa ${conversationId} — nenhuma regra ativada, ignorando`);
+            return;
+          }
+
+          if (evalResult.action === "confirm") {
+            console.log(`[activation-gate] Conversa ${conversationId} — confiança baixa, solicitando confirmação`);
+            const confirmMsg = await createMessage(db, {
+              conversation_id: conversationId,
+              organization_id: organizationId,
+              evolution_message_id: null,
+              role: "agent",
+              content: evalResult.confirmationMessage,
+              media_url: null,
+              media_type: null,
+              metadata: {},
+            });
+            await updateConversation(db, conversationId, {
+              awaiting_activation_confirmation: true,
+              last_message_at: new Date().toISOString(),
+            });
+            const sendQueue = getSendMessageQueue();
+            await sendQueue.add("send-message", {
+              conversationId,
+              messageId: confirmMsg.id,
+              instanceId: instance.id,
+              phone: contact.phone,
+              content: evalResult.confirmationMessage,
+              organizationId,
+            });
+            return;
+          }
+
+          // action === "activate"
           activatesKeyword = true;
-          console.log(`[keyword-gate] Conversa ${conversationId} ativada por keyword`);
+          console.log(`[activation-gate] Conversa ${conversationId} ativada`);
         }
 
-        // Fix #5: Commit activation before runAgent so BullMQ retries are idempotent.
+        // Commit activation before runAgent so BullMQ retries are idempotent.
         if (activatesKeyword) {
-          await updateConversation(db, conversationId, { is_keyword_activated: true });
+          await updateConversation(db, conversationId, {
+            is_keyword_activated: true,
+            awaiting_activation_confirmation: false,
+          });
         }
 
         const result = await runAgent({

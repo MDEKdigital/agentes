@@ -15,6 +15,13 @@ const { mockRunAgent } = vi.hoisted(() => ({
   })),
 }));
 
+const { mockEvaluateActivation } = vi.hoisted(() => ({
+  mockEvaluateActivation: vi.fn(async () => ({ action: "activate" as const })),
+}));
+vi.mock("../evaluate-activation", () => ({
+  evaluateActivation: mockEvaluateActivation,
+}));
+
 vi.mock("bullmq", () => ({
   Worker: vi.fn().mockImplementation((_name: string, processor: Function) => ({
     on: vi.fn(),
@@ -78,13 +85,14 @@ const activeAgent = {
   max_steps: 5,
   tools_config: { search_knowledge: false, search_faq: false },
   is_active: true,
-  activation_keywords: [],
+  activation_rules: [],
 };
 
 const conversation = {
   id: "conv-1",
   is_human_takeover: false,
   is_keyword_activated: true,
+  awaiting_activation_confirmation: false,
   evolution_instance_id: "inst-1",
   contacts: { phone: "5511999999999" },
 };
@@ -197,7 +205,11 @@ describe("startProcessMessageWorker", () => {
 });
 
 describe("keyword gate", () => {
-  it("não filtra quando agente não tem keywords", async () => {
+  beforeEach(() => {
+    mockEvaluateActivation.mockResolvedValue({ action: "activate" as const });
+  });
+
+  it("não filtra quando agente não tem regras de ativação", async () => {
     await runJob();
     expect(createMessage).toHaveBeenCalled();
   });
@@ -205,38 +217,43 @@ describe("keyword gate", () => {
   it("não filtra quando conversa já está ativada", async () => {
     vi.mocked(getAgentById).mockResolvedValue({
       ...activeAgent,
-      activation_keywords: ["suporte"],
+      activation_rules: [{ type: "keyword", keywords: ["suporte"] }],
     } as never);
     vi.mocked(getConversationById).mockResolvedValue({
       ...conversation,
       is_keyword_activated: true,
+      awaiting_activation_confirmation: false,
     } as never);
     await runJob();
     expect(createMessage).toHaveBeenCalled();
   });
 
-  it("filtra silenciosamente quando keyword não faz match", async () => {
+  it("filtra silenciosamente quando nenhuma regra ativa", async () => {
+    mockEvaluateActivation.mockResolvedValue({ action: "ignore" as const });
     vi.mocked(getAgentById).mockResolvedValue({
       ...activeAgent,
-      activation_keywords: ["^suporte$"],
+      activation_rules: [{ type: "keyword", keywords: ["suporte"] }],
     } as never);
     vi.mocked(getConversationById).mockResolvedValue({
       ...conversation,
       is_keyword_activated: false,
+      awaiting_activation_confirmation: false,
     } as never);
     await runJob();
     expect(createMessage).not.toHaveBeenCalled();
   });
 
-  it("ativa conversa e processa quando keyword faz match", async () => {
+  it("ativa conversa e processa quando regra faz match", async () => {
     const { updateConversation } = await import("@aula-agente/database");
+    mockEvaluateActivation.mockResolvedValue({ action: "activate" as const });
     vi.mocked(getAgentById).mockResolvedValue({
       ...activeAgent,
-      activation_keywords: ["olá"],
+      activation_rules: [{ type: "keyword", keywords: ["olá"] }],
     } as never);
     vi.mocked(getConversationById).mockResolvedValue({
       ...conversation,
       is_keyword_activated: false,
+      awaiting_activation_confirmation: false,
     } as never);
     await runJob();
     // is_keyword_activated is now committed before runAgent for retry idempotency.
@@ -248,18 +265,17 @@ describe("keyword gate", () => {
     expect(createMessage).toHaveBeenCalled();
   });
 
-  it("não ativa keyword quando mídia falhou na transcrição (placeholder)", async () => {
+  it("não ativa quando mídia falhou na transcrição (isMediaFallback)", async () => {
     vi.mocked(getAgentById).mockResolvedValue({
       ...activeAgent,
-      activation_keywords: ["processar"],
+      activation_rules: [{ type: "keyword", keywords: ["processar"] }],
     } as never);
     vi.mocked(getConversationById).mockResolvedValue({
       ...conversation,
       is_keyword_activated: false,
+      awaiting_activation_confirmation: false,
     } as never);
-    // Audio message with original content (not the placeholder)
-    // preprocessAudioMessage will fail (evolution mock throws) and return the placeholder
-    // which contains "processar" — but isMediaFallback should block keyword match
+    // Audio message — preprocessAudioMessage will fail (evolution mock throws) → isMediaFallback=true
     vi.mocked(getRecentMessages).mockResolvedValue([
       {
         id: "msg-1",
@@ -288,11 +304,12 @@ describe("keyword gate", () => {
   it("persiste is_keyword_activated antes de runAgent para sobreviver a retry", async () => {
     vi.mocked(getAgentById).mockResolvedValue({
       ...activeAgent,
-      activation_keywords: ["suporte"],
+      activation_rules: [{ type: "keyword", keywords: ["suporte"] }],
     } as never);
     vi.mocked(getConversationById).mockResolvedValue({
       ...conversation,
       is_keyword_activated: false,
+      awaiting_activation_confirmation: false,
     } as never);
     vi.mocked(getRecentMessages).mockResolvedValue([
       {
