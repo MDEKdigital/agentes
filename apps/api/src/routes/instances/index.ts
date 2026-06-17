@@ -7,6 +7,7 @@ import {
   createInstance as createInstanceRecord,
   updateInstance,
   deleteInstance as deleteInstanceRecord,
+  checkResourceLimit,
 } from "@aula-agente/database";
 import {
   createInstance as createEvolutionInstance,
@@ -71,11 +72,18 @@ export default async function instanceRoutes(app: FastifyInstance) {
       const { instance_name } = parseResult.data;
       const webhookUrl = `${process.env.PUBLIC_API_URL}/webhooks/evolution`;
 
+      const db = getAdminClient();
+
+      const limit = await checkResourceLimit(db, organizationId, "instances");
+      if (!limit.allowed) {
+        return reply.status(403).send({
+          error: `Limite de instâncias atingido. Seu plano permite ${limit.max} instância(s).`,
+          limit_exceeded: true,
+        });
+      }
+
       // Create in Evolution API
       const evolutionResult = await createEvolutionInstance(instance_name, webhookUrl) as Record<string, Record<string, string>>;
-
-      // Save to database
-      const db = getAdminClient();
       const instance = await createInstanceRecord(db, {
         organization_id: organizationId,
         instance_name,

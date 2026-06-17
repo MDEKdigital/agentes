@@ -7,3 +7,4 @@ export * from "./evolution-instances";
 export * from "./knowledge";
 export * from "./remarketing";
 export * from "./billing";
+export * from "./plan-limits";
