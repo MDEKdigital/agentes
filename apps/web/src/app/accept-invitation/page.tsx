@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { apiFetch } from "@/lib/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { CheckCircle, XCircle, Loader2 } from "lucide-react";
@@ -11,8 +12,18 @@ function AcceptInvitationContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const invitationId = searchParams.get("id");
-  const [status, setStatus] = useState<"loading" | "success" | "error" | "unauthenticated">("loading");
+
+  type Status = "loading" | "success" | "error" | "unauthenticated";
+  const [status, setStatus] = useState<Status>("loading");
   const [errorMessage, setErrorMessage] = useState("");
+
+  // Resend form state
+  const [resendEmail, setResendEmail] = useState("");
+  const [resendSent, setResendSent] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
+
+  const isExpiredError = status === "error" &&
+    /inválido ou expirado/i.test(errorMessage);
 
   useEffect(() => {
     if (!invitationId) {
@@ -33,7 +44,7 @@ function AcceptInvitationContent() {
         return;
       }
 
-      const { error } = await supabase.rpc("accept_invitation", {
+      const { data: role, error } = await supabase.rpc("accept_invitation", {
         invitation_id: invitationId,
       });
 
@@ -44,7 +55,8 @@ function AcceptInvitationContent() {
         setErrorMessage(error.message || "Convite inválido ou expirado.");
       } else {
         setStatus("success");
-        timerId = setTimeout(() => router.push("/inbox"), 2000);
+        const destination = role === "owner" ? "/onboarding" : "/inbox";
+        timerId = setTimeout(() => router.push(destination), 2000);
       }
     };
 
@@ -54,6 +66,22 @@ function AcceptInvitationContent() {
       if (timerId !== null) clearTimeout(timerId);
     };
   }, [invitationId, router]);
+
+  const handleResend = async () => {
+    if (!resendEmail.trim()) return;
+    setResendLoading(true);
+    try {
+      await apiFetch("/billing/resend-invitation", {
+        method: "POST",
+        body: JSON.stringify({ email: resendEmail.trim() }),
+      });
+    } catch {
+      // intentional: always show neutral feedback
+    } finally {
+      setResendSent(true);
+      setResendLoading(false);
+    }
+  };
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
@@ -69,22 +97,57 @@ function AcceptInvitationContent() {
               <p className="text-sm text-muted-foreground">Processando convite...</p>
             </>
           )}
+
           {status === "success" && (
             <>
               <CheckCircle className="h-10 w-10 text-green-500" />
               <p className="text-sm font-medium">Convite aceito com sucesso!</p>
-              <p className="text-xs text-muted-foreground">Redirecionando para o painel...</p>
+              <p className="text-xs text-muted-foreground">Redirecionando...</p>
             </>
           )}
+
           {status === "error" && (
             <>
               <XCircle className="h-10 w-10 text-destructive" />
               <p className="text-sm font-medium text-destructive">{errorMessage}</p>
-              <Button variant="outline" onClick={() => router.push("/login")}>
-                Ir para o login
-              </Button>
+
+              {isExpiredError && !resendSent && (
+                <div className="w-full space-y-3 pt-2">
+                  <p className="text-xs text-muted-foreground text-center">
+                    Informe seu email para receber um novo link de acesso.
+                  </p>
+                  <input
+                    type="email"
+                    placeholder="Seu email"
+                    value={resendEmail}
+                    onChange={(e) => setResendEmail(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") handleResend(); }}
+                    className="w-full rounded-md border border-border bg-muted px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                  />
+                  <Button
+                    className="w-full"
+                    onClick={handleResend}
+                    disabled={resendLoading || !resendEmail.trim()}
+                  >
+                    {resendLoading ? "Enviando..." : "Reenviar link"}
+                  </Button>
+                </div>
+              )}
+
+              {isExpiredError && resendSent && (
+                <p className="text-xs text-muted-foreground text-center">
+                  Se um convite estiver disponível, o email foi reenviado.
+                </p>
+              )}
+
+              {!isExpiredError && (
+                <Button variant="outline" onClick={() => router.push("/login")}>
+                  Ir para o login
+                </Button>
+              )}
             </>
           )}
+
           {status === "unauthenticated" && (
             <>
               <p className="text-sm text-muted-foreground text-center">

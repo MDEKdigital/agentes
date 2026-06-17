@@ -186,6 +186,37 @@ export async function findPendingInvitationByEmail(
   return data as OrganizationInvitation | null;
 }
 
+export async function findInvitationByEmailForResend(
+  client: SupabaseClient,
+  email: string
+): Promise<OrganizationInvitation | null> {
+  const { data, error } = await client
+    .from("organization_invitations")
+    .select("*")
+    .eq("email", email)
+    .eq("status", "pending")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return data as OrganizationInvitation | null;
+}
+
+export async function renewInvitationExpiry(
+  client: SupabaseClient,
+  invitationId: string,
+  newExpiresAt: string
+): Promise<OrganizationInvitation> {
+  const { data, error } = await client
+    .from("organization_invitations")
+    .update({ expires_at: newExpiresAt })
+    .eq("id", invitationId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data as OrganizationInvitation;
+}
+
 export async function createOrganizationForBilling(
   client: SupabaseClient,
   org: {
