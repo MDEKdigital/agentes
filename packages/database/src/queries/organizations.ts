@@ -65,6 +65,41 @@ export async function createOrganization(
   return orgData as Organization;
 }
 
+export async function isSlugAvailableForOrg(
+  client: SupabaseClient,
+  slug: string,
+  excludeOrgId: string
+): Promise<boolean> {
+  const { data } = await client
+    .from("organizations")
+    .select("id")
+    .eq("slug", slug)
+    .neq("id", excludeOrgId)
+    .maybeSingle();
+  return data === null;
+}
+
+export async function completeOrganizationOnboarding(
+  client: SupabaseClient,
+  orgId: string,
+  name: string,
+  slug: string
+): Promise<Organization> {
+  const { data, error } = await client
+    .from("organizations")
+    .update({
+      name,
+      slug,
+      // activates billing orgs that are still pending; no-op for already-active orgs
+      onboarding_status: "active",
+    })
+    .eq("id", orgId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data as Organization;
+}
+
 export async function createInvitation(
   client: SupabaseClient,
   invitation: Pick<OrganizationInvitation, "organization_id" | "email" | "role" | "invited_by">
