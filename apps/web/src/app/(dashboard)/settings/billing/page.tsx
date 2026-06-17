@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useOrganization } from "@/providers/organization-provider";
 import { apiFetch } from "@/lib/api";
-import { CreditCard, CheckCircle, AlertTriangle, Clock, Activity, Receipt } from "lucide-react";
+import { CreditCard, CheckCircle, AlertTriangle, Clock, Activity, Receipt, LayoutGrid } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Subscription, Plan, BillingEvent } from "@aula-agente/shared";
 
@@ -153,9 +154,18 @@ export default function BillingPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold text-foreground">Assinatura</h1>
-        <p className="text-xs text-muted-foreground mt-0.5">Detalhes do seu plano atual</p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-semibold text-foreground">Assinatura</h1>
+          <p className="text-xs text-muted-foreground mt-0.5">Detalhes do seu plano atual</p>
+        </div>
+        <Link
+          href="/settings/billing/plans"
+          className="shrink-0 flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-xs font-medium text-foreground transition-colors hover:bg-accent"
+        >
+          <LayoutGrid className="h-3.5 w-3.5 text-blue-electric-400" />
+          Ver planos disponíveis
+        </Link>
       </div>
 
       {/* Plan Card */}

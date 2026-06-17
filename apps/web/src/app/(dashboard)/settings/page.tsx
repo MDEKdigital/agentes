@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
 import { useOrganization } from "@/providers/organization-provider";
 import { createClient } from "@/lib/supabase/client";
 import { apiFetch } from "@/lib/api";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Eye, EyeOff, Save, Trash2, CheckCircle, Building2, Key, AlertTriangle } from "lucide-react";
+import { Eye, EyeOff, Save, Trash2, CheckCircle, Building2, Key, AlertTriangle, CreditCard, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { LLMProvider } from "@aula-agente/shared";
 
@@ -189,6 +190,21 @@ export default function SettingsPage() {
           </div>
         </div>
       </div>
+
+      {/* Assinatura */}
+      <Link
+        href="/settings/billing"
+        className="rounded-xl border border-border bg-card overflow-hidden flex items-center justify-between px-6 py-4 transition-colors hover:bg-accent group"
+      >
+        <div className="flex items-center gap-2">
+          <CreditCard className="h-4 w-4 text-blue-electric-400" />
+          <div>
+            <p className="text-sm font-semibold text-foreground">Assinatura</p>
+            <p className="text-xs text-muted-foreground">Plano atual, uso e histórico de pagamentos</p>
+          </div>
+        </div>
+        <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+      </Link>
 
       {/* API Keys */}
       <div className="rounded-xl border border-border bg-card overflow-hidden">
