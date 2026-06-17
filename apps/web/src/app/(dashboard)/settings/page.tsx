@@ -178,14 +178,24 @@ export default function SettingsPage() {
               Plano
             </Label>
             <div>
-              <span className={cn(
-                "inline-flex rounded-md px-2.5 py-0.5 text-xs font-semibold capitalize",
-                currentOrg.plan === "free"
-                  ? "bg-muted text-muted-foreground border border-border"
-                  : "bg-amber-fire-500/10 text-amber-fire-400 border border-amber-fire-500/30"
-              )}>
-                {currentOrg.plan}
-              </span>
+              {currentOrg.plan_id ? (
+                <Link
+                  href="/settings/billing"
+                  className="inline-flex items-center gap-1 rounded-md px-2.5 py-0.5 text-xs font-semibold bg-amber-fire-500/10 text-amber-fire-400 border border-amber-fire-500/30 hover:opacity-80 transition-opacity"
+                >
+                  Ver plano
+                  <ChevronRight className="h-3 w-3" />
+                </Link>
+              ) : (
+                <span className={cn(
+                  "inline-flex rounded-md px-2.5 py-0.5 text-xs font-semibold capitalize",
+                  currentOrg.plan === "free"
+                    ? "bg-muted text-muted-foreground border border-border"
+                    : "bg-amber-fire-500/10 text-amber-fire-400 border border-amber-fire-500/30"
+                )}>
+                  {currentOrg.plan}
+                </span>
+              )}
             </div>
           </div>
         </div>
