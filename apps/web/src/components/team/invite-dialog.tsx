@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useOrganization } from "@/providers/organization-provider";
-import { createClient } from "@/lib/supabase/client";
+import { apiFetch } from "@/lib/api";
 import {
   Dialog,
   DialogContent,
@@ -40,21 +40,10 @@ export function InviteDialog({ onInvited }: InviteDialogProps) {
     setError(null);
 
     try {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Sessão expirada. Faça login novamente.");
-      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-
-      const { error: insertError } = await supabase.from("organization_invitations").insert({
-        organization_id: currentOrg.id,
-        email,
-        role,
-        invited_by: user.id,
-        status: "pending",
-        expires_at: expiresAt,
+      await apiFetch(`/organizations/${currentOrg.id}/invitations`, {
+        method: "POST",
+        body: JSON.stringify({ email, role }),
       });
-
-      if (insertError) throw insertError;
       setEmail("");
       setRole("agent");
       setOpen(false);
