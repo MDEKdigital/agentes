@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import {
   getAdminClient,
   getOrganizationById,
+  getUserOrganizations,
   isSlugAvailableForOrg,
   completeOrganizationOnboarding,
   updateOrganizationName,
@@ -13,6 +14,16 @@ const SLUG_RE = /^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/;
 
 export default async function organizationRoutes(app: FastifyInstance) {
   app.addHook("preHandler", authMiddleware);
+
+  // List organizations for the current authenticated user
+  app.get("/me/organizations", async (request, reply) => {
+    const db = getAdminClient();
+    const memberships = await getUserOrganizations(db, request.user.id);
+    const orgs = (memberships ?? [])
+      .map((m: Record<string, unknown>) => m.organizations as Record<string, unknown>)
+      .filter(Boolean);
+    return reply.send(orgs);
+  });
 
   app.patch<{ Params: { organizationId: string } }>(
     "/organizations/:organizationId/onboarding",

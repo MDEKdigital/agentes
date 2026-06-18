@@ -1,8 +1,8 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { apiFetch } from "@/lib/api";
 import type { Organization } from "@aula-agente/shared";
 
 interface OrganizationContextType {
@@ -25,7 +25,6 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [currentOrg, setCurrentOrg] = useState<Organization | null>(null);
   const [loading, setLoading] = useState(true);
-  const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
   const pathname = usePathname();
   // Generation counter to discard stale concurrent fetches
@@ -35,45 +34,35 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
     const gen = ++fetchGen.current;
     setLoading(true);
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    try {
+      const orgs = await apiFetch("/me/organizations") as Organization[];
 
-    if (gen !== fetchGen.current) return;
+      if (gen !== fetchGen.current) return;
 
-    if (!user) {
-      setLoading(false);
-      return;
-    }
+      if (orgs && orgs.length > 0) {
+        setOrganizations(orgs);
 
-    const { data: memberships } = await supabase
-      .from("organization_members")
-      .select("organization_id, role, organizations(*)")
-      .eq("user_id", user.id);
-
-    if (gen !== fetchGen.current) return;
-
-    if (memberships && memberships.length > 0) {
-      const orgs = memberships
-        .map((m) => m.organizations as unknown as Organization)
-        .filter(Boolean);
-      setOrganizations(orgs);
-
-      let savedOrgId: string | null = null;
-      try {
-        savedOrgId = localStorage.getItem("currentOrgId");
-      } catch {
-        // localStorage unavailable in SSR or browsers with storage blocked
+        let savedOrgId: string | null = null;
+        try {
+          savedOrgId = localStorage.getItem("currentOrgId");
+        } catch {
+          // localStorage unavailable in SSR or browsers with storage blocked
+        }
+        const savedOrg = orgs.find((o) => o.id === savedOrgId);
+        setCurrentOrg(savedOrg || orgs[0]);
+      } else {
+        setOrganizations([]);
+        setCurrentOrg(null);
       }
-      const savedOrg = orgs.find((o) => o.id === savedOrgId);
-      setCurrentOrg(savedOrg || orgs[0]);
-    } else {
+    } catch {
+      if (gen !== fetchGen.current) return;
       setOrganizations([]);
       setCurrentOrg(null);
     }
 
+    if (gen !== fetchGen.current) return;
     setLoading(false);
-  }, [supabase]);
+  }, []);
 
   useEffect(() => {
     fetchOrgs();
