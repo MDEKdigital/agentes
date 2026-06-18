@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { apiFetch } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Plus } from "lucide-react";
@@ -12,19 +12,18 @@ interface NotesPanelProps {
   organizationId: string;
 }
 
-export function NotesPanel({ conversationId, organizationId }: NotesPanelProps) {
+export function NotesPanel({ conversationId }: NotesPanelProps) {
   const [notes, setNotes] = useState<ConversationNote[]>([]);
   const [newNote, setNewNote] = useState("");
   const [saving, setSaving] = useState(false);
 
   const fetchNotes = useCallback(async () => {
-    const supabase = createClient();
-    const { data } = await supabase
-      .from("conversation_notes")
-      .select("*")
-      .eq("conversation_id", conversationId)
-      .order("created_at", { ascending: false });
-    setNotes((data as ConversationNote[]) || []);
+    try {
+      const data = await apiFetch(`/conversations/${conversationId}/notes`);
+      setNotes(data.notes || []);
+    } catch {
+      // silently fail — notes are non-critical
+    }
   }, [conversationId]);
 
   useEffect(() => {
@@ -35,25 +34,17 @@ export function NotesPanel({ conversationId, organizationId }: NotesPanelProps) 
     if (!newNote.trim()) return;
     setSaving(true);
     try {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { error } = await supabase.from("conversation_notes").insert({
-        conversation_id: conversationId,
-        organization_id: organizationId,
-        user_id: user.id,
-        content: newNote.trim(),
+      await apiFetch(`/conversations/${conversationId}/notes`, {
+        method: "POST",
+        body: JSON.stringify({ content: newNote.trim() }),
       });
-
-      if (error) throw error;
       setNewNote("");
+      await fetchNotes();
     } catch (err) {
       alert(err instanceof Error ? err.message : "Erro ao salvar nota");
     } finally {
       setSaving(false);
     }
-    fetchNotes().catch(() => {});
   };
 
   return (

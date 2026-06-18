@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { getAdminClient } from "@aula-agente/database";
+import { getAdminClient, getConversationNotes, addConversationNote } from "@aula-agente/database";
 import { authMiddleware } from "../../middleware/auth";
 
 const STATUS_SCHEMA = {
@@ -19,6 +19,67 @@ const STATUS_SCHEMA = {
 
 export default async function conversationRoutes(app: FastifyInstance) {
   app.addHook("preHandler", authMiddleware);
+
+  app.get<{ Params: { conversationId: string } }>(
+    "/conversations/:conversationId/notes",
+    async (request, reply) => {
+      const { conversationId } = request.params;
+      const db = getAdminClient();
+
+      const { data: conv } = await db
+        .from("conversations")
+        .select("organization_id")
+        .eq("id", conversationId)
+        .single();
+
+      if (!conv) return reply.status(404).send({ error: "Conversa não encontrada" });
+
+      const membership = request.user.memberships.find(
+        (m) => m.organization_id === conv.organization_id
+      );
+      if (!membership) return reply.status(403).send({ error: "Acesso negado" });
+
+      const notes = await getConversationNotes(db, conversationId);
+      return reply.send({ notes });
+    }
+  );
+
+  app.post<{ Params: { conversationId: string } }>(
+    "/conversations/:conversationId/notes",
+    async (request, reply) => {
+      const { conversationId } = request.params;
+      const body = request.body as Record<string, unknown> | null | undefined;
+      const content = typeof body?.content === "string" ? body.content.trim() : "";
+
+      if (!content) {
+        return reply.status(400).send({ error: "Conteúdo da nota é obrigatório." });
+      }
+
+      const db = getAdminClient();
+
+      const { data: conv } = await db
+        .from("conversations")
+        .select("organization_id")
+        .eq("id", conversationId)
+        .single();
+
+      if (!conv) return reply.status(404).send({ error: "Conversa não encontrada" });
+
+      const membership = request.user.memberships.find(
+        (m) => m.organization_id === conv.organization_id
+      );
+      if (!membership) return reply.status(403).send({ error: "Acesso negado" });
+
+      const note = await addConversationNote(db, {
+        conversation_id: conversationId,
+        organization_id: conv.organization_id,
+        user_id: request.user.id,
+        content,
+      });
+
+      return reply.status(201).send(note);
+    }
+  );
 
   app.patch<{
     Params: { conversationId: string };
