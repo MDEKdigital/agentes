@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useOrganization } from "@/providers/organization-provider";
-import { createClient } from "@/lib/supabase/client";
+import { apiFetch } from "@/lib/api";
 import { AgentCard } from "@/components/agents/agent-card";
 import { Plus, Bot } from "lucide-react";
 import type { Agent } from "@aula-agente/shared";
@@ -18,14 +18,8 @@ export default function AgentsPage() {
 
     const fetchAgents = async () => {
       setAgentsLoading(true);
-      const supabase = createClient();
-      const { data } = await supabase
-        .from("agents")
-        .select("*")
-        .eq("organization_id", currentOrg.id)
-        .order("created_at", { ascending: false });
-
-      setAgents((data as Agent[]) || []);
+      const data = await apiFetch(`/organizations/${currentOrg.id}/agents`);
+      setAgents((data.agents as Agent[]) || []);
       setAgentsLoading(false);
     };
 
