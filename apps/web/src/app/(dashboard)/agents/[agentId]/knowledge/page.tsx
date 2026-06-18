@@ -2,7 +2,8 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { useOrganization } from "@/providers/organization-provider";
+import { apiFetch } from "@/lib/api";
 import { DocumentUpload } from "@/components/agents/document-upload";
 import { FaqManager } from "@/components/agents/faq-manager";
 import type { KnowledgeDocument, KnowledgeFaq } from "@aula-agente/shared";
@@ -12,30 +13,23 @@ import { ArrowLeft } from "lucide-react";
 
 export default function KnowledgePage() {
   const { agentId } = useParams<{ agentId: string }>();
+  const { currentOrg } = useOrganization();
   const [documents, setDocuments] = useState<KnowledgeDocument[]>([]);
   const [faqs, setFaqs] = useState<KnowledgeFaq[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
-    const supabase = createClient();
+    if (!currentOrg) return;
 
-    const [docsResult, faqsResult] = await Promise.all([
-      supabase
-        .from("knowledge_documents")
-        .select("*")
-        .eq("agent_id", agentId)
-        .order("created_at", { ascending: false }),
-      supabase
-        .from("knowledge_faqs")
-        .select("*")
-        .eq("agent_id", agentId)
-        .order("created_at", { ascending: false }),
+    const [docs, faqsList] = await Promise.all([
+      apiFetch(`/organizations/${currentOrg.id}/agents/${agentId}/documents`),
+      apiFetch(`/organizations/${currentOrg.id}/agents/${agentId}/faqs`),
     ]);
 
-    setDocuments((docsResult.data as KnowledgeDocument[]) || []);
-    setFaqs((faqsResult.data as KnowledgeFaq[]) || []);
+    setDocuments((docs as KnowledgeDocument[]) || []);
+    setFaqs((faqsList as KnowledgeFaq[]) || []);
     setLoading(false);
-  }, [agentId]);
+  }, [agentId, currentOrg]);
 
   useEffect(() => {
     fetchData();
