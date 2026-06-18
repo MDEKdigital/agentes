@@ -3,14 +3,13 @@
 import { Suspense, useEffect, useState, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useOrganization } from "@/providers/organization-provider";
-import { createClient } from "@/lib/supabase/client";
 import { useRealtime } from "@/lib/realtime";
+import { apiFetch } from "@/lib/api";
 import { ConversationList } from "@/components/inbox/conversation-list";
 import { ChatPanel } from "@/components/inbox/chat-panel";
 import { Input } from "@/components/ui/input";
 import { Search, MessageSquare, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { apiFetch } from "@/lib/api";
 
 interface ConversationRow {
   id: string;
@@ -51,30 +50,23 @@ function InboxContent() {
     }
     const myCount = ++fetchCounterRef.current;
     setLoading(true);
-    const supabase = createClient();
 
-    let query = supabase
-      .from("conversations")
-      .select("*, contacts(phone, name), agents(name)")
-      .eq("organization_id", currentOrg.id)
-      .order("last_message_at", { ascending: false });
+    const url =
+      statusFilter !== "all"
+        ? `/organizations/${currentOrg.id}/conversations?status=${statusFilter}`
+        : `/organizations/${currentOrg.id}/conversations`;
 
-    if (statusFilter !== "all") {
-      query = query.eq("status", statusFilter);
-    }
-
-    const { data, error: queryError } = await query;
-
-    if (fetchCounterRef.current !== myCount) return;
-
-    if (queryError) {
+    try {
+      const data = await apiFetch(url);
+      if (fetchCounterRef.current !== myCount) return;
+      setError(null);
+      setConversations((data as ConversationRow[]) || []);
+    } catch {
+      if (fetchCounterRef.current !== myCount) return;
       setError("Erro ao carregar conversas. Tente novamente.");
-      setLoading(false);
-      return;
+    } finally {
+      if (fetchCounterRef.current === myCount) setLoading(false);
     }
-    setError(null);
-    setConversations((data as ConversationRow[]) || []);
-    setLoading(false);
   }, [currentOrg, statusFilter]);
 
   useEffect(() => {
@@ -83,12 +75,7 @@ function InboxContent() {
 
   const handleRealtimeInsert = useCallback(async (newRow: Record<string, unknown>) => {
     if (!currentOrg) return;
-    const supabase = createClient();
-    const { data } = await supabase
-      .from("conversations")
-      .select("*, contacts(phone, name), agents(name)")
-      .eq("id", newRow.id as string)
-      .single();
+    const data = await apiFetch(`/conversations/${newRow.id as string}`).catch(() => null);
     if (data) {
       setConversations((prev) => [data as ConversationRow, ...prev]);
     }

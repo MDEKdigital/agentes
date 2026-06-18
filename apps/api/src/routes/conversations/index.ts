@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { getAdminClient, getConversationNotes, addConversationNote, updateConversationTags, getConversationById, getMessagesByConversation } from "@aula-agente/database";
+import { getAdminClient, getConversationNotes, addConversationNote, updateConversationTags, getConversationById, getMessagesByConversation, getInboxConversations } from "@aula-agente/database";
 import { authMiddleware } from "../../middleware/auth";
 
 const STATUS_SCHEMA = {
@@ -19,6 +19,26 @@ const STATUS_SCHEMA = {
 
 export default async function conversationRoutes(app: FastifyInstance) {
   app.addHook("preHandler", authMiddleware);
+
+  app.get<{
+    Params: { organizationId: string };
+    Querystring: { status?: string };
+  }>(
+    "/organizations/:organizationId/conversations",
+    async (request, reply) => {
+      const { organizationId } = request.params;
+      const { status } = request.query;
+
+      const membership = request.user.memberships.find(
+        (m) => m.organization_id === organizationId
+      );
+      if (!membership) return reply.status(403).send({ error: "Acesso negado" });
+
+      const db = getAdminClient();
+      const conversations = await getInboxConversations(db, organizationId, status);
+      return reply.send(conversations);
+    }
+  );
 
   app.get<{ Params: { conversationId: string } }>(
     "/conversations/:conversationId",

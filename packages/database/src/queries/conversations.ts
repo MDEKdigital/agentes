@@ -129,6 +129,26 @@ export async function getConversationNotes(client: SupabaseClient, conversationI
   return data as ConversationNote[];
 }
 
+export async function getInboxConversations(
+  client: SupabaseClient,
+  organizationId: string,
+  status?: string
+) {
+  let query = client
+    .from("conversations")
+    .select("*, contacts(phone, name), agents(name)")
+    .eq("organization_id", organizationId)
+    .order("last_message_at", { ascending: false });
+
+  if (status) {
+    query = query.eq("status", status);
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return data;
+}
+
 export async function updateConversationTags(
   client: SupabaseClient,
   conversationId: string,
