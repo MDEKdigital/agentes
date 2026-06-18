@@ -183,3 +183,15 @@ export async function createInvitation(
   if (error) throw error;
   return data as OrganizationInvitation;
 }
+
+
+export async function updateOrganizationName(client: SupabaseClient, organizationId: string, name: string) {
+  const { data, error } = await client
+    .from("organizations")
+    .update({ name })
+    .eq("id", organizationId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data as Organization;
+}

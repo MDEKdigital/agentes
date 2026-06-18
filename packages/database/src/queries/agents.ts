@@ -11,14 +11,15 @@ export async function getAgentsByOrganization(client: SupabaseClient, organizati
   return data as Agent[];
 }
 
-export async function getAgentById(client: SupabaseClient, id: string) {
+export async function getAgentById(client: SupabaseClient, id: string, organizationId: string) {
   const { data, error } = await client
     .from("agents")
     .select("*")
     .eq("id", id)
-    .single();
+    .eq("organization_id", organizationId)
+    .maybeSingle();
   if (error) throw error;
-  return data as Agent;
+  return data as Agent | null;
 }
 
 export async function createAgent(
@@ -34,11 +35,12 @@ export async function createAgent(
   return data as Agent;
 }
 
-export async function updateAgent(client: SupabaseClient, id: string, updates: Partial<Agent>) {
+export async function updateAgent(client: SupabaseClient, id: string, organizationId: string, updates: Partial<Agent>) {
   const { data, error } = await client
     .from("agents")
     .update(updates)
     .eq("id", id)
+    .eq("organization_id", organizationId)
     .select()
     .single();
   if (error) throw error;

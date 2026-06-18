@@ -128,3 +128,16 @@ export async function getConversationNotes(client: SupabaseClient, conversationI
   if (error) throw error;
   return data as ConversationNote[];
 }
+
+export async function resetAgentConversationsKeywordActivation(
+  client: SupabaseClient,
+  agentId: string,
+  isKeywordActivated: boolean
+) {
+  const { error } = await client
+    .from("conversations")
+    .update({ is_keyword_activated: isKeywordActivated, awaiting_activation_confirmation: false })
+    .eq("agent_id", agentId)
+    .in("status", ["open", "waiting"]);
+  if (error) throw error;
+}
