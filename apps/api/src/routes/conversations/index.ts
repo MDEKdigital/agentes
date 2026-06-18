@@ -22,21 +22,32 @@ export default async function conversationRoutes(app: FastifyInstance) {
 
   app.get<{
     Params: { organizationId: string };
-    Querystring: { status?: string };
+    Querystring: { status?: string; page?: string; limit?: string };
   }>(
     "/organizations/:organizationId/conversations",
     async (request, reply) => {
       const { organizationId } = request.params;
-      const { status } = request.query;
+      const { status, page: pageStr, limit: limitStr } = request.query;
 
       const membership = request.user.memberships.find(
         (m) => m.organization_id === organizationId
       );
       if (!membership) return reply.status(403).send({ error: "Acesso negado" });
 
+      const limit = Math.min(Math.max(parseInt(limitStr ?? "50", 10) || 50, 1), 100);
+      const page = Math.max(parseInt(pageStr ?? "1", 10) || 1, 1);
+      const offset = (page - 1) * limit;
+
       const db = getAdminClient();
-      const conversations = await getInboxConversations(db, organizationId, status);
-      return reply.send(conversations);
+      const { conversations, total } = await getInboxConversations(db, organizationId, status, limit, offset);
+
+      return reply.send({
+        conversations,
+        total,
+        page,
+        limit,
+        hasMore: offset + conversations.length < total,
+      });
     }
   );
 

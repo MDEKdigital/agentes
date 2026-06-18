@@ -22,6 +22,14 @@ interface ConversationRow {
   agents: { name: string };
 }
 
+interface PaginatedConversations {
+  conversations: ConversationRow[];
+  total: number;
+  page: number;
+  limit: number;
+  hasMore: boolean;
+}
+
 const STATUS_TABS = [
   { value: "all", label: "Todas" },
   { value: "open", label: "Abertas" },
@@ -30,12 +38,23 @@ const STATUS_TABS = [
   { value: "closed", label: "Fechadas" },
 ];
 
+const LIMIT = 50;
+
+function buildUrl(orgId: string, status: string, page: number): string {
+  let url = `/organizations/${orgId}/conversations?page=${page}&limit=${LIMIT}`;
+  if (status !== "all") url += `&status=${status}`;
+  return url;
+}
+
 function InboxContent() {
   const { currentOrg } = useOrganization();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [conversations, setConversations] = useState<ConversationRow[]>([]);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
@@ -51,16 +70,13 @@ function InboxContent() {
     const myCount = ++fetchCounterRef.current;
     setLoading(true);
 
-    const url =
-      statusFilter !== "all"
-        ? `/organizations/${currentOrg.id}/conversations?status=${statusFilter}`
-        : `/organizations/${currentOrg.id}/conversations`;
-
     try {
-      const data = await apiFetch(url);
+      const data = await apiFetch(buildUrl(currentOrg.id, statusFilter, 1)) as PaginatedConversations;
       if (fetchCounterRef.current !== myCount) return;
       setError(null);
-      setConversations((data as ConversationRow[]) || []);
+      setConversations(data.conversations ?? []);
+      setHasMore(data.hasMore ?? false);
+      setPage(1);
     } catch {
       if (fetchCounterRef.current !== myCount) return;
       setError("Erro ao carregar conversas. Tente novamente.");
@@ -72,6 +88,22 @@ function InboxContent() {
   useEffect(() => {
     fetchConversations();
   }, [fetchConversations]);
+
+  const handleLoadMore = useCallback(async () => {
+    if (!hasMore || !currentOrg || loadingMore) return;
+    const nextPage = page + 1;
+    setLoadingMore(true);
+    try {
+      const data = await apiFetch(buildUrl(currentOrg.id, statusFilter, nextPage)) as PaginatedConversations;
+      setConversations((prev) => [...prev, ...(data.conversations ?? [])]);
+      setHasMore(data.hasMore ?? false);
+      setPage(nextPage);
+    } catch {
+      // silently fail — user can retry by clicking again
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [currentOrg, statusFilter, hasMore, page, loadingMore]);
 
   const handleRealtimeInsert = useCallback(async (newRow: Record<string, unknown>) => {
     if (!currentOrg) return;
@@ -172,12 +204,33 @@ function InboxContent() {
       );
     }
     return (
-      <ConversationList
-        conversations={filtered}
-        selectedId={selectedId}
-        onSelect={handleSelect}
-        onDelete={handleDelete}
-      />
+      <>
+        <ConversationList
+          conversations={filtered}
+          selectedId={selectedId}
+          onSelect={handleSelect}
+          onDelete={handleDelete}
+        />
+        {hasMore && (
+          <div className="p-2">
+            <button
+              data-testid="load-more-button"
+              onClick={handleLoadMore}
+              disabled={loadingMore}
+              className="w-full rounded-lg border border-border py-2 text-xs text-muted-foreground hover:bg-accent disabled:opacity-60"
+            >
+              {loadingMore ? (
+                <span className="flex items-center justify-center gap-1.5">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Carregando...
+                </span>
+              ) : (
+                "Carregar mais"
+              )}
+            </button>
+          </div>
+        )}
+      </>
     );
   };
 

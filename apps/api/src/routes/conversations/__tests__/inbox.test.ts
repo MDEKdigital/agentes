@@ -59,13 +59,14 @@ async function buildApp(orgId = ORG_ID) {
 beforeEach(() => {
   vi.clearAllMocks();
   mockGetAdminClient.mockReturnValue({});
-  mockGetInboxConversations.mockResolvedValue(CONV_FIXTURE);
+  // getInboxConversations now returns { conversations, total }
+  mockGetInboxConversations.mockResolvedValue({ conversations: CONV_FIXTURE, total: 1 });
 });
 
 // ── GET /organizations/:organizationId/conversations ──────────────────────────
 
 describe("GET /organizations/:organizationId/conversations", () => {
-  it("membro da org → 200 com lista de conversas", async () => {
+  it("membro da org → 200 com envelope paginado", async () => {
     const app = await buildApp();
     const res = await app.inject({
       method: "GET",
@@ -73,9 +74,78 @@ describe("GET /organizations/:organizationId/conversations", () => {
     });
     expect(res.statusCode).toBe(200);
     const body = res.json();
-    expect(Array.isArray(body)).toBe(true);
-    expect(body).toHaveLength(1);
-    expect(body[0].id).toBe("conv-1");
+    expect(Array.isArray(body)).toBe(false);
+    expect(Array.isArray(body.conversations)).toBe(true);
+    expect(body.conversations).toHaveLength(1);
+    expect(body.conversations[0].id).toBe("conv-1");
+  });
+
+  it("resposta inclui total, page, limit e hasMore", async () => {
+    const app = await buildApp();
+    const res = await app.inject({
+      method: "GET",
+      url: `/organizations/${ORG_ID}/conversations`,
+    });
+    const body = res.json();
+    expect(typeof body.total).toBe("number");
+    expect(typeof body.page).toBe("number");
+    expect(typeof body.limit).toBe("number");
+    expect(typeof body.hasMore).toBe("boolean");
+  });
+
+  it("sem params → page=1, limit=50, hasMore=false quando total<=50", async () => {
+    const app = await buildApp();
+    const res = await app.inject({
+      method: "GET",
+      url: `/organizations/${ORG_ID}/conversations`,
+    });
+    const body = res.json();
+    expect(body.page).toBe(1);
+    expect(body.limit).toBe(50);
+    expect(body.hasMore).toBe(false);
+    expect(body.total).toBe(1);
+  });
+
+  it("?page=2&limit=10 → getInboxConversations chamado com limit=10, offset=10", async () => {
+    const app = await buildApp();
+    await app.inject({
+      method: "GET",
+      url: `/organizations/${ORG_ID}/conversations?page=2&limit=10`,
+    });
+    expect(mockGetInboxConversations).toHaveBeenCalledWith(
+      expect.anything(),
+      ORG_ID,
+      undefined,
+      10,
+      10
+    );
+  });
+
+  it("hasMore=true quando offset + returned < total", async () => {
+    mockGetInboxConversations.mockResolvedValue({ conversations: CONV_FIXTURE, total: 200 });
+    const app = await buildApp();
+    const res = await app.inject({
+      method: "GET",
+      url: `/organizations/${ORG_ID}/conversations?page=1&limit=50`,
+    });
+    const body = res.json();
+    expect(body.hasMore).toBe(true);
+    expect(body.total).toBe(200);
+  });
+
+  it("limit clamped a 100 no máximo", async () => {
+    const app = await buildApp();
+    await app.inject({
+      method: "GET",
+      url: `/organizations/${ORG_ID}/conversations?limit=999`,
+    });
+    expect(mockGetInboxConversations).toHaveBeenCalledWith(
+      expect.anything(),
+      ORG_ID,
+      undefined,
+      100,
+      0
+    );
   });
 
   it("sem ?status → getInboxConversations chamado com status undefined", async () => {
@@ -87,7 +157,9 @@ describe("GET /organizations/:organizationId/conversations", () => {
     expect(mockGetInboxConversations).toHaveBeenCalledWith(
       expect.anything(),
       ORG_ID,
-      undefined
+      undefined,
+      50,
+      0
     );
   });
 
@@ -100,7 +172,9 @@ describe("GET /organizations/:organizationId/conversations", () => {
     expect(mockGetInboxConversations).toHaveBeenCalledWith(
       expect.anything(),
       ORG_ID,
-      "open"
+      "open",
+      50,
+      0
     );
   });
 
@@ -113,7 +187,9 @@ describe("GET /organizations/:organizationId/conversations", () => {
     expect(mockGetInboxConversations).toHaveBeenCalledWith(
       expect.anything(),
       ORG_ID,
-      "resolved"
+      "resolved",
+      50,
+      0
     );
   });
 

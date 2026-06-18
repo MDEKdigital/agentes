@@ -132,21 +132,24 @@ export async function getConversationNotes(client: SupabaseClient, conversationI
 export async function getInboxConversations(
   client: SupabaseClient,
   organizationId: string,
-  status?: string
-) {
+  status?: string,
+  limit = 50,
+  offset = 0,
+): Promise<{ conversations: Conversation[]; total: number }> {
   let query = client
     .from("conversations")
-    .select("*, contacts(phone, name), agents(name)")
+    .select("*, contacts(phone, name), agents(name)", { count: "exact" })
     .eq("organization_id", organizationId)
-    .order("last_message_at", { ascending: false });
+    .order("last_message_at", { ascending: false })
+    .range(offset, offset + limit - 1);
 
   if (status) {
     query = query.eq("status", status);
   }
 
-  const { data, error } = await query;
+  const { data, count, error } = await query;
   if (error) throw error;
-  return data;
+  return { conversations: (data as Conversation[]) ?? [], total: count ?? 0 };
 }
 
 export async function updateConversationTags(
