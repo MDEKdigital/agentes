@@ -129,8 +129,8 @@ describe("GET /organizations/:organizationId/members", () => {
 // ── tests: PATCH /members/:memberId ──────────────────────────────────────────
 
 describe("PATCH /organizations/:organizationId/members/:memberId", () => {
-  it("cenário 1: admin altera role de agent → 200 com membro atualizado", async () => {
-    const app = await buildApp("admin");
+  it("cenário 1: owner altera role de agent para admin → 200 com membro atualizado", async () => {
+    const app = await buildApp("owner");
     const res = await app.inject({
       method: "PATCH",
       url: `/organizations/${ORG_ID}/members/${MEMBER_ID}`,
@@ -195,6 +195,47 @@ describe("PATCH /organizations/:organizationId/members/:memberId", () => {
     });
 
     expect(res.statusCode).toBe(400);
+    expect(mockUpdateMemberRole).not.toHaveBeenCalled();
+  });
+
+  it("admin não pode promover membro para owner", async () => {
+    const app = await buildApp("admin");
+
+    const res = await app.inject({
+      method: "PATCH",
+      url: `/organizations/${ORG_ID}/members/${MEMBER_ID}`,
+      payload: {
+        role: "owner",
+      },
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(mockUpdateMemberRole).not.toHaveBeenCalled();
+  });
+
+  it("admin não pode rebaixar outro admin", async () => {
+    mockGetMemberById.mockResolvedValue({ ...mockAgentMember, role: "admin" });
+
+    const app = await buildApp("admin");
+    const res = await app.inject({
+      method: "PATCH",
+      url: `/organizations/${ORG_ID}/members/${MEMBER_ID}`,
+      payload: { role: "agent" },
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(mockUpdateMemberRole).not.toHaveBeenCalled();
+  });
+
+  it("admin não pode promover agent para admin", async () => {
+    const app = await buildApp("admin");
+    const res = await app.inject({
+      method: "PATCH",
+      url: `/organizations/${ORG_ID}/members/${MEMBER_ID}`,
+      payload: { role: "admin" },
+    });
+
+    expect(res.statusCode).toBe(403);
     expect(mockUpdateMemberRole).not.toHaveBeenCalled();
   });
 

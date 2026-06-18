@@ -49,6 +49,9 @@ export default async function membersRoutes(app: FastifyInstance) {
       if (!VALID_ROLES.includes(role as MemberRoleType)) {
         return reply.status(400).send({ error: "Função inválida. Use: owner, admin ou agent." });
       }
+      if (role === "owner") {
+        return reply.status(403).send({ error: "Não é possível promover membros para proprietário por esta rota." });
+      }
 
       const db = getAdminClient();
       const target = await getMemberById(db, organizationId, memberId);
@@ -60,6 +63,9 @@ export default async function membersRoutes(app: FastifyInstance) {
       }
       if (target.user_id === request.user.id) {
         return reply.status(403).send({ error: "Não é possível alterar o próprio role." });
+      }
+      if ((target.role === "admin" || role === "admin") && membership.role !== "owner") {
+        return reply.status(403).send({ error: "Apenas proprietários podem gerenciar admins." });
       }
 
       const updated = await updateMemberRole(db, organizationId, memberId, role as MemberRoleType);

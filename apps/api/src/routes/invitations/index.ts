@@ -15,10 +15,10 @@ export default async function invitationRoutes(app: FastifyInstance) {
       const { organizationId } = request.params;
 
       const membership = request.user.memberships.find(
-        (m) => m.organization_id === organizationId
+        (m) => m.organization_id === organizationId && m.role !== "agent"
       );
       if (!membership) {
-        return reply.status(403).send({ error: "Acesso negado" });
+        return reply.status(403).send({ error: "Acesso de administrador necessário" });
       }
 
       const db = getAdminClient();

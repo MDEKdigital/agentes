@@ -217,14 +217,15 @@ describe("GET /organizations/:organizationId/invitations", () => {
     expect(body.invitations).toHaveLength(2);
   });
 
-  it("cenário 3: agent → 200 (agents também podem ver convites)", async () => {
+  it("cenário 3: agent → 403 (agents não podem ver convites pendentes)", async () => {
     const app = await buildApp("agent");
     const res = await app.inject({
       method: "GET",
       url: `/organizations/${ORG_ID}/invitations`,
     });
 
-    expect(res.statusCode).toBe(200);
+    expect(res.statusCode).toBe(403);
+    expect(mockGetOrgInvitations).not.toHaveBeenCalled();
   });
 
   it("cenário 4: não é membro da org → 403", async () => {
