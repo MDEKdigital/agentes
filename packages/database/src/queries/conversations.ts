@@ -129,6 +129,18 @@ export async function getConversationNotes(client: SupabaseClient, conversationI
   return data as ConversationNote[];
 }
 
+export async function updateConversationTags(
+  client: SupabaseClient,
+  conversationId: string,
+  tags: string[]
+) {
+  const { error } = await client
+    .from("conversations")
+    .update({ tags })
+    .eq("id", conversationId);
+  if (error) throw error;
+}
+
 export async function resetAgentConversationsKeywordActivation(
   client: SupabaseClient,
   agentId: string,

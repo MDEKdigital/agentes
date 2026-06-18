@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { getAdminClient, getConversationNotes, addConversationNote } from "@aula-agente/database";
+import { getAdminClient, getConversationNotes, addConversationNote, updateConversationTags } from "@aula-agente/database";
 import { authMiddleware } from "../../middleware/auth";
 
 const STATUS_SCHEMA = {
@@ -153,6 +153,36 @@ export default async function conversationRoutes(app: FastifyInstance) {
         .eq("organization_id", conv.organization_id);
 
       if (error) return reply.status(500).send({ error: "Falha ao atualizar takeover" });
+      return reply.status(204).send();
+    }
+  );
+
+  app.patch<{ Params: { conversationId: string } }>(
+    "/conversations/:conversationId/tags",
+    async (request, reply) => {
+      const { conversationId } = request.params;
+      const body = request.body as Record<string, unknown> | null | undefined;
+
+      if (!body || !Array.isArray(body.tags)) {
+        return reply.status(400).send({ error: "Campo 'tags' (array) é obrigatório." });
+      }
+      const tags = body.tags as string[];
+
+      const db = getAdminClient();
+      const { data: conv } = await db
+        .from("conversations")
+        .select("organization_id")
+        .eq("id", conversationId)
+        .single();
+
+      if (!conv) return reply.status(404).send({ error: "Conversa não encontrada" });
+
+      const membership = request.user.memberships.find(
+        (m) => m.organization_id === conv.organization_id
+      );
+      if (!membership) return reply.status(403).send({ error: "Acesso negado" });
+
+      await updateConversationTags(db, conversationId, tags);
       return reply.status(204).send();
     }
   );
