@@ -244,3 +244,29 @@ export async function returnConversationToAgent(
     .eq("id", conversationId);
   if (error) throw error;
 }
+
+export async function getRemarketingFlowsByIds(
+  client: SupabaseClient,
+  ids: string[]
+): Promise<RemarketingFlow[]> {
+  if (ids.length === 0) return [];
+  const { data, error } = await client
+    .from("remarketing_flows")
+    .select("*")
+    .in("id", ids);
+  if (error) throw error;
+  return (data as RemarketingFlow[]) ?? [];
+}
+
+export async function getRemarketingStepsByIds(
+  client: SupabaseClient,
+  ids: string[]
+): Promise<RemarketingStep[]> {
+  if (ids.length === 0) return [];
+  const { data, error } = await client
+    .from("remarketing_steps")
+    .select("*")
+    .in("id", ids);
+  if (error) throw error;
+  return (data as RemarketingStep[]) ?? [];
+}

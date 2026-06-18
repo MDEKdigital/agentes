@@ -11,7 +11,8 @@ import {
   getConversationsEligibleForEnrollment,
   createEnrollment,
   getActiveEnrollments,
-  getStepById,
+  getRemarketingFlowsByIds,
+  getRemarketingStepsByIds,
   cancelEnrollment,
   advanceEnrollment,
   updateFlowLastExecuted,
@@ -29,16 +30,7 @@ function toMinutes(value: number, unit: string): number {
   return value;
 }
 
-async function getFlowById(db: ReturnType<typeof getAdminClient>, flowId: string) {
-  const { data } = await db
-    .from("remarketing_flows")
-    .select("*")
-    .eq("id", flowId)
-    .maybeSingle();
-  return data;
-}
-
-async function processRemarketingCycle() {
+export async function processRemarketingCycle() {
   const db = getAdminClient();
 
   // ── Passo 1: Detectar novas entradas ──────────────────────────────────────
@@ -75,11 +67,30 @@ async function processRemarketingCycle() {
   // ── Passo 2: Processar etapas pendentes ───────────────────────────────────
   const enrollments = await getActiveEnrollments(db);
 
+  if (enrollments.length === 0) return;
+
+  // Batch-fetch flows e steps para eliminar N queries por enrollment
+  const flowIds = [...new Set(enrollments.map((e) => e.flow_id))];
+  const stepIds = enrollments
+    .map((e) => e.next_step_id)
+    .filter((id): id is string => id != null);
+
+  const [flowsForEnrollments, stepsForEnrollments] = await Promise.all([
+    getRemarketingFlowsByIds(db, flowIds),
+    getRemarketingStepsByIds(db, stepIds),
+  ]);
+
+  const flowMap = new Map(flowsForEnrollments.map((f) => [f.id, f]));
+  const stepMap = new Map(stepsForEnrollments.map((s) => [s.id, s]));
+
+  // Acumula flows que tiveram etapa enviada — para batch de updateFlowLastExecuted
+  const processedFlowIds = new Set<string>();
+
   for (const enrollment of enrollments) {
     try {
       if (!enrollment.next_step_id) continue;
 
-      const step = await getStepById(db, enrollment.next_step_id);
+      const step = stepMap.get(enrollment.next_step_id);
       if (!step) {
         await cancelEnrollment(db, enrollment.id, "step_not_found");
         continue;
@@ -92,9 +103,7 @@ async function processRemarketingCycle() {
         toMinutes(step.delay_value, step.delay_unit) * 60 * 1000;
       if (Date.now() < readyAt) continue;
 
-      // Buscar o fluxo diretamente do banco para ter dados sempre atualizados
-      // (o array `flows` do Passo 1 só contém fluxos ativos no momento da varredura)
-      const flow = await getFlowById(db, enrollment.flow_id);
+      const flow = flowMap.get(enrollment.flow_id);
 
       // ── Verificar regras de cancelamento ──────────────────────────────────
 
@@ -183,11 +192,16 @@ async function processRemarketingCycle() {
       // ── Avançar para próxima etapa ─────────────────────────────────────────
       const nextStep = await getNextActiveStep(db, enrollment.flow_id, step.step_order);
       await advanceEnrollment(db, enrollment.id, nextStep?.id ?? null);
-      await updateFlowLastExecuted(db, enrollment.flow_id);
+
+      // Registrar flow processado para atualização em batch ao final
+      processedFlowIds.add(enrollment.flow_id);
     } catch (err) {
       console.error(`[remarketing] Error processing enrollment ${enrollment.id}:`, err);
     }
   }
+
+  // ── Atualizar last_executed_at: uma vez por flow, não por enrollment ───────
+  await Promise.all([...processedFlowIds].map((fid) => updateFlowLastExecuted(db, fid)));
 }
 
 export function startRemarketingWorker() {
