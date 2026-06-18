@@ -3,13 +3,11 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useOrganization } from "@/providers/organization-provider";
-import { createClient } from "@/lib/supabase/client";
+import { apiFetch } from "@/lib/api";
 import { FlowForm } from "@/components/remarketing/flow-form";
 import { StepsEditor } from "@/components/remarketing/steps-editor";
 import { Loader2 } from "lucide-react";
 import type { RemarketingFlow, RemarketingStep } from "@aula-agente/shared";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL!;
 
 type StepDraft = Omit<RemarketingStep, "id" | "flow_id" | "created_at"> & { _tempId?: string; id?: string; step_order: number };
 
@@ -36,102 +34,71 @@ export default function FlowEditPage() {
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
 
-  const getHeaders = useCallback(async () => {
-    const supabase = createClient();
-    const { data: { session } } = await supabase.auth.getSession();
-    return {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${session?.access_token}`,
-      "x-organization-id": currentOrg?.id ?? "",
-    };
-  }, [currentOrg]);
-
   useEffect(() => {
     if (!currentOrg) return;
-    const supabase = createClient();
 
-    Promise.all([
-      supabase.from("agents").select("id, name").eq("organization_id", currentOrg.id),
-      supabase.from("evolution_instances").select("id, instance_name").eq("organization_id", currentOrg.id),
-    ]).then(([{ data: ag }, { data: inst }]) => {
-      setAgents(ag ?? []);
-      setInstances(inst ?? []);
-    });
+    const load = async () => {
+      const [agData, instData] = await Promise.all([
+        apiFetch(`/organizations/${currentOrg.id}/agents`),
+        apiFetch(`/organizations/${currentOrg.id}/instances`),
+      ]);
+      setAgents(((agData as { agents: { id: string; name: string }[] })?.agents) ?? []);
+      setInstances((instData as { id: string; instance_name: string }[]) ?? []);
 
-    if (!isNew) {
-      getHeaders().then(async (headers) => {
-        const [flowRes, stepsRes] = await Promise.all([
-          fetch(`${API_URL}/remarketing/flows`, { headers }),
-          fetch(`${API_URL}/remarketing/flows/${params.flowId}/steps`, { headers }),
+      if (!isNew) {
+        const [allFlows, stepsData] = await Promise.all([
+          apiFetch(`/remarketing/flows`),
+          apiFetch(`/remarketing/flows/${params.flowId}/steps`),
         ]);
-        if (flowRes.ok) {
-          const allFlows: RemarketingFlow[] = await flowRes.json();
-          const flow = allFlows.find((f) => f.id === params.flowId);
-          if (flow) setFlowData(flow);
-        }
-        if (stepsRes.ok) {
-          const data: RemarketingStep[] = await stepsRes.json();
-          setSteps(data.map((s) => ({ ...s, _tempId: s.id })));
-        }
+        const flow = (allFlows as RemarketingFlow[] | null)?.find((f) => f.id === params.flowId);
+        if (flow) setFlowData(flow);
+        setSteps(((stepsData as RemarketingStep[] | null) ?? []).map((s) => ({ ...s, _tempId: s.id })));
         setLoading(false);
-      });
-    }
-  }, [currentOrg, isNew, params.flowId, getHeaders]);
+      }
+    };
+
+    load();
+  }, [currentOrg, isNew, params.flowId]);
 
   async function handleSave() {
     if (!currentOrg) return;
     setSaving(true);
-    const headers = await getHeaders();
 
     try {
       let flowId = params.flowId;
 
       if (isNew) {
-        const res = await fetch(`${API_URL}/remarketing/flows`, {
+        const created = await apiFetch(`/remarketing/flows`, {
           method: "POST",
-          headers,
           body: JSON.stringify(flowData),
-        });
-        if (!res.ok) throw new Error(await res.text());
-        const created = await res.json();
+        }) as { id: string };
         flowId = created.id;
       } else {
-        const res = await fetch(`${API_URL}/remarketing/flows/${flowId}`, {
+        await apiFetch(`/remarketing/flows/${flowId}`, {
           method: "PUT",
-          headers,
           body: JSON.stringify(flowData),
         });
-        if (!res.ok) throw new Error(await res.text());
       }
 
-      // Salvar etapas: atualizar existentes, criar novas, deletar removidas
       const currentStepIds = new Set(steps.filter((s) => s.id).map((s) => s.id!));
 
-      const existingRes = await fetch(`${API_URL}/remarketing/flows/${flowId}/steps`, { headers });
-      if (existingRes.ok) {
-        const dbSteps: { id: string }[] = await existingRes.json();
-        for (const dbStep of dbSteps) {
-          if (!currentStepIds.has(dbStep.id)) {
-            await fetch(`${API_URL}/remarketing/flows/${flowId}/steps/${dbStep.id}`, {
-              method: "DELETE",
-              headers,
-            });
-          }
+      const dbSteps = await apiFetch(`/remarketing/flows/${flowId}/steps`) as { id: string }[];
+      for (const dbStep of dbSteps) {
+        if (!currentStepIds.has(dbStep.id)) {
+          await apiFetch(`/remarketing/flows/${flowId}/steps/${dbStep.id}`, { method: "DELETE" });
         }
       }
 
       for (const step of steps) {
         const { _tempId, id, ...body } = step;
         if (id) {
-          await fetch(`${API_URL}/remarketing/flows/${flowId}/steps/${id}`, {
+          await apiFetch(`/remarketing/flows/${flowId}/steps/${id}`, {
             method: "PUT",
-            headers,
             body: JSON.stringify(body),
           });
         } else {
-          await fetch(`${API_URL}/remarketing/flows/${flowId}/steps`, {
+          await apiFetch(`/remarketing/flows/${flowId}/steps`, {
             method: "POST",
-            headers,
             body: JSON.stringify(body),
           });
         }
