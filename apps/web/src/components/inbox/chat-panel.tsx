@@ -31,20 +31,17 @@ export function ChatPanel({ conversationId, onDelete }: ChatPanelProps) {
   } | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  const fetchMessages = useCallback(async () => {
-    const data = await apiFetch(`/conversations/${conversationId}/messages`).catch(() => null);
-    setMessages((data?.messages as Message[]) || []);
-  }, [conversationId]);
-
-  const fetchConversation = useCallback(async () => {
-    const data = await apiFetch(`/conversations/${conversationId}`).catch(() => null);
-    setConversation(data as typeof conversation);
+  const fetchFull = useCallback(async () => {
+    const data = await apiFetch(`/conversations/${conversationId}/full`).catch(() => null);
+    if (data) {
+      setConversation((data as any).conversation ?? null);
+      setMessages(((data as any).messages as Message[]) ?? []);
+    }
   }, [conversationId]);
 
   useEffect(() => {
-    fetchMessages();
-    fetchConversation();
-  }, [fetchMessages, fetchConversation]);
+    fetchFull();
+  }, [fetchFull]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -150,7 +147,7 @@ export function ChatPanel({ conversationId, onDelete }: ChatPanelProps) {
 
       {/* Painel lateral */}
       {conversation && (
-        <SidePanel conversation={conversation} onUpdate={fetchConversation} onDelete={onDelete} />
+        <SidePanel conversation={conversation} onUpdate={fetchFull} onDelete={onDelete} />
       )}
     </div>
   );

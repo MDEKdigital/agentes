@@ -89,6 +89,25 @@ export default async function conversationRoutes(app: FastifyInstance) {
   );
 
   app.get<{ Params: { conversationId: string } }>(
+    "/conversations/:conversationId/full",
+    async (request, reply) => {
+      const { conversationId } = request.params;
+      const db = getAdminClient();
+
+      const conv = await getConversationById(db, conversationId);
+      if (!conv) return reply.status(404).send({ error: "Conversa não encontrada" });
+
+      const membership = request.user.memberships.find(
+        (m) => m.organization_id === (conv as Record<string, unknown>).organization_id
+      );
+      if (!membership) return reply.status(403).send({ error: "Acesso negado" });
+
+      const messages = await getMessagesByConversation(db, conversationId);
+      return reply.send({ conversation: conv, messages });
+    }
+  );
+
+  app.get<{ Params: { conversationId: string } }>(
     "/conversations/:conversationId/notes",
     async (request, reply) => {
       const { conversationId } = request.params;
