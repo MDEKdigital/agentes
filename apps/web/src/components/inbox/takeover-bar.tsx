@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { apiFetch } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -31,43 +31,37 @@ export function TakeoverBar({
   const [members, setMembers] = useState<Array<{ user_id: string; role: string }>>([]);
 
   useEffect(() => {
-    const fetchMembers = async () => {
-      const supabase = createClient();
-      const { data } = await supabase
-        .from("organization_members")
-        .select("user_id, role")
-        .eq("organization_id", organizationId);
-      setMembers(data || []);
-    };
-    fetchMembers();
+    apiFetch(`/organizations/${organizationId}/members`)
+      .then((data) => setMembers(data.members || []))
+      .catch(() => {});
   }, [organizationId]);
 
   const handleTakeover = async () => {
-    const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    await supabase
-      .from("conversations")
-      .update({
-        is_human_takeover: !isHumanTakeover,
-        human_takeover_at: !isHumanTakeover ? new Date().toISOString() : null,
-        assigned_to: !isHumanTakeover ? user?.id : null,
-      })
-      .eq("id", conversationId);
-    onUpdate();
+    try {
+      await apiFetch(`/conversations/${conversationId}/takeover`, {
+        method: "PATCH",
+        body: JSON.stringify({ takeover: !isHumanTakeover }),
+      });
+      onUpdate();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Erro ao atualizar atendimento");
+    }
   };
 
   const handleAssign = async (userId: string) => {
-    const supabase = createClient();
-    await supabase
-      .from("conversations")
-      .update({ assigned_to: userId === "none" ? null : userId })
-      .eq("id", conversationId);
-    onUpdate();
+    try {
+      await apiFetch(`/conversations/${conversationId}/assignment`, {
+        method: "PATCH",
+        body: JSON.stringify({ assigned_to: userId === "none" ? null : userId }),
+      });
+      onUpdate();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Erro ao atribuir conversa");
+    }
   };
 
   return (
     <div className="space-y-2">
-      {/* Banner de takeover ativo */}
       {isHumanTakeover && (
         <div className="rounded-lg border border-amber-fire-500/30 bg-amber-fire-500/10 px-3 py-2">
           <p className="text-[11px] font-medium text-amber-fire-400">
