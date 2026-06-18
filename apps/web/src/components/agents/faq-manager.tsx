@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useOrganization } from "@/providers/organization-provider";
-import { createClient } from "@/lib/supabase/client";
+import { apiFetch } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -27,34 +27,42 @@ export function FaqManager({ agentId, faqs, onRefresh }: FaqManagerProps) {
   const handleAdd = async () => {
     if (!currentOrg || !question || !answer) return;
     setSaving(true);
-
-    const supabase = createClient();
-    await supabase.from("knowledge_faqs").insert({
-      agent_id: agentId,
-      organization_id: currentOrg.id,
-      question,
-      answer,
-      is_active: true,
-    });
-
-    setQuestion("");
-    setAnswer("");
-    setShowForm(false);
-    setSaving(false);
-    onRefresh();
+    try {
+      await apiFetch(`/organizations/${currentOrg.id}/faqs`, {
+        method: "POST",
+        body: JSON.stringify({ agent_id: agentId, question, answer }),
+      });
+      setQuestion("");
+      setAnswer("");
+      setShowForm(false);
+      onRefresh();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Erro ao criar FAQ");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleToggle = async (faqId: string, isActive: boolean) => {
-    const supabase = createClient();
-    await supabase.from("knowledge_faqs").update({ is_active: isActive }).eq("id", faqId);
-    onRefresh();
+    try {
+      await apiFetch(`/faqs/${faqId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ is_active: isActive }),
+      });
+      onRefresh();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Erro ao atualizar FAQ");
+    }
   };
 
   const handleDelete = async (faqId: string) => {
     if (!confirm("Excluir FAQ?")) return;
-    const supabase = createClient();
-    await supabase.from("knowledge_faqs").delete().eq("id", faqId);
-    onRefresh();
+    try {
+      await apiFetch(`/faqs/${faqId}`, { method: "DELETE" });
+      onRefresh();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Erro ao excluir FAQ");
+    }
   };
 
   return (
