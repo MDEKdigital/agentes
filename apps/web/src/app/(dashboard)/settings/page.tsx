@@ -3,7 +3,6 @@
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { useOrganization } from "@/providers/organization-provider";
-import { createClient } from "@/lib/supabase/client";
 import { apiFetch } from "@/lib/api";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -51,9 +50,10 @@ export default function SettingsPage() {
     if (!currentOrg || !name) return;
     setSaving(true);
     try {
-      const supabase = createClient();
-      const { error } = await supabase.from("organizations").update({ name }).eq("id", currentOrg.id);
-      if (error) throw error;
+      await apiFetch(`/organizations/${currentOrg.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ name }),
+      });
       await refetch();
     } catch (err) {
       alert(err instanceof Error ? err.message : "Erro ao salvar nome");

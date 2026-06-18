@@ -4,6 +4,7 @@ import {
   getOrganizationById,
   isSlugAvailableForOrg,
   completeOrganizationOnboarding,
+  updateOrganizationName,
 } from "@aula-agente/database";
 import { authMiddleware } from "../../middleware/auth";
 import { deleteInstance } from "../../services/evolution.service";
@@ -62,6 +63,30 @@ export default async function organizationRoutes(app: FastifyInstance) {
         request.log.error({ err }, "onboarding: db error updating org");
         return reply.status(500).send({ error: "Erro interno." });
       }
+    }
+  );
+
+  app.patch<{ Params: { organizationId: string } }>(
+    "/organizations/:organizationId",
+    async (request, reply) => {
+      const { organizationId } = request.params;
+
+      const membership = request.user.memberships.find(
+        (m) => m.organization_id === organizationId && m.role === "owner"
+      );
+      if (!membership) {
+        return reply.status(403).send({ error: "Apenas proprietários podem alterar o nome da organização." });
+      }
+
+      const body = request.body as Record<string, unknown> | null | undefined;
+      const name = typeof body?.name === "string" ? body.name.trim() : "";
+      if (!name) {
+        return reply.status(400).send({ error: "Nome é obrigatório." });
+      }
+
+      const db = getAdminClient();
+      const org = await updateOrganizationName(db, organizationId, name);
+      return reply.send(org);
     }
   );
 
