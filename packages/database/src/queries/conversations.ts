@@ -132,12 +132,14 @@ export async function getConversationNotes(client: SupabaseClient, conversationI
 export async function updateConversationTags(
   client: SupabaseClient,
   conversationId: string,
+  organizationId: string,
   tags: string[]
 ) {
   const { error } = await client
     .from("conversations")
     .update({ tags })
-    .eq("id", conversationId);
+    .eq("id", conversationId)
+    .eq("organization_id", organizationId);
   if (error) throw error;
 }
 

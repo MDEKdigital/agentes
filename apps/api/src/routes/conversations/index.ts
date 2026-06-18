@@ -182,7 +182,7 @@ export default async function conversationRoutes(app: FastifyInstance) {
       );
       if (!membership) return reply.status(403).send({ error: "Acesso negado" });
 
-      await updateConversationTags(db, conversationId, tags);
+      await updateConversationTags(db, conversationId, conv.organization_id, tags);
       return reply.status(204).send();
     }
   );
