@@ -95,6 +95,29 @@ export default async function instanceRoutes(app: FastifyInstance) {
     }
   );
 
+  // Get instance by ID
+  app.get<{ Params: { instanceId: string } }>(
+    "/instances/:instanceId",
+    async (request, reply) => {
+      const db = getAdminClient();
+      let instance;
+      try {
+        instance = await getInstanceById(db, request.params.instanceId);
+      } catch (err: unknown) {
+        const code = (err as { code?: string })?.code;
+        if (code === "PGRST116") return reply.status(404).send({ error: "Instância não encontrada" });
+        throw err;
+      }
+
+      const membership = request.user.memberships.find(
+        (m) => m.organization_id === instance.organization_id
+      );
+      if (!membership) return reply.status(403).send({ error: "Acesso negado" });
+
+      return reply.send(instance);
+    }
+  );
+
   // Get instance status
   app.get<{ Params: { instanceId: string } }>(
     "/instances/:instanceId/status",

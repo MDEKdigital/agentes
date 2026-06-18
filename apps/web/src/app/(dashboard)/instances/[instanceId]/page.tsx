@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
-import { createClient } from "@/lib/supabase/client";
 import { QrCodeDialog } from "@/components/instances/qrcode-dialog";
 import { PairingCodeDialog } from "@/components/instances/pairing-code-dialog";
 import { InstanceStatus } from "@/components/instances/instance-status";
@@ -45,31 +44,21 @@ export default function InstanceDetailPage() {
 
   useEffect(() => {
     const fetchData = async () => {
-      const supabase = createClient();
-
-      const { data: inst } = await supabase
-        .from("evolution_instances")
-        .select("*")
-        .eq("id", instanceId)
-        .single();
+      const inst = await apiFetch(`/instances/${instanceId}`).catch(() => null) as EvolutionInstance | null;
 
       if (inst) {
-        const { data: agentList } = await supabase
-          .from("agents")
-          .select("*")
-          .eq("organization_id", inst.organization_id)
-          .eq("is_active", true);
-        setAgents((agentList as Agent[]) || []);
+        const agentData = await apiFetch(`/organizations/${inst.organization_id}/agents`).catch(() => ({ agents: [] })) as { agents: Agent[] };
+        setAgents(agentData.agents || []);
       }
 
       setLoading(false);
 
       // Sempre sincroniza status e phone_number da Evolution API ao carregar
       try {
-        const liveData = await apiFetch(`/instances/${instanceId}/status`);
+        const liveData = await apiFetch(`/instances/${instanceId}/status`) as { status: string; phone_number?: string | null };
         setInstance({
           ...(inst as EvolutionInstance),
-          status: liveData.status,
+          status: liveData.status as InstanceStatusType,
           phone_number: liveData.phone_number ?? (inst as EvolutionInstance).phone_number,
         });
         if (liveData.status === "connected") {
