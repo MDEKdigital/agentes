@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { getAdminClient, getConversationNotes, addConversationNote, updateConversationTags } from "@aula-agente/database";
+import { getAdminClient, getConversationNotes, addConversationNote, updateConversationTags, getConversationById, getMessagesByConversation } from "@aula-agente/database";
 import { authMiddleware } from "../../middleware/auth";
 
 const STATUS_SCHEMA = {
@@ -19,6 +19,43 @@ const STATUS_SCHEMA = {
 
 export default async function conversationRoutes(app: FastifyInstance) {
   app.addHook("preHandler", authMiddleware);
+
+  app.get<{ Params: { conversationId: string } }>(
+    "/conversations/:conversationId",
+    async (request, reply) => {
+      const { conversationId } = request.params;
+      const db = getAdminClient();
+
+      const conv = await getConversationById(db, conversationId);
+      if (!conv) return reply.status(404).send({ error: "Conversa não encontrada" });
+
+      const membership = request.user.memberships.find(
+        (m) => m.organization_id === (conv as Record<string, unknown>).organization_id
+      );
+      if (!membership) return reply.status(403).send({ error: "Acesso negado" });
+
+      return reply.send(conv);
+    }
+  );
+
+  app.get<{ Params: { conversationId: string } }>(
+    "/conversations/:conversationId/messages",
+    async (request, reply) => {
+      const { conversationId } = request.params;
+      const db = getAdminClient();
+
+      const conv = await getConversationById(db, conversationId);
+      if (!conv) return reply.status(404).send({ error: "Conversa não encontrada" });
+
+      const membership = request.user.memberships.find(
+        (m) => m.organization_id === (conv as Record<string, unknown>).organization_id
+      );
+      if (!membership) return reply.status(403).send({ error: "Acesso negado" });
+
+      const messages = await getMessagesByConversation(db, conversationId);
+      return reply.send({ messages });
+    }
+  );
 
   app.get<{ Params: { conversationId: string } }>(
     "/conversations/:conversationId/notes",

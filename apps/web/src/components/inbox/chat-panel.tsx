@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
-import { createClient } from "@/lib/supabase/client";
 import { useRealtime } from "@/lib/realtime";
 import { apiFetch } from "@/lib/api";
 import { MessageBubble } from "./message-bubble";
@@ -33,22 +32,12 @@ export function ChatPanel({ conversationId, onDelete }: ChatPanelProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const fetchMessages = useCallback(async () => {
-    const supabase = createClient();
-    const { data } = await supabase
-      .from("messages")
-      .select("*")
-      .eq("conversation_id", conversationId)
-      .order("created_at", { ascending: true });
-    setMessages((data as Message[]) || []);
+    const data = await apiFetch(`/conversations/${conversationId}/messages`).catch(() => null);
+    setMessages((data?.messages as Message[]) || []);
   }, [conversationId]);
 
   const fetchConversation = useCallback(async () => {
-    const supabase = createClient();
-    const { data } = await supabase
-      .from("conversations")
-      .select("*, contacts(phone, name)")
-      .eq("id", conversationId)
-      .single();
+    const data = await apiFetch(`/conversations/${conversationId}`).catch(() => null);
     setConversation(data as typeof conversation);
   }, [conversationId]);
 
