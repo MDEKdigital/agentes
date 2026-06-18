@@ -83,8 +83,9 @@ export async function processRemarketingCycle() {
   const flowMap = new Map(flowsForEnrollments.map((f) => [f.id, f]));
   const stepMap = new Map(stepsForEnrollments.map((s) => [s.id, s]));
 
-  // Acumula flows que tiveram etapa enviada — para batch de updateFlowLastExecuted
+  // Acumula flows processados com o menor delay de step observado por flow
   const processedFlowIds = new Set<string>();
+  const flowMinDelayMs = new Map<string, number>();
 
   for (const enrollment of enrollments) {
     try {
@@ -193,15 +194,22 @@ export async function processRemarketingCycle() {
       const nextStep = await getNextActiveStep(db, enrollment.flow_id, step.step_order);
       await advanceEnrollment(db, enrollment.id, nextStep?.id ?? null);
 
-      // Registrar flow processado para atualização em batch ao final
+      // Registrar flow e menor delay observado para next_check_at
       processedFlowIds.add(enrollment.flow_id);
+      const delayMs = toMinutes(step.delay_value, step.delay_unit) * 60_000;
+      const prev = flowMinDelayMs.get(enrollment.flow_id) ?? Infinity;
+      if (delayMs < prev) flowMinDelayMs.set(enrollment.flow_id, delayMs);
     } catch (err) {
       console.error(`[remarketing] Error processing enrollment ${enrollment.id}:`, err);
     }
   }
 
-  // ── Atualizar last_executed_at: uma vez por flow, não por enrollment ───────
-  await Promise.all([...processedFlowIds].map((fid) => updateFlowLastExecuted(db, fid)));
+  // ── Atualizar last_executed_at e next_check_at por flow distinto ───────────
+  await Promise.all([...processedFlowIds].map((fid) => {
+    const minDelay = flowMinDelayMs.get(fid) ?? 60_000;
+    const nextCheckAt = new Date(Date.now() + minDelay).toISOString();
+    return updateFlowLastExecuted(db, fid, nextCheckAt);
+  }));
 }
 
 export function startRemarketingWorker() {

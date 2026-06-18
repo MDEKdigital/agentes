@@ -278,8 +278,8 @@ describe("processRemarketingCycle — eliminação N+1", () => {
 
     // Deve ser chamado exatamente 2 vezes (FLOW_1 e FLOW_2), não 3
     expect(mockUpdateFlowLastExecuted).toHaveBeenCalledTimes(2);
-    expect(mockUpdateFlowLastExecuted).toHaveBeenCalledWith(expect.anything(), FLOW_1_ID);
-    expect(mockUpdateFlowLastExecuted).toHaveBeenCalledWith(expect.anything(), FLOW_2_ID);
+    expect(mockUpdateFlowLastExecuted).toHaveBeenCalledWith(expect.anything(), FLOW_1_ID, expect.any(String));
+    expect(mockUpdateFlowLastExecuted).toHaveBeenCalledWith(expect.anything(), FLOW_2_ID, expect.any(String));
   });
 
   it("T6: sem enrollments ativos → nenhuma query de batch é feita", async () => {

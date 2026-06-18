@@ -17,6 +17,7 @@ export interface RemarketingFlow {
   cancel_on_opt_out: boolean;
   system_prompt: string;
   last_executed_at: string | null;
+  next_check_at: string | null;
   created_at: string;
   updated_at: string;
 }

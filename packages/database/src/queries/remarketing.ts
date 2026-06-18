@@ -13,10 +13,12 @@ const OPT_OUT_KEYWORDS = [
 export async function getActiveRemarketingFlows(
   client: SupabaseClient
 ): Promise<RemarketingFlow[]> {
+  const now = new Date().toISOString();
   const { data, error } = await client
     .from("remarketing_flows")
     .select("*")
-    .eq("status", "active");
+    .eq("status", "active")
+    .or(`next_check_at.is.null,next_check_at.lte.${now}`);
   if (error) throw error;
   return (data as RemarketingFlow[]) ?? [];
 }
@@ -178,11 +180,13 @@ export async function advanceEnrollment(
 
 export async function updateFlowLastExecuted(
   client: SupabaseClient,
-  flowId: string
+  flowId: string,
+  nextCheckAt?: string
 ): Promise<void> {
+  const next = nextCheckAt ?? new Date(Date.now() + 60_000).toISOString();
   const { error } = await client
     .from("remarketing_flows")
-    .update({ last_executed_at: new Date().toISOString() })
+    .update({ last_executed_at: new Date().toISOString(), next_check_at: next })
     .eq("id", flowId);
   if (error) throw error;
 }
