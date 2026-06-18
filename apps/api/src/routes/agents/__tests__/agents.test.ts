@@ -7,11 +7,19 @@ const {
   mockGetAdminClient,
   mockCreateAgent,
   mockCheckResourceLimit,
+  mockGetAgentsByOrganization,
+  mockGetAgentById,
+  mockUpdateAgent,
+  mockDeleteAgent,
 } = vi.hoisted(() => ({
   mockAuthMiddleware: vi.fn(),
   mockGetAdminClient: vi.fn(() => ({})),
   mockCreateAgent: vi.fn(),
   mockCheckResourceLimit: vi.fn(),
+  mockGetAgentsByOrganization: vi.fn(),
+  mockGetAgentById: vi.fn(),
+  mockUpdateAgent: vi.fn(),
+  mockDeleteAgent: vi.fn(),
 }));
 
 vi.mock("../../../middleware/auth", () => ({
@@ -22,6 +30,10 @@ vi.mock("@aula-agente/database", () => ({
   getAdminClient: mockGetAdminClient,
   createAgent: mockCreateAgent,
   checkResourceLimit: mockCheckResourceLimit,
+  getAgentsByOrganization: mockGetAgentsByOrganization,
+  getAgentById: mockGetAgentById,
+  updateAgent: mockUpdateAgent,
+  deleteAgent: mockDeleteAgent,
 }));
 
 import agentRoutes from "../index";
@@ -67,11 +79,17 @@ async function buildApp(role = "admin") {
 
 // ── default state ─────────────────────────────────────────────────────────────
 
+const AGENT_ID = "agent-uuid-1";
+
 beforeEach(() => {
   vi.clearAllMocks();
   mockGetAdminClient.mockReturnValue({});
   mockCreateAgent.mockResolvedValue(mockCreatedAgent);
   mockCheckResourceLimit.mockResolvedValue({ allowed: true, current: 2, max: 5 });
+  mockGetAgentsByOrganization.mockResolvedValue([mockCreatedAgent]);
+  mockGetAgentById.mockResolvedValue(mockCreatedAgent);
+  mockUpdateAgent.mockResolvedValue({ ...mockCreatedAgent, name: "Atualizado" });
+  mockDeleteAgent.mockResolvedValue(undefined);
 });
 
 // ── tests ─────────────────────────────────────────────────────────────────────
@@ -162,5 +180,147 @@ describe("POST /organizations/:organizationId/agents", () => {
       ORG_ID,
       "agents"
     );
+  });
+});
+
+describe("GET /organizations/:organizationId/agents", () => {
+  it("qualquer membro → 200 com lista de agentes", async () => {
+    const app = await buildApp("agent");
+    const res = await app.inject({
+      method: "GET",
+      url: `/organizations/${ORG_ID}/agents`,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.agents).toHaveLength(1);
+    expect(mockGetAgentsByOrganization).toHaveBeenCalledWith(expect.anything(), ORG_ID);
+  });
+
+  it("não é membro da org → 403", async () => {
+    mockAuthMiddleware.mockImplementation(async (request: any) => {
+      request.user = { id: USER_ID, memberships: [{ organization_id: "outra-org", role: "owner" }] };
+    });
+    const app = Fastify({ logger: false });
+    await app.register(agentRoutes);
+
+    const res = await app.inject({ method: "GET", url: `/organizations/${ORG_ID}/agents` });
+    expect(res.statusCode).toBe(403);
+    expect(mockGetAgentsByOrganization).not.toHaveBeenCalled();
+  });
+});
+
+describe("GET /organizations/:organizationId/agents/:agentId", () => {
+  it("membro da org → 200 com agente", async () => {
+    const app = await buildApp("agent");
+    const res = await app.inject({
+      method: "GET",
+      url: `/organizations/${ORG_ID}/agents/${AGENT_ID}`,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.id).toBe(AGENT_ID);
+    expect(mockGetAgentById).toHaveBeenCalledWith(expect.anything(), AGENT_ID, ORG_ID);
+  });
+
+  it("agente não pertence à org → 404", async () => {
+    mockGetAgentById.mockResolvedValue(null);
+    const app = await buildApp();
+    const res = await app.inject({
+      method: "GET",
+      url: `/organizations/${ORG_ID}/agents/${AGENT_ID}`,
+    });
+
+    expect(res.statusCode).toBe(404);
+  });
+});
+
+describe("PATCH /organizations/:organizationId/agents/:agentId", () => {
+  it("body com campos server-managed (organization_id, id) → 400 sem atualizar", async () => {
+    const app = await buildApp("admin");
+    const res = await app.inject({
+      method: "PATCH",
+      url: `/organizations/${ORG_ID}/agents/${AGENT_ID}`,
+      payload: { organization_id: "outro-org", id: "outro-id" },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(mockUpdateAgent).not.toHaveBeenCalled();
+  });
+
+  it("admin atualiza agente → 200 com agente atualizado", async () => {
+    const app = await buildApp("admin");
+    const res = await app.inject({
+      method: "PATCH",
+      url: `/organizations/${ORG_ID}/agents/${AGENT_ID}`,
+      payload: { name: "Atualizado" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.name).toBe("Atualizado");
+    expect(mockUpdateAgent).toHaveBeenCalledWith(expect.anything(), AGENT_ID, ORG_ID, { name: "Atualizado" });
+  });
+
+  it("role agent → 403 sem atualizar", async () => {
+    const app = await buildApp("agent");
+    const res = await app.inject({
+      method: "PATCH",
+      url: `/organizations/${ORG_ID}/agents/${AGENT_ID}`,
+      payload: { name: "Atualizado" },
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(mockUpdateAgent).not.toHaveBeenCalled();
+  });
+
+  it("agente não encontrado → 404", async () => {
+    mockGetAgentById.mockResolvedValue(null);
+    const app = await buildApp("admin");
+    const res = await app.inject({
+      method: "PATCH",
+      url: `/organizations/${ORG_ID}/agents/${AGENT_ID}`,
+      payload: { name: "Atualizado" },
+    });
+
+    expect(res.statusCode).toBe(404);
+    expect(mockUpdateAgent).not.toHaveBeenCalled();
+  });
+});
+
+describe("DELETE /organizations/:organizationId/agents/:agentId", () => {
+  it("admin deleta agente → 204", async () => {
+    const app = await buildApp("admin");
+    const res = await app.inject({
+      method: "DELETE",
+      url: `/organizations/${ORG_ID}/agents/${AGENT_ID}`,
+    });
+
+    expect(res.statusCode).toBe(204);
+    expect(mockDeleteAgent).toHaveBeenCalledWith(expect.anything(), AGENT_ID, ORG_ID);
+  });
+
+  it("role agent → 403 sem deletar", async () => {
+    const app = await buildApp("agent");
+    const res = await app.inject({
+      method: "DELETE",
+      url: `/organizations/${ORG_ID}/agents/${AGENT_ID}`,
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(mockDeleteAgent).not.toHaveBeenCalled();
+  });
+
+  it("agente não encontrado → 404 sem deletar", async () => {
+    mockGetAgentById.mockResolvedValue(null);
+    const app = await buildApp("admin");
+    const res = await app.inject({
+      method: "DELETE",
+      url: `/organizations/${ORG_ID}/agents/${AGENT_ID}`,
+    });
+
+    expect(res.statusCode).toBe(404);
+    expect(mockDeleteAgent).not.toHaveBeenCalled();
   });
 });

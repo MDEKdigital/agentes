@@ -20,15 +20,8 @@ export default async function knowledgeDocumentRoutes(app: FastifyInstance) {
       if (!membership) return reply.status(403).send({ error: "Acesso negado" });
 
       const db = getAdminClient();
-      let agent;
-      try {
-        agent = await getAgentById(db, agentId);
-      } catch {
-        return reply.status(404).send({ error: "Agente não encontrado" });
-      }
-      if (agent.organization_id !== organizationId) {
-        return reply.status(403).send({ error: "Acesso negado" });
-      }
+      const agent = await getAgentById(db, agentId, organizationId);
+      if (!agent) return reply.status(404).send({ error: "Agente não encontrado" });
 
       const documents = await getDocumentsByAgent(db, agentId, organizationId);
       return documents;
@@ -46,15 +39,8 @@ export default async function knowledgeDocumentRoutes(app: FastifyInstance) {
       if (!membership) return reply.status(403).send({ error: "Acesso de administrador necessário" });
 
       const db = getAdminClient();
-      let agent;
-      try {
-        agent = await getAgentById(db, agentId);
-      } catch {
-        return reply.status(404).send({ error: "Agente não encontrado" });
-      }
-      if (agent.organization_id !== organizationId) {
-        return reply.status(403).send({ error: "Acesso negado" });
-      }
+      const agent = await getAgentById(db, agentId, organizationId);
+      if (!agent) return reply.status(404).send({ error: "Agente não encontrado" });
 
       const data = await request.file();
       if (!data) {
