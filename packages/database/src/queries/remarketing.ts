@@ -87,19 +87,22 @@ export async function getConversationsEligibleForEnrollment(
   const candidates = conversations.filter((c) => !enrolledIds.has(c.id));
   if (candidates.length === 0) return [];
 
-  const eligible: { id: string; organization_id: string }[] = [];
-  for (const conv of candidates) {
-    const { count, error: msgErr } = await client
-      .from("messages")
-      .select("*", { count: "exact", head: true })
-      .eq("conversation_id", conv.id)
-      .eq("role", "contact")
-      .gt("created_at", silenceCutoff);
+  const candidateIds = candidates.map((c) => c.id);
 
-    if (msgErr) throw msgErr;
-    if (count === 0) eligible.push(conv);
-  }
-  return eligible;
+  const { data: recentMsgs, error: msgErr } = await client
+    .from("messages")
+    .select("conversation_id")
+    .in("conversation_id", candidateIds)
+    .eq("role", "contact")
+    .gt("created_at", silenceCutoff);
+
+  if (msgErr) throw msgErr;
+
+  const withRecentActivity = new Set(
+    (recentMsgs ?? []).map((m: { conversation_id: string }) => m.conversation_id)
+  );
+
+  return candidates.filter((c) => !withRecentActivity.has(c.id));
 }
 
 export async function createEnrollment(
