@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent, act } from "@testing-library/react";
 import React from "react";
 
 // ── hoisted mocks ─────────────────────────────────────────────────────────────
@@ -216,6 +216,78 @@ describe("InboxPage — paginação", () => {
     await waitFor(() => {
       expect(screen.getByTestId("conversation-list")).toHaveTextContent("count:2");
     });
+  });
+
+  it("K: evento realtime INSERT não dispara apiFetch", async () => {
+    let capturedOnInsert: ((row: Record<string, unknown>) => void) | undefined;
+    mockUseRealtime.mockImplementation(({ onInsert }: { onInsert: (row: Record<string, unknown>) => void }) => {
+      capturedOnInsert = onInsert;
+    });
+
+    render(<InboxPage />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("conversation-list")).toBeInTheDocument();
+    });
+
+    // Zera as chamadas do fetch inicial
+    mockApiFetch.mockClear();
+
+    const realtimeRow = {
+      id: "conv-realtime",
+      organization_id: ORG_ID,
+      status: "open",
+      is_human_takeover: false,
+      last_message_at: "2026-01-02T00:00:00Z",
+      tags: [],
+      assigned_to: null,
+      contacts: { phone: "+5511777777777", name: "Novo" },
+      agents: { name: "Bot" },
+    };
+
+    await act(async () => {
+      capturedOnInsert?.(realtimeRow);
+    });
+
+    // Nenhum fetch extra deve ocorrer após o evento realtime
+    expect(mockApiFetch).not.toHaveBeenCalled();
+  });
+
+  it("L: evento realtime INSERT adiciona conversa ao topo da lista sem fetch", async () => {
+    let capturedOnInsert: ((row: Record<string, unknown>) => void) | undefined;
+    mockUseRealtime.mockImplementation(({ onInsert }: { onInsert: (row: Record<string, unknown>) => void }) => {
+      capturedOnInsert = onInsert;
+    });
+
+    render(<InboxPage />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("conversation-list")).toHaveTextContent("count:1");
+    });
+
+    mockApiFetch.mockClear();
+
+    const realtimeRow = {
+      id: "conv-realtime",
+      organization_id: ORG_ID,
+      status: "open",
+      is_human_takeover: false,
+      last_message_at: "2026-01-02T00:00:00Z",
+      tags: [],
+      assigned_to: null,
+      contacts: { phone: "+5511777777777", name: "Novo" },
+      agents: { name: "Bot" },
+    };
+
+    await act(async () => {
+      capturedOnInsert?.(realtimeRow);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("conversation-list")).toHaveTextContent("count:2");
+    });
+
+    expect(mockApiFetch).not.toHaveBeenCalled();
   });
 
   it("J: mudar filtro de status → reseta para página 1 e substitui lista", async () => {

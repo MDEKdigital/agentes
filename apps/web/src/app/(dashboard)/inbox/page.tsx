@@ -105,12 +105,19 @@ function InboxContent() {
     }
   }, [currentOrg, statusFilter, hasMore, page, loadingMore]);
 
-  const handleRealtimeInsert = useCallback(async (newRow: Record<string, unknown>) => {
+  const handleRealtimeInsert = useCallback((newRow: Record<string, unknown>) => {
     if (!currentOrg) return;
-    const data = await apiFetch(`/conversations/${newRow.id as string}`).catch(() => null);
-    if (data) {
-      setConversations((prev) => [data as ConversationRow, ...prev]);
-    }
+    const conv: ConversationRow = {
+      id: newRow.id as string,
+      status: newRow.status as string,
+      is_human_takeover: (newRow.is_human_takeover as boolean) ?? false,
+      last_message_at: (newRow.last_message_at as string) ?? new Date().toISOString(),
+      tags: (newRow.tags as string[]) ?? [],
+      assigned_to: (newRow.assigned_to as string | null) ?? null,
+      contacts: (newRow.contacts as ConversationRow["contacts"]) ?? { phone: "", name: null },
+      agents: (newRow.agents as ConversationRow["agents"]) ?? { name: "" },
+    };
+    setConversations((prev) => [conv, ...prev]);
   }, [currentOrg]);
 
   const handleRealtimeUpdate = useCallback((updatedRow: Record<string, unknown>) => {
