@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useOrganization } from "@/providers/organization-provider";
-import { createClient } from "@/lib/supabase/client";
+import { apiFetch } from "@/lib/api";
 import { MembersList } from "@/components/team/members-list";
 import { InviteDialog } from "@/components/team/invite-dialog";
 import { Users, Mail, Clock } from "lucide-react";
@@ -38,28 +38,20 @@ export default function TeamPage() {
 
   const fetchData = useCallback(async () => {
     if (!currentOrg) { setLoading(false); return; }
-    const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { setLoading(false); return; }
 
-    setCurrentUserId(user.id);
-
-    const [membersResult, invitationsResult] = await Promise.all([
-      supabase.rpc("get_org_members_with_email", { p_org_id: currentOrg.id }),
-      supabase
-        .from("organization_invitations")
-        .select("*")
-        .eq("organization_id", currentOrg.id)
-        .eq("status", "pending")
-        .order("created_at", { ascending: false }),
+    const [membersData, invitationsData] = await Promise.all([
+      apiFetch(`/organizations/${currentOrg.id}/members`),
+      apiFetch(`/organizations/${currentOrg.id}/invitations`),
     ]);
 
-    const membersList = (membersResult.data || []) as Member[];
+    const membersList = (membersData.members || []) as Member[];
     setMembers(membersList);
-    setInvitations((invitationsResult.data || []) as Invitation[]);
+    setCurrentUserId(membersData.current_user_id || "");
 
-    const myMembership = membersList.find((m) => m.user_id === user.id);
+    const myMembership = membersList.find((m) => m.user_id === membersData.current_user_id);
     setCurrentUserRole(myMembership?.role || "agent");
+
+    setInvitations((invitationsData.invitations || []) as Invitation[]);
     setLoading(false);
   }, [currentOrg]);
 
@@ -113,6 +105,7 @@ export default function TeamPage() {
             members={members}
             currentUserId={currentUserId}
             currentUserRole={currentUserRole}
+            orgId={currentOrg!.id}
             onRefresh={fetchData}
           />
         </div>

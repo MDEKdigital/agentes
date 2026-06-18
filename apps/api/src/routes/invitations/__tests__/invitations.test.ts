@@ -7,11 +7,13 @@ const {
   mockGetAdminClient,
   mockCreateInvitation,
   mockCheckResourceLimit,
+  mockGetOrgInvitations,
 } = vi.hoisted(() => ({
   mockAuthMiddleware: vi.fn(),
   mockGetAdminClient: vi.fn(() => ({})),
   mockCreateInvitation: vi.fn(),
   mockCheckResourceLimit: vi.fn(),
+  mockGetOrgInvitations: vi.fn(),
 }));
 
 vi.mock("../../../middleware/auth", () => ({
@@ -22,6 +24,7 @@ vi.mock("@aula-agente/database", () => ({
   getAdminClient: mockGetAdminClient,
   createInvitation: mockCreateInvitation,
   checkResourceLimit: mockCheckResourceLimit,
+  getOrgInvitations: mockGetOrgInvitations,
 }));
 
 import invitationRoutes from "../index";
@@ -56,11 +59,26 @@ async function buildApp(role = "owner") {
 
 // ── default state ─────────────────────────────────────────────────────────────
 
+const mockPendingInvitations = [
+  mockCreatedInvitation,
+  {
+    id: "inv-uuid-2",
+    organization_id: ORG_ID,
+    email: "outro@membro.com",
+    role: "admin",
+    invited_by: USER_ID,
+    status: "pending",
+    expires_at: "2026-06-24T00:00:00Z",
+    created_at: "2026-06-17T00:00:00Z",
+  },
+];
+
 beforeEach(() => {
   vi.clearAllMocks();
   mockGetAdminClient.mockReturnValue({});
   mockCreateInvitation.mockResolvedValue(mockCreatedInvitation);
   mockCheckResourceLimit.mockResolvedValue({ allowed: true, current: 2, max: 10 });
+  mockGetOrgInvitations.mockResolvedValue(mockPendingInvitations);
 });
 
 // ── tests ─────────────────────────────────────────────────────────────────────
@@ -168,5 +186,63 @@ describe("POST /organizations/:organizationId/invitations", () => {
       ORG_ID,
       "members"
     );
+  });
+});
+
+// ── tests: GET /invitations ───────────────────────────────────────────────────
+
+describe("GET /organizations/:organizationId/invitations", () => {
+  it("cenário 1: owner → 200 com lista de convites pendentes", async () => {
+    const app = await buildApp("owner");
+    const res = await app.inject({
+      method: "GET",
+      url: `/organizations/${ORG_ID}/invitations`,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.invitations).toHaveLength(2);
+    expect(mockGetOrgInvitations).toHaveBeenCalledWith(expect.anything(), ORG_ID);
+  });
+
+  it("cenário 2: admin → 200 com lista de convites pendentes", async () => {
+    const app = await buildApp("admin");
+    const res = await app.inject({
+      method: "GET",
+      url: `/organizations/${ORG_ID}/invitations`,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.invitations).toHaveLength(2);
+  });
+
+  it("cenário 3: agent → 200 (agents também podem ver convites)", async () => {
+    const app = await buildApp("agent");
+    const res = await app.inject({
+      method: "GET",
+      url: `/organizations/${ORG_ID}/invitations`,
+    });
+
+    expect(res.statusCode).toBe(200);
+  });
+
+  it("cenário 4: não é membro da org → 403", async () => {
+    mockAuthMiddleware.mockImplementation(async (request: any) => {
+      request.user = {
+        id: USER_ID,
+        memberships: [{ organization_id: "outra-org", role: "owner" }],
+      };
+    });
+    const app = Fastify({ logger: false });
+    await app.register(invitationRoutes);
+
+    const res = await app.inject({
+      method: "GET",
+      url: `/organizations/${ORG_ID}/invitations`,
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(mockGetOrgInvitations).not.toHaveBeenCalled();
   });
 });

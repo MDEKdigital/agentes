@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Organization, OrganizationMember, OrganizationInvitation } from "@aula-agente/shared";
+import type { Organization, OrganizationMember, OrganizationInvitation, MemberRole } from "@aula-agente/shared";
 
 export async function getOrganizationById(client: SupabaseClient, id: string) {
   const { data, error } = await client
@@ -98,6 +98,76 @@ export async function completeOrganizationOnboarding(
     .single();
   if (error) throw error;
   return data as Organization;
+}
+
+export async function getOrgMembersWithEmail(
+  client: SupabaseClient,
+  organizationId: string
+): Promise<Array<{ id: string; user_id: string; email: string; role: string; created_at: string }>> {
+  const { data, error } = await client.rpc("get_org_members_with_email", {
+    p_org_id: organizationId,
+  });
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function getOrgInvitations(
+  client: SupabaseClient,
+  organizationId: string
+): Promise<OrganizationInvitation[]> {
+  const { data, error } = await client
+    .from("organization_invitations")
+    .select("*")
+    .eq("organization_id", organizationId)
+    .eq("status", "pending")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as OrganizationInvitation[];
+}
+
+export async function getMemberById(
+  client: SupabaseClient,
+  organizationId: string,
+  memberId: string
+): Promise<OrganizationMember | null> {
+  const { data, error } = await client
+    .from("organization_members")
+    .select("*")
+    .eq("id", memberId)
+    .eq("organization_id", organizationId)
+    .maybeSingle();
+  if (error) throw error;
+  return data as OrganizationMember | null;
+}
+
+export async function updateMemberRole(
+  client: SupabaseClient,
+  organizationId: string,
+  memberId: string,
+  role: MemberRole
+): Promise<OrganizationMember> {
+  const { data, error } = await client
+    .from("organization_members")
+    .update({ role })
+    .eq("id", memberId)
+    .eq("organization_id", organizationId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data as OrganizationMember;
+}
+
+export async function removeMember(
+  client: SupabaseClient,
+  organizationId: string,
+  memberId: string
+): Promise<void> {
+  const { error } = await client
+    .from("organization_members")
+    .delete()
+    .eq("id", memberId)
+    .eq("organization_id", organizationId);
+  if (error) throw error;
 }
 
 export async function createInvitation(

@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { getAdminClient, createInvitation, checkResourceLimit } from "@aula-agente/database";
+import { getAdminClient, createInvitation, checkResourceLimit, getOrgInvitations } from "@aula-agente/database";
 import { authMiddleware } from "../../middleware/auth";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -8,6 +8,24 @@ type InvitationRole = (typeof VALID_ROLES)[number];
 
 export default async function invitationRoutes(app: FastifyInstance) {
   app.addHook("preHandler", authMiddleware);
+
+  app.get<{ Params: { organizationId: string } }>(
+    "/organizations/:organizationId/invitations",
+    async (request, reply) => {
+      const { organizationId } = request.params;
+
+      const membership = request.user.memberships.find(
+        (m) => m.organization_id === organizationId
+      );
+      if (!membership) {
+        return reply.status(403).send({ error: "Acesso negado" });
+      }
+
+      const db = getAdminClient();
+      const invitations = await getOrgInvitations(db, organizationId);
+      return reply.send({ invitations });
+    }
+  );
 
   app.post<{ Params: { organizationId: string } }>(
     "/organizations/:organizationId/invitations",

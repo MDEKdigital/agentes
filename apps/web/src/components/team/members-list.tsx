@@ -1,6 +1,6 @@
 "use client";
 
-import { createClient } from "@/lib/supabase/client";
+import { apiFetch } from "@/lib/api";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,6 +25,7 @@ interface MembersListProps {
   members: Member[];
   currentUserId: string;
   currentUserRole: string;
+  orgId: string;
   onRefresh: () => void;
 }
 
@@ -34,19 +35,22 @@ const roleBadge: Record<string, string> = {
   agent: "bg-muted text-muted-foreground border border-border",
 };
 
-export function MembersList({ members, currentUserId, currentUserRole, onRefresh }: MembersListProps) {
+export function MembersList({ members, currentUserId, currentUserRole, orgId, onRefresh }: MembersListProps) {
   const canManage = currentUserRole === "owner" || currentUserRole === "admin";
 
   const handleRoleChange = async (memberId: string, newRole: string) => {
-    const supabase = createClient();
-    await supabase.from("organization_members").update({ role: newRole }).eq("id", memberId);
+    await apiFetch(`/organizations/${orgId}/members/${memberId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ role: newRole }),
+    });
     onRefresh();
   };
 
   const handleRemove = async (memberId: string) => {
     if (!confirm("Remover este membro?")) return;
-    const supabase = createClient();
-    await supabase.from("organization_members").delete().eq("id", memberId);
+    await apiFetch(`/organizations/${orgId}/members/${memberId}`, {
+      method: "DELETE",
+    });
     onRefresh();
   };
 
@@ -96,6 +100,7 @@ export function MembersList({ members, currentUserId, currentUserRole, onRefresh
                     <Button
                       variant="ghost"
                       size="icon"
+                      aria-label="Remover"
                       onClick={() => handleRemove(member.id)}
                       className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                     >
