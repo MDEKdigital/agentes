@@ -204,7 +204,18 @@ describe("PATCH /faqs/:faqId", () => {
       payload: { is_active: false },
     });
     expect(res.statusCode).toBe(200);
-    expect(mockUpdateFaq).toHaveBeenCalledWith(expect.anything(), FAQ_ID, { is_active: false });
+    expect(mockUpdateFaq).toHaveBeenCalledWith(expect.anything(), FAQ_ID, ORG_ID, { is_active: false });
+  });
+
+  it("updateFaq é chamado com organization_id como defesa em profundidade", async () => {
+    const app = await buildApp("admin");
+    await app.inject({
+      method: "PATCH",
+      url: `/faqs/${FAQ_ID}`,
+      payload: { is_active: false },
+    });
+    const call = mockUpdateFaq.mock.calls[0];
+    expect(call[2]).toBe(ORG_ID);
   });
 
   it("FAQ não encontrada → 404", async () => {

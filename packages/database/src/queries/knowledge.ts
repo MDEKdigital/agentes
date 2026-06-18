@@ -125,12 +125,14 @@ export async function createFaq(
 export async function updateFaq(
   client: SupabaseClient,
   id: string,
+  organizationId: string,
   updates: Partial<KnowledgeFaq>
 ) {
   const { data, error } = await client
     .from("knowledge_faqs")
     .update(updates)
     .eq("id", id)
+    .eq("organization_id", organizationId)
     .select()
     .single();
   if (error) throw error;

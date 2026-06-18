@@ -78,7 +78,7 @@ export default async function knowledgeFaqRoutes(app: FastifyInstance) {
       );
       if (!membership) return reply.status(403).send({ error: "Acesso de administrador necessário" });
 
-      const updated = await updateFaq(db, request.params.faqId, parseResult.data);
+      const updated = await updateFaq(db, request.params.faqId, faq.organization_id, parseResult.data);
       return updated;
     }
   );
