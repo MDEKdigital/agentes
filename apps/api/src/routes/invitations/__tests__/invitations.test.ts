@@ -83,6 +83,56 @@ beforeEach(() => {
 
 // ── tests ─────────────────────────────────────────────────────────────────────
 
+describe("POST /organizations/:organizationId/invitations — privilege escalation guards", () => {
+  it("admin convida como owner → 403 (escalonamento crítico bloqueado)", async () => {
+    const app = await buildApp("admin");
+    const res = await app.inject({
+      method: "POST",
+      url: `/organizations/${ORG_ID}/invitations`,
+      payload: { email: "complice@evil.com", role: "owner" },
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(mockCreateInvitation).not.toHaveBeenCalled();
+  });
+
+  it("admin convida como admin → 403 (peer management bloqueado)", async () => {
+    const app = await buildApp("admin");
+    const res = await app.inject({
+      method: "POST",
+      url: `/organizations/${ORG_ID}/invitations`,
+      payload: { email: "peer@evil.com", role: "admin" },
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(mockCreateInvitation).not.toHaveBeenCalled();
+  });
+
+  it("owner convida como owner → 403 (role owner nunca atribuível via convite, igual ao PATCH members)", async () => {
+    const app = await buildApp("owner");
+    const res = await app.inject({
+      method: "POST",
+      url: `/organizations/${ORG_ID}/invitations`,
+      payload: { email: "coowner@empresa.com", role: "owner" },
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(mockCreateInvitation).not.toHaveBeenCalled();
+  });
+
+  it("owner convida como admin → 201 (owner pode criar admins)", async () => {
+    const app = await buildApp("owner");
+    const res = await app.inject({
+      method: "POST",
+      url: `/organizations/${ORG_ID}/invitations`,
+      payload: { email: "admin@empresa.com", role: "admin" },
+    });
+
+    expect(res.statusCode).toBe(201);
+    expect(mockCreateInvitation).toHaveBeenCalled();
+  });
+});
+
 describe("POST /organizations/:organizationId/invitations", () => {
   it("cenário 1: dentro do limite → cria convite → 201", async () => {
     const app = await buildApp();

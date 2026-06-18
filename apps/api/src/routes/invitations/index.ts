@@ -49,6 +49,12 @@ export default async function invitationRoutes(app: FastifyInstance) {
       if (!VALID_ROLES.includes(role as InvitationRole)) {
         return reply.status(400).send({ error: "Função inválida. Use: owner, admin ou agent." });
       }
+      if (role === "owner") {
+        return reply.status(403).send({ error: "Não é possível convidar membros como proprietário." });
+      }
+      if (role === "admin" && membership.role !== "owner") {
+        return reply.status(403).send({ error: "Apenas proprietários podem convidar novos administradores." });
+      }
 
       const db = getAdminClient();
 
