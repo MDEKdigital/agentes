@@ -24,21 +24,14 @@ export async function getOrgPlanLimits(
   client: SupabaseClient,
   organizationId: string
 ): Promise<{ max_agents: number; max_instances: number; max_members: number } | null> {
-  const { data: sub } = await client
+  const { data } = await client
     .from("subscriptions")
-    .select("plan_id")
+    .select("plans(max_agents, max_instances, max_members)")
     .eq("organization_id", organizationId)
     .eq("status", "active")
     .maybeSingle();
 
-  if (!sub?.plan_id) return null;
-
-  const { data: plan } = await client
-    .from("plans")
-    .select("max_agents, max_instances, max_members")
-    .eq("id", sub.plan_id)
-    .single();
-
+  const plan = (data as any)?.plans;
   if (!plan) return null;
 
   return {
@@ -53,20 +46,20 @@ export async function checkResourceLimit(
   organizationId: string,
   resource: PlanResource
 ): Promise<LimitCheckResult> {
-  const limits = await getOrgPlanLimits(client, organizationId);
+  const [limits, countResult] = await Promise.all([
+    getOrgPlanLimits(client, organizationId),
+    client
+      .from(RESOURCE_TABLE[resource])
+      .select("*", { count: "exact", head: true })
+      .eq("organization_id", organizationId),
+  ]);
+
+  const current = (countResult as any).count ?? 0;
 
   if (!limits) {
-    return { allowed: true, current: 0, max: null };
+    return { allowed: true, current, max: null };
   }
 
   const max = limits[RESOURCE_LIMIT_KEY[resource]];
-
-  const { count } = await client
-    .from(RESOURCE_TABLE[resource])
-    .select("*", { count: "exact", head: true })
-    .eq("organization_id", organizationId);
-
-  const current = count ?? 0;
-
   return { allowed: current < max, current, max };
 }
