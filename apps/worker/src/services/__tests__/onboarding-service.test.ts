@@ -401,3 +401,73 @@ describe("audit logs no worker", () => {
     );
   });
 });
+
+// ─── R3: organization.created falso positivo ──────────────────────────────────
+
+describe("R3: organization.created não dispara em redelivery/existingInvitation", () => {
+  it("R3: convite existente → NÃO dispara organization.created (falso positivo)", async () => {
+    mockFindPendingInvitationByEmail.mockResolvedValue({
+      id: "existing-inv",
+      organization_id: "existing-org",
+    });
+
+    await handleSubscriptionActivated(CLIENT, "be-r3", makeNormalized());
+
+    const orgCreatedCalls = mockCreateAuditLog.mock.calls.filter(
+      (args: unknown[]) => (args[1] as { action: string })?.action === "organization.created"
+    );
+    expect(orgCreatedCalls).toHaveLength(0);
+  });
+
+  it("R3: sem convite existente → organization.created É disparado (caminho real)", async () => {
+    mockFindPendingInvitationByEmail.mockResolvedValue(null);
+
+    await handleSubscriptionActivated(CLIENT, "be-r3b", makeNormalized());
+
+    expect(mockCreateAuditLog).toHaveBeenCalledWith(
+      CLIENT,
+      expect.objectContaining({ action: "organization.created" })
+    );
+  });
+});
+
+// ─── R5: audits antes do processed mark ──────────────────────────────────────
+
+describe("R5: audit logs escritos ANTES do billing event ser marcado como processed", () => {
+  it("R5: plan.activated é auditado ANTES de updateBillingEventStatus('processed')", async () => {
+    const callOrder: string[] = [];
+
+    mockCreateAuditLog.mockImplementation((_client: unknown, params: { action: string }) => {
+      callOrder.push(`audit:${params.action}`);
+      return Promise.resolve({ id: "audit-uuid" });
+    });
+    mockUpdateBillingEventStatus.mockImplementation(
+      (_c: unknown, _id: unknown, status: string) => {
+        callOrder.push(`status:${status}`);
+        return Promise.resolve(undefined);
+      }
+    );
+
+    await handleSubscriptionActivated(CLIENT, "be-r5", makeNormalized());
+
+    const planActivatedIdx = callOrder.indexOf("audit:plan.activated");
+    const processedIdx = callOrder.indexOf("status:processed");
+
+    expect(planActivatedIdx).toBeGreaterThanOrEqual(0);
+    expect(processedIdx).toBeGreaterThanOrEqual(0);
+    expect(planActivatedIdx).toBeLessThan(processedIdx);
+  });
+
+  it("R5: quando audit falha, billing event NÃO é marcado como processed", async () => {
+    mockCreateAuditLog.mockRejectedValue(new Error("Audit DB write failed"));
+
+    await expect(
+      handleSubscriptionActivated(CLIENT, "be-r5b", makeNormalized())
+    ).rejects.toThrow("Audit DB write failed");
+
+    const processedCalls = mockUpdateBillingEventStatus.mock.calls.filter(
+      (args: unknown[]) => args[2] === "processed"
+    );
+    expect(processedCalls).toHaveLength(0);
+  });
+});

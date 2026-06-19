@@ -274,6 +274,24 @@ export async function isSlugAvailable(client: SupabaseClient, slug: string): Pro
   return data === null;
 }
 
+export async function claimBillingEventForProcessing(
+  client: SupabaseClient,
+  id: string
+): Promise<BillingEvent | null> {
+  const { data, error } = await client
+    .from("billing_events")
+    .update({ status: "processing" })
+    .eq("id", id)
+    .eq("status", "pending")
+    .select("*")
+    .single();
+  if (error) {
+    if (error.code === "PGRST116") return null;
+    throw error;
+  }
+  return data as BillingEvent;
+}
+
 export async function updateBillingEventStatus(
   client: SupabaseClient,
   id: string,

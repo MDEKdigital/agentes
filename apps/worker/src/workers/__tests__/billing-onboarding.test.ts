@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const {
   mockGetBillingEventById,
   mockUpdateBillingEventStatus,
+  mockClaimBillingEventForProcessing,
   mockGetAdminClient,
   mockNormalizePayload,
   mockHandleActivated,
@@ -13,6 +14,7 @@ const {
 } = vi.hoisted(() => ({
   mockGetBillingEventById: vi.fn(),
   mockUpdateBillingEventStatus: vi.fn(),
+  mockClaimBillingEventForProcessing: vi.fn(),
   mockGetAdminClient: vi.fn(() => ({})),
   mockNormalizePayload: vi.fn(),
   mockHandleActivated: vi.fn(),
@@ -32,6 +34,7 @@ vi.mock("@aula-agente/database", () => ({
   getAdminClient: mockGetAdminClient,
   getBillingEventById: mockGetBillingEventById,
   updateBillingEventStatus: mockUpdateBillingEventStatus,
+  claimBillingEventForProcessing: mockClaimBillingEventForProcessing,
 }));
 
 vi.mock("../lib/redis", () => ({
@@ -105,7 +108,8 @@ describe("createBillingOnboardingWorker", () => {
   });
 
   it("pula eventos que não estão pending (idempotência)", async () => {
-    mockGetBillingEventById.mockResolvedValue(makeBillingEvent({ status: "processed" }));
+    // R4: claimBillingEventForProcessing returns null when event is already claimed/processed
+    mockClaimBillingEventForProcessing.mockResolvedValue(null);
     const job = makeJob("be-001");
     await runProcessor(job);
     expect(mockUpdateBillingEventStatus).not.toHaveBeenCalled();
@@ -113,24 +117,23 @@ describe("createBillingOnboardingWorker", () => {
     expect(job.log).toHaveBeenCalledWith(expect.stringContaining("Skipping"));
   });
 
-  it("marca como processing antes de normalizar", async () => {
-    mockGetBillingEventById.mockResolvedValue(makeBillingEvent());
+  it("claim atômico: claimBillingEventForProcessing é chamado com o billingEventId correto", async () => {
+    mockClaimBillingEventForProcessing.mockResolvedValue(makeBillingEvent());
     mockNormalizePayload.mockReturnValue(makeNormalized("subscription.activated"));
     mockHandleActivated.mockResolvedValue(undefined);
 
     const job = makeJob("be-001");
     await runProcessor(job);
 
-    expect(mockUpdateBillingEventStatus).toHaveBeenCalledWith(
+    expect(mockClaimBillingEventForProcessing).toHaveBeenCalledWith(
       expect.anything(),
-      "be-001",
-      "processing"
+      "be-001"
     );
   });
 
   it("despacha subscription.activated para handleSubscriptionActivated", async () => {
     const event = makeBillingEvent();
-    mockGetBillingEventById.mockResolvedValue(event);
+    mockClaimBillingEventForProcessing.mockResolvedValue(event);
     const normalized = makeNormalized("subscription.activated");
     mockNormalizePayload.mockReturnValue(normalized);
     mockHandleActivated.mockResolvedValue(undefined);
@@ -142,7 +145,7 @@ describe("createBillingOnboardingWorker", () => {
   });
 
   it("despacha subscription.renewed para handleSubscriptionRenewed", async () => {
-    mockGetBillingEventById.mockResolvedValue(makeBillingEvent());
+    mockClaimBillingEventForProcessing.mockResolvedValue(makeBillingEvent());
     const normalized = makeNormalized("subscription.renewed");
     mockNormalizePayload.mockReturnValue(normalized);
     mockHandleRenewed.mockResolvedValue(undefined);
@@ -153,7 +156,7 @@ describe("createBillingOnboardingWorker", () => {
   });
 
   it("despacha subscription.cancelled para handleSubscriptionCancelled", async () => {
-    mockGetBillingEventById.mockResolvedValue(makeBillingEvent());
+    mockClaimBillingEventForProcessing.mockResolvedValue(makeBillingEvent());
     const normalized = makeNormalized("subscription.cancelled");
     mockNormalizePayload.mockReturnValue(normalized);
     mockHandleCancelled.mockResolvedValue(undefined);
@@ -164,7 +167,7 @@ describe("createBillingOnboardingWorker", () => {
   });
 
   it("despacha subscription.past_due para handleSubscriptionPastDue", async () => {
-    mockGetBillingEventById.mockResolvedValue(makeBillingEvent());
+    mockClaimBillingEventForProcessing.mockResolvedValue(makeBillingEvent());
     const normalized = makeNormalized("subscription.past_due");
     mockNormalizePayload.mockReturnValue(normalized);
     mockHandlePastDue.mockResolvedValue(undefined);
@@ -175,7 +178,7 @@ describe("createBillingOnboardingWorker", () => {
   });
 
   it("subscription.reactivated chama handleSubscriptionRenewed", async () => {
-    mockGetBillingEventById.mockResolvedValue(makeBillingEvent());
+    mockClaimBillingEventForProcessing.mockResolvedValue(makeBillingEvent());
     const normalized = makeNormalized("subscription.reactivated");
     mockNormalizePayload.mockReturnValue(normalized);
     mockHandleRenewed.mockResolvedValue(undefined);
@@ -186,7 +189,7 @@ describe("createBillingOnboardingWorker", () => {
   });
 
   it("refund.processed marca como ignored sem chamar handlers", async () => {
-    mockGetBillingEventById.mockResolvedValue(makeBillingEvent());
+    mockClaimBillingEventForProcessing.mockResolvedValue(makeBillingEvent());
     const normalized = makeNormalized("refund.processed");
     mockNormalizePayload.mockReturnValue(normalized);
 
@@ -203,7 +206,7 @@ describe("createBillingOnboardingWorker", () => {
   });
 
   it("unknown marca como ignored", async () => {
-    mockGetBillingEventById.mockResolvedValue(makeBillingEvent());
+    mockClaimBillingEventForProcessing.mockResolvedValue(makeBillingEvent());
     const normalized = makeNormalized("unknown");
     mockNormalizePayload.mockReturnValue(normalized);
 
@@ -214,6 +217,43 @@ describe("createBillingOnboardingWorker", () => {
       "be-001",
       "ignored",
       expect.any(Object)
+    );
+  });
+});
+
+// ─── R4: TOCTOU — atomic claim ────────────────────────────────────────────────
+
+describe("R4: proteção TOCTOU — claimBillingEventForProcessing atômico", () => {
+  it("R4: claim retorna null → nenhum handler é executado (worker já processou)", async () => {
+    // claimBillingEventForProcessing returns null = event was already claimed by another worker
+    mockClaimBillingEventForProcessing.mockResolvedValue(null);
+    // getBillingEventById would return pending if called — but with R4 fix it should NOT be called
+    mockGetBillingEventById.mockResolvedValue(makeBillingEvent({ status: "pending" }));
+    mockNormalizePayload.mockReturnValue(makeNormalized("subscription.activated"));
+    mockHandleActivated.mockResolvedValue(undefined);
+
+    const job = makeJob("be-001");
+    await runProcessor(job);
+
+    expect(mockHandleActivated).not.toHaveBeenCalled();
+    expect(mockHandleRenewed).not.toHaveBeenCalled();
+    expect(mockHandleCancelled).not.toHaveBeenCalled();
+    expect(mockHandlePastDue).not.toHaveBeenCalled();
+    expect(job.log).toHaveBeenCalledWith(expect.stringContaining("Skipping"));
+  });
+
+  it("R4: claim retorna evento → processamento prossegue normalmente", async () => {
+    const event = makeBillingEvent();
+    mockClaimBillingEventForProcessing.mockResolvedValue(event);
+    mockNormalizePayload.mockReturnValue(makeNormalized("subscription.activated"));
+    mockHandleActivated.mockResolvedValue(undefined);
+
+    await runProcessor(makeJob("be-001"));
+
+    expect(mockHandleActivated).toHaveBeenCalledWith(
+      expect.anything(),
+      "be-001",
+      expect.objectContaining({ event_type: "subscription.activated" })
     );
   });
 });

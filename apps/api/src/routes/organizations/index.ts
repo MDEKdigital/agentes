@@ -163,7 +163,7 @@ export default async function organizationRoutes(app: FastifyInstance) {
       }
 
       createAuditLog(db, {
-        organization_id: organizationId,
+        organization_id: null,
         user_id: request.user.id,
         action: "organization.deleted",
         entity_type: "organization",

@@ -192,7 +192,7 @@ describe("DELETE /organizations/:organizationId", () => {
     expect(mockCreateAuditLog).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({
-        organization_id: ORG_ID,
+        organization_id: null,
         user_id: USER_ID,
         action: "organization.deleted",
         entity_type: "organization",

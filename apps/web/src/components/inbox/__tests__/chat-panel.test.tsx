@@ -88,7 +88,7 @@ describe("ChatPanel — M1 (single /full request)", () => {
       expect(mockApiFetch).toHaveBeenCalled();
     });
 
-    const calls = mockApiFetch.mock.calls.map(([url]: [string]) => url);
+    const calls = mockApiFetch.mock.calls.map((args: unknown[]) => args[0] as string);
     expect(calls.some((url) => url === `/conversations/${CONV_ID}`)).toBe(false);
   });
 
@@ -99,7 +99,7 @@ describe("ChatPanel — M1 (single /full request)", () => {
       expect(mockApiFetch).toHaveBeenCalled();
     });
 
-    const calls = mockApiFetch.mock.calls.map(([url]: [string]) => url);
+    const calls = mockApiFetch.mock.calls.map((args: unknown[]) => args[0] as string);
     expect(calls.some((url) => url === `/conversations/${CONV_ID}/messages`)).toBe(false);
   });
 

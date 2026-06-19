@@ -109,6 +109,15 @@ export async function handleSubscriptionActivated(
       invited_by: null,
     });
     invitationId = invitation.id;
+
+    // R3: audit only when org is ACTUALLY created (not in redelivery/dedup path)
+    await createAuditLog(client, {
+      organization_id: orgId,
+      action: "organization.created",
+      entity_type: "organization",
+      entity_id: orgId,
+      metadata: { plan_id: planId, email: normalized.customer.email },
+    });
   }
 
   // 5. Create subscription
@@ -125,16 +134,16 @@ export async function handleSubscriptionActivated(
     metadata: normalized.metadata,
   });
 
-  // 6. Mark billing event as processed
-  await updateBillingEventStatus(client, billingEventId, "processed", {
+  // R5: audit BEFORE marking processed — guarantees audit is recorded even if worker restarts
+  await createAuditLog(client, {
     organization_id: orgId,
-    subscription_id: subscription.id,
-    processed_at: new Date().toISOString(),
-    normalized_payload: normalized as unknown as Record<string, unknown>,
-    event_type: "subscription.activated",
+    action: "plan.activated",
+    entity_type: "plan",
+    entity_id: subscription.id,
+    metadata: { plan_id: planId, plan_name: planName, gateway: normalized.gateway },
   });
 
-  // 7. Send welcome email — non-fatal
+  // 6. Send welcome email — non-fatal
   try {
     await sendWelcomeEmail({
       to: normalized.customer.email,
@@ -150,21 +159,14 @@ export async function handleSubscriptionActivated(
     );
   }
 
-  createAuditLog(client, {
+  // 7. Mark billing event as processed (after audits — R5)
+  await updateBillingEventStatus(client, billingEventId, "processed", {
     organization_id: orgId,
-    action: "organization.created",
-    entity_type: "organization",
-    entity_id: orgId,
-    metadata: { plan_id: planId, email: normalized.customer.email },
-  }).catch((err) => console.error("[audit] organization.created failed", err));
-
-  createAuditLog(client, {
-    organization_id: orgId,
-    action: "plan.activated",
-    entity_type: "plan",
-    entity_id: subscription.id,
-    metadata: { plan_id: planId, plan_name: planName, gateway: normalized.gateway },
-  }).catch((err) => console.error("[audit] plan.activated failed", err));
+    subscription_id: subscription.id,
+    processed_at: new Date().toISOString(),
+    normalized_payload: normalized as unknown as Record<string, unknown>,
+    event_type: "subscription.activated",
+  });
 }
 
 // ─── subscription.renewed ────────────────────────────────────────────────────

@@ -2,7 +2,7 @@ import { Worker, type Job } from "bullmq";
 import { QUEUE_NAMES } from "@aula-agente/shared";
 import type { BillingOnboardingJobData } from "@aula-agente/queue";
 import { getConnectionOptions } from "../lib/redis";
-import { getAdminClient, getBillingEventById, updateBillingEventStatus } from "@aula-agente/database";
+import { getAdminClient, claimBillingEventForProcessing, updateBillingEventStatus } from "@aula-agente/database";
 import { normalizePayload } from "../normalizers/index";
 import {
   handleSubscriptionActivated,
@@ -15,17 +15,12 @@ async function processBillingOnboarding(job: Job<BillingOnboardingJobData>): Pro
   const { billingEventId } = job.data;
   const client = getAdminClient();
 
-  // 1. Fetch event
-  const billingEvent = await getBillingEventById(client, billingEventId);
-
-  // 2. Guard: skip if already processed (worker restart safety)
-  if (billingEvent.status !== "pending") {
-    job.log(`Skipping billing_event ${billingEventId}: status=${billingEvent.status}`);
+  // R4: Atomic claim — UPDATE WHERE status='pending' RETURNING; returns null if already claimed
+  const billingEvent = await claimBillingEventForProcessing(client, billingEventId);
+  if (!billingEvent) {
+    job.log(`Skipping billing_event ${billingEventId}: not pending (already claimed or processed)`);
     return;
   }
-
-  // 3. Mark as processing
-  await updateBillingEventStatus(client, billingEventId, "processing");
 
   // 4. Normalize raw payload
   const normalized = normalizePayload(

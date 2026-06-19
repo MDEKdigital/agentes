@@ -546,7 +546,8 @@ export default async function instanceRoutes(app: FastifyInstance) {
       try {
         await restartInstance(instance.instance_name);
       } catch (err) {
-        request.log.warn({ err }, "restartInstance failed on Evolution API");
+        request.log.error({ err }, "restartInstance failed on Evolution API");
+        return reply.status(502).send({ error: "Falha ao reiniciar instância na Evolution API" });
       }
 
       createAuditLog(db, {
