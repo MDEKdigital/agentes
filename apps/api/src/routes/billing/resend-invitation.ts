@@ -36,6 +36,14 @@ export default async function resendInvitationRoute(app: FastifyInstance) {
       return reply.send({ message: NEUTRAL_MSG });
     }
 
+    // IDOR guard: caller must be admin/owner of the invitation's org
+    const callerIsMember = request.user?.memberships?.some(
+      (m) => m.organization_id === invitation.organization_id && ["owner", "admin"].includes(m.role)
+    );
+    if (!callerIsMember) {
+      return reply.send({ message: NEUTRAL_MSG });
+    }
+
     // Extend expiry by 7 days from now
     const newExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 

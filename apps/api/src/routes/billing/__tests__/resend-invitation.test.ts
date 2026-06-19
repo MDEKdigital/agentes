@@ -67,7 +67,14 @@ const mockRenewedInvitation = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockAuthMiddleware.mockImplementation(async () => {});
+  // Default: authenticated user belongs to the same org as the invitation (org-uuid-1)
+  mockAuthMiddleware.mockImplementation(async (request: any) => {
+    request.user = {
+      id: "user-uuid-1",
+      email: "admin@org.com",
+      memberships: [{ organization_id: "org-uuid-1", role: "admin" }],
+    };
+  });
   mockGetAdminClient.mockReturnValue({});
   mockFindInvitationByEmailForResend.mockResolvedValue(mockInvitation);
   mockRenewInvitationExpiry.mockResolvedValue(mockRenewedInvitation);
@@ -162,5 +169,31 @@ describe("POST /billing/resend-invitation", () => {
     });
 
     expect(res.statusCode).toBe(500);
+  });
+
+  it("cenário 7 (IDOR): usuário autenticado de outra org não renova nem reenvia convite de org alheia — retorna 200 neutro sem ação", async () => {
+    // User belongs only to "org-uuid-OUTRO", but invitation is for "org-uuid-1"
+    mockAuthMiddleware.mockImplementation(async (request: any) => {
+      request.user = {
+        id: "user-uuid-outro",
+        email: "invasor@outraorg.com",
+        memberships: [{ organization_id: "org-uuid-OUTRO", role: "admin" }],
+      };
+    });
+
+    const app = await buildApp();
+    const res = await app.inject({
+      method: "POST",
+      url: "/billing/resend-invitation",
+      payload: { email: "cliente@empresa.com" },
+    });
+
+    // Must still return 200 + neutral message (no enumeration leak)
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body).message).toBe(NEUTRAL_MSG);
+
+    // Must NOT renew expiry or send email for a foreign org
+    expect(mockRenewInvitationExpiry).not.toHaveBeenCalled();
+    expect(mockSendWelcomeEmailApi).not.toHaveBeenCalled();
   });
 });

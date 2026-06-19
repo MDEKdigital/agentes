@@ -30,8 +30,10 @@ if (missing.length > 0) {
 }
 import cors from "@fastify/cors";
 import helmet from "@fastify/helmet";
+import rateLimitPlugin from "@fastify/rate-limit";
 import { parseAllowedOrigins, isOriginAllowed } from "./lib/cors";
 import { helmetOptions } from "./lib/helmet";
+import { parseRateLimitConfig } from "./lib/rate-limit";
 import evolutionWebhookRoutes from "./routes/webhooks/evolution";
 import messageSendRoutes from "./routes/messages/send";
 import instanceRoutes from "./routes/instances/index";
@@ -66,6 +68,42 @@ server.addContentTypeParser(
     }
   }
 );
+
+// Rate limiting
+const rateTiers = parseRateLimitConfig(process.env as Record<string, string | undefined>);
+server.register(rateLimitPlugin, {
+  global: true,
+  max: rateTiers.defaultMax,
+  timeWindow: "1 minute",
+  keyGenerator: (req) => req.ip ?? "unknown",
+});
+
+// Assign per-tier rate limits via onRoute hook (runs before route is finalized)
+server.addHook("onRoute", (routeOptions) => {
+  const url = routeOptions.url;
+  // Skip health check
+  if (url === "/health") return;
+
+  let max: number | undefined;
+  if (url.startsWith("/webhooks/")) {
+    max = rateTiers.webhookMax;
+  } else if (url === "/messages/send") {
+    max = rateTiers.messagesMax;
+  } else if (
+    url.includes("/invitations") ||
+    url.includes("/secrets/") ||
+    url === "/billing/resend-invitation"
+  ) {
+    max = rateTiers.sensitiveMax;
+  }
+
+  if (max !== undefined) {
+    routeOptions.config = {
+      ...routeOptions.config,
+      rateLimit: { max, timeWindow: "1 minute" },
+    };
+  }
+});
 
 // Plugins
 server.register(helmet, helmetOptions);
