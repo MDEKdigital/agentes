@@ -29,7 +29,9 @@ if (missing.length > 0) {
   process.exit(1);
 }
 import cors from "@fastify/cors";
+import helmet from "@fastify/helmet";
 import { parseAllowedOrigins, isOriginAllowed } from "./lib/cors";
+import { helmetOptions } from "./lib/helmet";
 import evolutionWebhookRoutes from "./routes/webhooks/evolution";
 import messageSendRoutes from "./routes/messages/send";
 import instanceRoutes from "./routes/instances/index";
@@ -66,6 +68,8 @@ server.addContentTypeParser(
 );
 
 // Plugins
+server.register(helmet, helmetOptions);
+
 const allowedOrigins = parseAllowedOrigins(process.env.ALLOWED_ORIGINS);
 server.register(cors, {
   origin: (origin, callback) => {
