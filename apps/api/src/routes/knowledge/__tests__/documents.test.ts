@@ -139,4 +139,26 @@ describe("Audit logs — documents", () => {
       })
     );
   });
+
+  // ── R9: document com file_url fora do bucket gerenciado ─────────────────────
+
+  it("R9: file_url fora do bucket gerenciado → rejeita operação e NÃO audita document.deleted", async () => {
+    mockGetDocumentById.mockResolvedValue({
+      ...mockDocument,
+      file_url: "https://external.example.com/arquivo.pdf",
+    });
+
+    const app = await buildApp();
+    const res = await app.inject({
+      method: "DELETE",
+      url: `/documents/${DOC_ID}`,
+    });
+
+    expect(res.statusCode).toBe(422);
+    expect(mockCreateAuditLog).not.toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ action: "document.deleted" })
+    );
+    expect(mockDeleteDocument).not.toHaveBeenCalled();
+  });
 });

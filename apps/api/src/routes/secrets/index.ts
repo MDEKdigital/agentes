@@ -88,22 +88,26 @@ export default async function secretsRoutes(app: FastifyInstance) {
       }
 
       const db = getAdminClient();
-      const { error } = await db
+      const { data: deleted, error } = await db
         .from("organization_secrets")
         .delete()
         .eq("organization_id", organizationId)
-        .eq("provider", provider);
+        .eq("provider", provider)
+        .select("provider");
 
       if (error) return reply.status(500).send({ error: "Erro interno ao processar chave" });
 
-      createAuditLog(db, {
-        organization_id: organizationId,
-        user_id: request.user.id,
-        action: "secret.deleted",
-        entity_type: "secret",
-        entity_id: `${organizationId}:${provider}`,
-        metadata: { provider },
-      }).catch((err) => request.log.error({ err }, "audit: secret.deleted failed"));
+      // R8: only audit when a row was actually deleted
+      if (deleted && deleted.length > 0) {
+        createAuditLog(db, {
+          organization_id: organizationId,
+          user_id: request.user.id,
+          action: "secret.deleted",
+          entity_type: "secret",
+          entity_id: `${organizationId}:${provider}`,
+          metadata: { provider },
+        }).catch((err) => request.log.error({ err }, "audit: secret.deleted failed"));
+      }
 
       return reply.status(204).send();
     }

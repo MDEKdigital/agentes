@@ -417,6 +417,37 @@ describe("audit logs — remarketing-worker", () => {
     );
   });
 
+  // ── R10: step_sent — idempotência via reordenação ─────────────────────────────
+
+  it("R10: advanceEnrollment é chamado ANTES de sendQueue.add (guarda retry)", async () => {
+    const callOrder: string[] = [];
+
+    mockAdvanceEnrollment.mockImplementation(async () => {
+      callOrder.push("advanceEnrollment");
+    });
+    mockQueueAdd.mockImplementation(async () => {
+      callOrder.push("sendQueue.add");
+    });
+
+    const enr = makeEnrollment("enr-order", FLOW_1_ID, STEP_1_ID);
+    mockGetActiveEnrollments.mockResolvedValue([enr]);
+    mockGetRemarketingFlowsByIds.mockResolvedValue([makeFlow(FLOW_1_ID)]);
+    mockGetRemarketingStepsByIds.mockResolvedValue([makeStep(STEP_1_ID, FLOW_1_ID)]);
+    mockIsConversationResolved.mockResolvedValue(false);
+    mockGetConversationById.mockResolvedValue(makeConversation("conv-enr-order"));
+    mockGetNextActiveStep.mockResolvedValue(null);
+
+    await processRemarketingCycle();
+
+    const advIdx = callOrder.indexOf("advanceEnrollment");
+    const addIdx = callOrder.indexOf("sendQueue.add");
+
+    // Currently: sendQueue.add fires BEFORE advanceEnrollment → advIdx > addIdx → FAILS (RED)
+    expect(advIdx).toBeGreaterThanOrEqual(0);
+    expect(addIdx).toBeGreaterThanOrEqual(0);
+    expect(advIdx).toBeLessThan(addIdx);
+  });
+
   it("(audit): NÃO audita enrollment_created quando createEnrollment lança erro de duplicata", async () => {
     const flow = makeFlow(FLOW_1_ID);
     const conv = makeConversation("conv-dup");

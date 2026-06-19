@@ -435,3 +435,28 @@ describe("audit logs — process-message", () => {
     expect(resolvedCalls).toHaveLength(0);
   });
 });
+
+// ── R6: idempotência em retry de conversa já resolvida ─────────────────────────
+
+describe("R6: retry com conversa já resolved — NÃO emite segundo conversation.resolved", () => {
+  it("R6: conversation.status=resolved → job retorna sem auditar conversation.resolved", async () => {
+    vi.mocked(getConversationById).mockResolvedValue({
+      ...conversation,
+      status: "resolved",
+    } as never);
+    mockRunAgent.mockResolvedValue({
+      text: "Até logo!",
+      model: "gpt-4o-mini",
+      tokensUsed: 50,
+      latencyMs: 100,
+      toolCalls: ["close_conversation"],
+    });
+
+    await runJob();
+
+    const resolvedCalls = mockCreateAuditLog.mock.calls.filter(
+      (args: unknown[]) => (args[1] as { action: string })?.action === "conversation.resolved"
+    );
+    expect(resolvedCalls).toHaveLength(0);
+  });
+});

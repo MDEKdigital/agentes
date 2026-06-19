@@ -29,7 +29,11 @@ import secretsRoutes from "../index";
 const ORG_ID = "org-uuid-1";
 const USER_ID = "user-uuid-1";
 
-function makeDb(upsertError: unknown = null, deleteError: unknown = null) {
+function makeDb(
+  deleteData: Array<{ provider: string }> = [{ provider: "openai" }],
+  upsertError: unknown = null,
+  deleteError: unknown = null
+) {
   return {
     from: vi.fn().mockReturnValue({
       select: vi.fn().mockReturnValue({
@@ -38,7 +42,9 @@ function makeDb(upsertError: unknown = null, deleteError: unknown = null) {
       upsert: vi.fn().mockResolvedValue({ error: upsertError }),
       delete: vi.fn().mockReturnValue({
         eq: vi.fn().mockReturnValue({
-          eq: vi.fn().mockResolvedValue({ error: deleteError }),
+          eq: vi.fn().mockReturnValue({
+            select: vi.fn().mockResolvedValue({ data: deleteData, error: deleteError }),
+          }),
         }),
       }),
     }),
@@ -101,6 +107,37 @@ describe("Audit logs — secrets", () => {
         user_id: USER_ID,
         metadata: expect.objectContaining({ provider: "openai" }),
       })
+    );
+  });
+
+  // ── R8: secret fantasma — sem audit quando 0 linhas afetadas ────────────────
+
+  it("R8: DELETE de secret inexistente (0 linhas afetadas) → NÃO audita secret.deleted", async () => {
+    mockGetAdminClient.mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockResolvedValue({ data: [], error: null }),
+        }),
+        upsert: vi.fn().mockResolvedValue({ error: null }),
+        delete: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              select: vi.fn().mockResolvedValue({ data: [], error: null }),
+            }),
+          }),
+        }),
+      }),
+    });
+
+    const app = await buildApp();
+    await app.inject({
+      method: "DELETE",
+      url: `/organizations/${ORG_ID}/secrets/openai`,
+    });
+
+    expect(mockCreateAuditLog).not.toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ action: "secret.deleted" })
     );
   });
 });

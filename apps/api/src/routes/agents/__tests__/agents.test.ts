@@ -391,3 +391,51 @@ describe("DELETE /organizations/:organizationId/agents/:agentId", () => {
     );
   });
 });
+
+// ── R7: audit agent.updated só dispara DEPOIS do side effect reset ─────────────
+
+describe("R7: agent.updated — audit não pode preceder resetAgentConversationsKeywordActivation", () => {
+  it("R7: se reset falha, NÃO audita agent.updated como sucesso", async () => {
+    mockGetAgentById.mockResolvedValue({ ...mockCreatedAgent, activation_rules: [] });
+    mockUpdateAgent.mockResolvedValue({
+      ...mockCreatedAgent,
+      activation_rules: [{ type: "single_word", value: "oi" }],
+    });
+    mockResetAgentConversationsKeywordActivation.mockRejectedValue(new Error("DB timeout"));
+
+    const app = await buildApp("admin");
+    const res = await app.inject({
+      method: "PATCH",
+      url: `/organizations/${ORG_ID}/agents/${AGENT_ID}`,
+      payload: { activation_rules: [{ type: "single_word", value: "oi" }] },
+    });
+
+    expect(res.statusCode).toBe(500);
+    expect(mockCreateAuditLog).not.toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ action: "agent.updated" })
+    );
+  });
+
+  it("R7: reset conclui com sucesso → agent.updated é auditado normalmente", async () => {
+    mockGetAgentById.mockResolvedValue({ ...mockCreatedAgent, activation_rules: [] });
+    mockUpdateAgent.mockResolvedValue({
+      ...mockCreatedAgent,
+      activation_rules: [{ type: "single_word", value: "oi" }],
+    });
+    mockResetAgentConversationsKeywordActivation.mockResolvedValue(undefined);
+
+    const app = await buildApp("admin");
+    const res = await app.inject({
+      method: "PATCH",
+      url: `/organizations/${ORG_ID}/agents/${AGENT_ID}`,
+      payload: { activation_rules: [{ type: "single_word", value: "oi" }] },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(mockCreateAuditLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ action: "agent.updated" })
+    );
+  });
+});

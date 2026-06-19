@@ -190,6 +190,12 @@ export async function processRemarketingCycle() {
         continue;
       }
 
+      // ── R10: Avançar para próxima etapa ANTES de enviar ──────────────────────
+      // Crash after advanceEnrollment but before sendQueue.add → retry sees advanced
+      // next_step_id and skips this step, preventing duplicate step_sent audits.
+      const nextStep = await getNextActiveStep(db, enrollment.flow_id, step.step_order);
+      await advanceEnrollment(db, enrollment.id, nextStep?.id ?? null, enrollment.organization_id);
+
       // ── Inserir mensagem no histórico ──────────────────────────────────────
       const { data: insertedMsg, error: msgError } = await db
         .from("messages")
@@ -228,10 +234,6 @@ export async function processRemarketingCycle() {
       console.log(
         `[remarketing] Queued step ${step.step_order} → conversation ${enrollment.conversation_id} (phone ${contact.phone})`
       );
-
-      // ── Avançar para próxima etapa ─────────────────────────────────────────
-      const nextStep = await getNextActiveStep(db, enrollment.flow_id, step.step_order);
-      await advanceEnrollment(db, enrollment.id, nextStep?.id ?? null, enrollment.organization_id);
 
       // Registrar flow e menor delay observado para next_check_at
       processedFlowIds.add(enrollment.flow_id);

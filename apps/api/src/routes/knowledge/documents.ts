@@ -94,15 +94,21 @@ export default async function knowledgeDocumentRoutes(app: FastifyInstance) {
       // Return 404 (not 403) to avoid revealing document existence to unauthorized users
       if (!membership) return reply.status(404).send({ error: "Documento não encontrado" });
 
-      // Remove file from storage before deleting DB record
+      // R9: reject deletion when file is outside the managed bucket — prevents false-success audit
       const bucketPrefix = `${process.env.SUPABASE_URL}/storage/v1/object/public/knowledge-documents/`;
-      if (doc.file_url.startsWith(bucketPrefix)) {
-        const storagePath = doc.file_url.slice(bucketPrefix.length);
-        const { error: storageError } = await db.storage.from("knowledge-documents").remove([storagePath]);
-        if (storageError) {
-          request.log.error({ storageError, storagePath }, "Falha ao remover arquivo do storage");
-          return reply.status(500).send({ error: "Erro ao remover arquivo do storage" });
-        }
+      if (!doc.file_url.startsWith(bucketPrefix)) {
+        request.log.warn(
+          { docId: doc.id, file_url: doc.file_url },
+          "document.deleted: file_url outside managed bucket, aborting"
+        );
+        return reply.status(422).send({ error: "Arquivo fora do bucket gerenciado. Contacte o suporte." });
+      }
+
+      const storagePath = doc.file_url.slice(bucketPrefix.length);
+      const { error: storageError } = await db.storage.from("knowledge-documents").remove([storagePath]);
+      if (storageError) {
+        request.log.error({ storageError, storagePath }, "Falha ao remover arquivo do storage");
+        return reply.status(500).send({ error: "Erro ao remover arquivo do storage" });
       }
 
       await deleteDocument(db, doc.id, doc.organization_id);

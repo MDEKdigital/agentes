@@ -98,15 +98,6 @@ export default async function agentRoutes(app: FastifyInstance) {
       }
       const updated = await updateAgent(db, agentId, organizationId, parseResult.data);
 
-      createAuditLog(db, {
-        organization_id: organizationId,
-        user_id: request.user.id,
-        action: "agent.updated",
-        entity_type: "agent",
-        entity_id: agentId,
-        metadata: { fields: Object.keys(parseResult.data) },
-      }).catch((err) => request.log.error({ err }, "audit: agent.updated failed"));
-
       const oldRules = existing.activation_rules ?? [];
       const newRules = parseResult.data.activation_rules ?? oldRules;
       const hadRules = oldRules.length > 0;
@@ -116,6 +107,16 @@ export default async function agentRoutes(app: FastifyInstance) {
       } else if (hadRules && !hasRules) {
         await resetAgentConversationsKeywordActivation(db, agentId, true);
       }
+
+      // R7: audit fires AFTER side effects — if reset throws above, no false-success audit
+      createAuditLog(db, {
+        organization_id: organizationId,
+        user_id: request.user.id,
+        action: "agent.updated",
+        entity_type: "agent",
+        entity_id: agentId,
+        metadata: { fields: Object.keys(parseResult.data) },
+      }).catch((err) => request.log.error({ err }, "audit: agent.updated failed"));
 
       return reply.send(updated);
     }

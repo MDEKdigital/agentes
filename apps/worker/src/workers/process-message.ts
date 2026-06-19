@@ -186,6 +186,10 @@ export function startProcessMessageWorker() {
           console.log(`Conversation ${conversationId} is in human takeover, skipping`);
           return;
         }
+        if ((conversation as { status?: string }).status === "resolved") {
+          console.log(`Conversation ${conversationId} already resolved, skipping retry`);
+          return;
+        }
 
         const contact = conversation.contacts;
         if (!contact?.phone) {
