@@ -24,6 +24,7 @@ const {
   mockQueueAdd,
   mockGetSendMessageQueue,
   mockGetRemarketingQueue,
+  mockCreateAuditLog,
 } = vi.hoisted(() => ({
   mockGetAdminClient: vi.fn(),
   mockGetActiveRemarketingFlows: vi.fn(),
@@ -47,6 +48,7 @@ const {
   mockQueueAdd: vi.fn(),
   mockGetSendMessageQueue: vi.fn(),
   mockGetRemarketingQueue: vi.fn(),
+  mockCreateAuditLog: vi.fn(),
 }));
 
 vi.mock("@aula-agente/database", () => ({
@@ -69,6 +71,7 @@ vi.mock("@aula-agente/database", () => ({
   getConversationById: mockGetConversationById,
   getNextActiveStep: mockGetNextActiveStep,
   returnConversationToAgent: mockReturnConversationToAgent,
+  createAuditLog: mockCreateAuditLog,
 }));
 
 vi.mock("@aula-agente/queue", () => ({
@@ -189,6 +192,7 @@ beforeEach(() => {
   mockGetSendMessageQueue.mockReturnValue({ add: mockQueueAdd });
   mockGetRemarketingQueue.mockReturnValue({ upsertJobScheduler: vi.fn() });
   mockQueueAdd.mockResolvedValue(undefined);
+  mockCreateAuditLog.mockResolvedValue({});
 });
 
 // ── testes de eliminação N+1 ───────────────────────────────────────────────────
@@ -317,5 +321,118 @@ describe("processRemarketingCycle — eliminação N+1", () => {
 
     expect(mockCancelEnrollment).toHaveBeenCalledWith(expect.anything(), "enr-resolved", "resolved", "org-1");
     expect(mockUpdateFlowLastExecuted).not.toHaveBeenCalled();
+  });
+});
+
+// ── audit log assertions ───────────────────────────────────────────────────────
+
+describe("audit logs — remarketing-worker", () => {
+  it("(audit): enrollment criado → registra remarketing.enrollment_created", async () => {
+    const flow = makeFlow(FLOW_1_ID);
+    const conv = makeConversation("conv-audit");
+    const step = makeStep(STEP_1_ID, FLOW_1_ID);
+
+    mockGetActiveRemarketingFlows.mockResolvedValue([flow]);
+    mockGetConversationsEligibleForEnrollment.mockResolvedValue([conv]);
+    mockGetFirstActiveStep.mockResolvedValue(step);
+    mockCreateEnrollment.mockResolvedValue({});
+    mockGetActiveEnrollments.mockResolvedValue([]);
+
+    await processRemarketingCycle();
+
+    expect(mockCreateAuditLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        action: "remarketing.enrollment_created",
+        entity_type: "remarketing_enrollment",
+        organization_id: "org-1",
+        metadata: expect.objectContaining({ flow_id: FLOW_1_ID }),
+      })
+    );
+  });
+
+  it("(audit): enrollment cancelado por conversa resolvida → registra remarketing.enrollment_cancelled", async () => {
+    const enr = makeEnrollment("enr-cancelled", FLOW_1_ID, STEP_1_ID);
+    mockGetActiveEnrollments.mockResolvedValue([enr]);
+    mockGetRemarketingFlowsByIds.mockResolvedValue([makeFlow(FLOW_1_ID)]);
+    mockGetRemarketingStepsByIds.mockResolvedValue([makeStep(STEP_1_ID, FLOW_1_ID)]);
+    mockIsConversationResolved.mockResolvedValue(true);
+
+    await processRemarketingCycle();
+
+    expect(mockCreateAuditLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        action: "remarketing.enrollment_cancelled",
+        entity_type: "remarketing_enrollment",
+        entity_id: "enr-cancelled",
+        organization_id: "org-1",
+        metadata: expect.objectContaining({ reason: "resolved" }),
+      })
+    );
+  });
+
+  it("(audit): enrollment cancelado por resposta do contato → registra remarketing.enrollment_cancelled com reason=reply", async () => {
+    const flow = { ...makeFlow(FLOW_1_ID), cancel_on_reply: true };
+    const enr = makeEnrollment("enr-reply", FLOW_1_ID, STEP_1_ID);
+    mockGetActiveEnrollments.mockResolvedValue([enr]);
+    mockGetRemarketingFlowsByIds.mockResolvedValue([flow]);
+    mockGetRemarketingStepsByIds.mockResolvedValue([makeStep(STEP_1_ID, FLOW_1_ID)]);
+    mockIsConversationResolved.mockResolvedValue(false);
+    mockHasContactRepliedSince.mockResolvedValue(true);
+
+    await processRemarketingCycle();
+
+    expect(mockCreateAuditLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        action: "remarketing.enrollment_cancelled",
+        entity_id: "enr-reply",
+        metadata: expect.objectContaining({ reason: "reply" }),
+      })
+    );
+  });
+
+  it("(audit): step enviado → registra remarketing.step_sent", async () => {
+    const enr = makeEnrollment("enr-sent", FLOW_1_ID, STEP_1_ID);
+    mockGetActiveEnrollments.mockResolvedValue([enr]);
+    mockGetRemarketingFlowsByIds.mockResolvedValue([makeFlow(FLOW_1_ID)]);
+    mockGetRemarketingStepsByIds.mockResolvedValue([makeStep(STEP_1_ID, FLOW_1_ID)]);
+    mockIsConversationResolved.mockResolvedValue(false);
+    mockHasContactRepliedSince.mockResolvedValue(false);
+    mockGetConversationById.mockResolvedValue(makeConversation("conv-enr-sent"));
+    mockGetNextActiveStep.mockResolvedValue(null);
+
+    await processRemarketingCycle();
+
+    expect(mockCreateAuditLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        action: "remarketing.step_sent",
+        entity_type: "remarketing_enrollment",
+        entity_id: "enr-sent",
+        organization_id: "org-1",
+        metadata: expect.objectContaining({ flow_id: FLOW_1_ID }),
+      })
+    );
+  });
+
+  it("(audit): NÃO audita enrollment_created quando createEnrollment lança erro de duplicata", async () => {
+    const flow = makeFlow(FLOW_1_ID);
+    const conv = makeConversation("conv-dup");
+    const step = makeStep(STEP_1_ID, FLOW_1_ID);
+
+    mockGetActiveRemarketingFlows.mockResolvedValue([flow]);
+    mockGetConversationsEligibleForEnrollment.mockResolvedValue([conv]);
+    mockGetFirstActiveStep.mockResolvedValue(step);
+    mockCreateEnrollment.mockRejectedValue(new Error("duplicate key violation"));
+    mockGetActiveEnrollments.mockResolvedValue([]);
+
+    await processRemarketingCycle();
+
+    expect(mockCreateAuditLog).not.toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ action: "remarketing.enrollment_created" })
+    );
   });
 });

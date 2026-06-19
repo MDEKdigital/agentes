@@ -3,30 +3,42 @@ import { QUEUE_NAMES, HUMAN_TAKEOVER_TIMEOUT_MS } from "@aula-agente/shared";
 import type { TakeoverTimeoutJobData } from "@aula-agente/queue";
 import { getTakeoverTimeoutQueue } from "@aula-agente/queue";
 import { getConnectionOptions } from "../lib/redis";
-import { getAdminClient, getExpiredTakeovers, updateConversation } from "@aula-agente/database";
+import { getAdminClient, getExpiredTakeovers, updateConversation, createAuditLog } from "@aula-agente/database";
+
+export async function processTakeoverTimeouts() {
+  const db = getAdminClient();
+  const expired = await getExpiredTakeovers(db, HUMAN_TAKEOVER_TIMEOUT_MS);
+
+  for (const conversation of expired) {
+    try {
+      await updateConversation(db, conversation.id, {
+        is_human_takeover: false,
+        human_takeover_at: null,
+      }, conversation.organization_id);
+      createAuditLog(db, {
+        organization_id: conversation.organization_id,
+        action: "conversation.takeover_expired",
+        entity_type: "conversation",
+        entity_id: conversation.id,
+      }).catch((err) =>
+        console.error(`[audit] conversation.takeover_expired failed for ${conversation.id}:`, err)
+      );
+      console.log(`Auto-released takeover for conversation ${conversation.id}`);
+    } catch (err) {
+      console.error(`Failed to release takeover for conversation ${conversation.id}:`, err);
+    }
+  }
+
+  if (expired.length > 0) {
+    console.log(`Released ${expired.length} expired takeovers`);
+  }
+}
 
 export function startTakeoverTimeoutWorker() {
   const worker = new Worker<TakeoverTimeoutJobData>(
     QUEUE_NAMES.TAKEOVER_TIMEOUT,
     async (_job: Job) => {
-      const db = getAdminClient();
-      const expired = await getExpiredTakeovers(db, HUMAN_TAKEOVER_TIMEOUT_MS);
-
-      for (const conversation of expired) {
-        try {
-          await updateConversation(db, conversation.id, {
-            is_human_takeover: false,
-            human_takeover_at: null,
-          }, conversation.organization_id);
-          console.log(`Auto-released takeover for conversation ${conversation.id}`);
-        } catch (err) {
-          console.error(`Failed to release takeover for conversation ${conversation.id}:`, err);
-        }
-      }
-
-      if (expired.length > 0) {
-        console.log(`Released ${expired.length} expired takeovers`);
-      }
+      await processTakeoverTimeouts();
     },
     {
       connection: getConnectionOptions(),

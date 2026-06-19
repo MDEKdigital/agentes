@@ -32,6 +32,10 @@ vi.mock("bullmq", () => ({
     _processor: processor,
   })),
 }));
+const { mockCreateAuditLog } = vi.hoisted(() => ({
+  mockCreateAuditLog: vi.fn().mockResolvedValue({}),
+}));
+
 vi.mock("@aula-agente/database", () => ({
   getAdminClient: vi.fn(() => ({})),
   getAgentById: vi.fn(),
@@ -40,6 +44,7 @@ vi.mock("@aula-agente/database", () => ({
   createMessage: vi.fn(),
   updateConversation: vi.fn(),
   getInstanceById: vi.fn(),
+  createAuditLog: mockCreateAuditLog,
 }));
 vi.mock("@aula-agente/queue", () => ({
   getSendMessageQueue: vi.fn(() => ({ add: vi.fn() })),
@@ -107,6 +112,7 @@ const messages = [
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockCreateAuditLog.mockResolvedValue({});
   mockRunAgent.mockResolvedValue({
     text: "Resposta do agente",
     model: "gpt-4o-mini",
@@ -344,5 +350,88 @@ describe("keyword gate", () => {
       expect.objectContaining({ is_keyword_activated: true }),
       "org-1"
     );
+  });
+});
+
+// ── audit log assertions ───────────────────────────────────────────────────────
+
+describe("audit logs — process-message", () => {
+  it("(audit): keyword ativada → registra conversation.keyword_activated", async () => {
+    vi.mocked(getAgentById).mockResolvedValue({
+      ...activeAgent,
+      activation_rules: [{ type: "single_word", value: "suporte" }],
+    } as never);
+    vi.mocked(getConversationById).mockResolvedValue({
+      ...conversation,
+      is_keyword_activated: false,
+      awaiting_activation_confirmation: false,
+    } as never);
+    mockEvaluateActivation.mockResolvedValue({ action: "activate" as const });
+
+    await runJob();
+
+    expect(mockCreateAuditLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        action: "conversation.keyword_activated",
+        entity_type: "conversation",
+        entity_id: "conv-1",
+        organization_id: "org-1",
+      })
+    );
+  });
+
+  it("(audit): NÃO audita keyword_activated quando conversa já está ativada", async () => {
+    vi.mocked(getConversationById).mockResolvedValue({
+      ...conversation,
+      is_keyword_activated: true,
+      awaiting_activation_confirmation: false,
+    } as never);
+
+    await runJob();
+
+    const keywordCalls = mockCreateAuditLog.mock.calls.filter(
+      ([, params]: [unknown, { action: string }]) => params.action === "conversation.keyword_activated"
+    );
+    expect(keywordCalls).toHaveLength(0);
+  });
+
+  it("(audit): conversa resolvida pelo agente → registra conversation.resolved", async () => {
+    mockRunAgent.mockResolvedValue({
+      text: "Até logo!",
+      model: "gpt-4o-mini",
+      tokensUsed: 50,
+      latencyMs: 100,
+      toolCalls: ["close_conversation"],
+    });
+
+    await runJob();
+
+    expect(mockCreateAuditLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        action: "conversation.resolved",
+        entity_type: "conversation",
+        entity_id: "conv-1",
+        organization_id: "org-1",
+      })
+    );
+  });
+
+  it("(audit): NÃO audita conversation.resolved quando agente não chamou close_conversation", async () => {
+    mockRunAgent.mockResolvedValue({
+      text: "Olá!",
+      model: "gpt-4o-mini",
+      tokensUsed: 50,
+      latencyMs: 100,
+      toolCalls: [],
+    });
+
+    await runJob();
+
+    const resolvedCalls = mockCreateAuditLog.mock.calls.filter(
+      ([, params]: [unknown, { action: string }]) => params.action === "conversation.resolved"
+    );
+    expect(resolvedCalls).toHaveLength(0);
   });
 });
