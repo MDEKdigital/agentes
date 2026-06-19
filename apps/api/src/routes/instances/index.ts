@@ -8,6 +8,7 @@ import {
   updateInstance,
   deleteInstance as deleteInstanceRecord,
   checkResourceLimit,
+  getAgentById,
 } from "@aula-agente/database";
 import {
   createInstance as createEvolutionInstance,
@@ -321,6 +322,13 @@ export default async function instanceRoutes(app: FastifyInstance) {
       const parseResult = updateInstanceSchema.safeParse(request.body);
       if (!parseResult.success) {
         return reply.status(400).send({ error: parseResult.error.issues });
+      }
+
+      if (parseResult.data.active_agent_id) {
+        const agent = await getAgentById(db, parseResult.data.active_agent_id, instance.organization_id);
+        if (!agent) {
+          return reply.status(403).send({ error: "Agente não pertence a esta organização" });
+        }
       }
 
       const updated = await updateInstance(db, instance.id, parseResult.data, instance.organization_id);
