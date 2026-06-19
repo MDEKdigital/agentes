@@ -21,11 +21,12 @@ export async function getConversationsByOrganization(
   return data;
 }
 
-export async function getConversationById(client: SupabaseClient, id: string) {
+export async function getConversationById(client: SupabaseClient, id: string, organizationId: string) {
   const { data, error } = await client
     .from("conversations")
     .select("*, contacts(*), agents(name)")
     .eq("id", id)
+    .eq("organization_id", organizationId)
     .single();
   if (error) throw error;
   return data;
@@ -65,7 +66,7 @@ export async function reopenConversation(
   if (error) throw error;
   if (data) return data as Conversation;
   // Concurrent request already reopened — return current state
-  return getConversationById(client, id);
+  return getConversationById(client, id, organizationId);
 }
 
 export async function createConversation(
@@ -123,11 +124,12 @@ export async function addConversationNote(
   return data as ConversationNote;
 }
 
-export async function getConversationNotes(client: SupabaseClient, conversationId: string) {
+export async function getConversationNotes(client: SupabaseClient, conversationId: string, organizationId: string) {
   const { data, error } = await client
     .from("conversation_notes")
     .select("*")
     .eq("conversation_id", conversationId)
+    .eq("organization_id", organizationId)
     .order("created_at", { ascending: false });
   if (error) throw error;
   return data as ConversationNote[];

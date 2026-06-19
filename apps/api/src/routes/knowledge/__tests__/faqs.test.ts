@@ -230,7 +230,7 @@ describe("PATCH /faqs/:faqId", () => {
     expect(mockUpdateFaq).not.toHaveBeenCalled();
   });
 
-  it("não é membro da org da FAQ → 403", async () => {
+  it("(S9) não é membro da org da FAQ → 404 (anti-enumeração)", async () => {
     mockGetAdminClient.mockReturnValue(makeDb("outra-org"));
     const app = await buildApp("admin");
     const res = await app.inject({
@@ -238,7 +238,7 @@ describe("PATCH /faqs/:faqId", () => {
       url: `/faqs/${FAQ_ID}`,
       payload: { is_active: false },
     });
-    expect(res.statusCode).toBe(403);
+    expect(res.statusCode).toBe(404);
     expect(mockUpdateFaq).not.toHaveBeenCalled();
   });
 
@@ -278,14 +278,14 @@ describe("DELETE /faqs/:faqId", () => {
     expect(mockDeleteFaq).not.toHaveBeenCalled();
   });
 
-  it("não é membro da org da FAQ → 403", async () => {
+  it("(S9) não é membro da org da FAQ → 404 (anti-enumeração)", async () => {
     mockGetAdminClient.mockReturnValue(makeDb("outra-org"));
     const app = await buildApp("admin");
     const res = await app.inject({
       method: "DELETE",
       url: `/faqs/${FAQ_ID}`,
     });
-    expect(res.statusCode).toBe(403);
+    expect(res.statusCode).toBe(404);
     expect(mockDeleteFaq).not.toHaveBeenCalled();
   });
 

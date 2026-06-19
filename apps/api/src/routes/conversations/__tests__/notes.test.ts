@@ -89,7 +89,7 @@ describe("GET /conversations/:conversationId/notes", () => {
     const body = JSON.parse(res.body);
     expect(body.notes).toHaveLength(1);
     expect(body.notes[0].content).toBe("Nota de teste");
-    expect(mockGetConversationNotes).toHaveBeenCalledWith(expect.anything(), CONV_ID);
+    expect(mockGetConversationNotes).toHaveBeenCalledWith(expect.anything(), CONV_ID, ORG_ID);
   });
 
   it("conversa não encontrada → 404", async () => {

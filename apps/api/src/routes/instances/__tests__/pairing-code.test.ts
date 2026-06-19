@@ -142,7 +142,7 @@ describe("POST /instances/:instanceId/pairing-code", () => {
     expect(res.statusCode).toBe(500);
   });
 
-  it("retorna 403 quando usuário não tem permissão de admin", async () => {
+  it("(S8) usuário não é membro da org da instância → 404 (anti-enumeração)", async () => {
     mockAuthMiddleware.mockImplementationOnce(async (request: { user: unknown }) => {
       request.user = {
         memberships: [{ organization_id: "other-org", role: "admin" }],
@@ -157,6 +157,6 @@ describe("POST /instances/:instanceId/pairing-code", () => {
       payload: { phone_number: "11999999999" },
     });
 
-    expect(res.statusCode).toBe(403);
+    expect(res.statusCode).toBe(404);
   });
 });

@@ -159,7 +159,7 @@ describe("PATCH /instances/:instanceId", () => {
     expect(mockUpdateInstance).not.toHaveBeenCalled();
   });
 
-  it("usuário não é membro da org da instância → 403", async () => {
+  it("(S8): usuário não é membro da org da instância → 404 (anti-enumeração)", async () => {
     mockAuthMiddleware.mockImplementation(async (request: any) => {
       request.user = {
         id: USER_ID,
@@ -175,7 +175,7 @@ describe("PATCH /instances/:instanceId", () => {
       payload: { active_agent_id: AGENT_ORG_A },
     });
 
-    expect(res.statusCode).toBe(403);
+    expect(res.statusCode).toBe(404);
     expect(mockUpdateInstance).not.toHaveBeenCalled();
   });
 

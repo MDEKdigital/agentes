@@ -113,7 +113,7 @@ export default async function instanceRoutes(app: FastifyInstance) {
       const membership = request.user.memberships.find(
         (m) => m.organization_id === instance.organization_id
       );
-      if (!membership) return reply.status(403).send({ error: "Acesso negado" });
+      if (!membership) return reply.status(404).send({ error: "Instância não encontrada" });
 
       return reply.send(instance);
     }
@@ -136,7 +136,7 @@ export default async function instanceRoutes(app: FastifyInstance) {
       const membership = request.user.memberships.find(
         (m) => m.organization_id === instance.organization_id
       );
-      if (!membership) return reply.status(403).send({ error: "Acesso negado" });
+      if (!membership) return reply.status(404).send({ error: "Instância não encontrada" });
 
       const [status, details] = await Promise.all([
         getInstanceStatus(instance.instance_name) as Promise<Record<string, Record<string, string>>>,
@@ -176,7 +176,7 @@ export default async function instanceRoutes(app: FastifyInstance) {
       const membership = request.user.memberships.find(
         (m) => m.organization_id === instance.organization_id
       );
-      if (!membership) return reply.status(403).send({ error: "Acesso negado" });
+      if (!membership) return reply.status(404).send({ error: "Instância não encontrada" });
 
       if (instance.status !== "connected") {
         return { name: null, status: null, picture: null };
@@ -236,9 +236,10 @@ export default async function instanceRoutes(app: FastifyInstance) {
       }
 
       const membership = request.user.memberships.find(
-        (m) => m.organization_id === instance.organization_id && m.role !== "agent"
+        (m) => m.organization_id === instance.organization_id
       );
-      if (!membership) return reply.status(403).send({ error: "Acesso de administrador necessário" });
+      if (!membership) return reply.status(404).send({ error: "Instância não encontrada" });
+      if (membership.role === "agent") return reply.status(403).send({ error: "Acesso de administrador necessário" });
 
       if (instance.status !== "connected") {
         return reply.status(422).send({ error: "Instância não está conectada" });
@@ -291,9 +292,10 @@ export default async function instanceRoutes(app: FastifyInstance) {
       }
 
       const membership = request.user.memberships.find(
-        (m) => m.organization_id === instance.organization_id && m.role !== "agent"
+        (m) => m.organization_id === instance.organization_id
       );
-      if (!membership) return reply.status(403).send({ error: "Acesso de administrador necessário" });
+      if (!membership) return reply.status(404).send({ error: "Instância não encontrada" });
+      if (membership.role === "agent") return reply.status(403).send({ error: "Acesso de administrador necessário" });
 
       const qrData = await getInstanceQrCode(instance.instance_name);
       return qrData;
@@ -315,9 +317,10 @@ export default async function instanceRoutes(app: FastifyInstance) {
       }
 
       const membership = request.user.memberships.find(
-        (m) => m.organization_id === instance.organization_id && m.role !== "agent"
+        (m) => m.organization_id === instance.organization_id
       );
-      if (!membership) return reply.status(403).send({ error: "Acesso de administrador necessário" });
+      if (!membership) return reply.status(404).send({ error: "Instância não encontrada" });
+      if (membership.role === "agent") return reply.status(403).send({ error: "Acesso de administrador necessário" });
 
       const parseResult = updateInstanceSchema.safeParse(request.body);
       if (!parseResult.success) {
@@ -351,9 +354,10 @@ export default async function instanceRoutes(app: FastifyInstance) {
       }
 
       const membership = request.user.memberships.find(
-        (m) => m.organization_id === instance.organization_id && m.role === "owner"
+        (m) => m.organization_id === instance.organization_id
       );
-      if (!membership) return reply.status(403).send({ error: "Acesso de proprietário necessário" });
+      if (!membership) return reply.status(404).send({ error: "Instância não encontrada" });
+      if (membership.role !== "owner") return reply.status(403).send({ error: "Acesso de proprietário necessário" });
 
       // Delete from Evolution API
       try {
@@ -381,7 +385,7 @@ export default async function instanceRoutes(app: FastifyInstance) {
         throw err;
       }
       const membership = request.user.memberships.find((m) => m.organization_id === instance.organization_id);
-      if (!membership) return reply.status(403).send({ error: "Acesso negado" });
+      if (!membership) return reply.status(404).send({ error: "Instância não encontrada" });
       try {
         const settings = await getInstanceSettings(instance.instance_name);
         return settings;
@@ -405,9 +409,10 @@ export default async function instanceRoutes(app: FastifyInstance) {
         throw err;
       }
       const membership = request.user.memberships.find(
-        (m) => m.organization_id === instance.organization_id && m.role !== "agent"
+        (m) => m.organization_id === instance.organization_id
       );
-      if (!membership) return reply.status(403).send({ error: "Acesso de administrador necessário" });
+      if (!membership) return reply.status(404).send({ error: "Instância não encontrada" });
+      if (membership.role === "agent") return reply.status(403).send({ error: "Acesso de administrador necessário" });
       await setInstanceSettings(instance.instance_name, request.body as Record<string, unknown>);
       return { ok: true };
     }
@@ -427,7 +432,7 @@ export default async function instanceRoutes(app: FastifyInstance) {
         throw err;
       }
       const membership = request.user.memberships.find((m) => m.organization_id === instance.organization_id);
-      if (!membership) return reply.status(403).send({ error: "Acesso negado" });
+      if (!membership) return reply.status(404).send({ error: "Instância não encontrada" });
       if (instance.status !== "connected") return reply.status(422).send({ error: "Instância não está conectada" });
       try {
         const privacy = await getPrivacySettings(instance.instance_name);
@@ -452,9 +457,10 @@ export default async function instanceRoutes(app: FastifyInstance) {
         throw err;
       }
       const membership = request.user.memberships.find(
-        (m) => m.organization_id === instance.organization_id && m.role !== "agent"
+        (m) => m.organization_id === instance.organization_id
       );
-      if (!membership) return reply.status(403).send({ error: "Acesso de administrador necessário" });
+      if (!membership) return reply.status(404).send({ error: "Instância não encontrada" });
+      if (membership.role === "agent") return reply.status(403).send({ error: "Acesso de administrador necessário" });
       if (instance.status !== "connected") return reply.status(422).send({ error: "Instância não está conectada" });
       await updatePrivacySettings(instance.instance_name, request.body as Record<string, unknown>);
       return { ok: true };
@@ -475,9 +481,10 @@ export default async function instanceRoutes(app: FastifyInstance) {
         throw err;
       }
       const membership = request.user.memberships.find(
-        (m) => m.organization_id === instance.organization_id && m.role !== "agent"
+        (m) => m.organization_id === instance.organization_id
       );
-      if (!membership) return reply.status(403).send({ error: "Acesso de administrador necessário" });
+      if (!membership) return reply.status(404).send({ error: "Instância não encontrada" });
+      if (membership.role === "agent") return reply.status(403).send({ error: "Acesso de administrador necessário" });
       try {
         await restartInstance(instance.instance_name);
       } catch (err) {
@@ -502,9 +509,10 @@ export default async function instanceRoutes(app: FastifyInstance) {
       }
 
       const membership = request.user.memberships.find(
-        (m) => m.organization_id === instance.organization_id && m.role !== "agent"
+        (m) => m.organization_id === instance.organization_id
       );
-      if (!membership) return reply.status(403).send({ error: "Acesso de administrador necessário" });
+      if (!membership) return reply.status(404).send({ error: "Instância não encontrada" });
+      if (membership.role === "agent") return reply.status(403).send({ error: "Acesso de administrador necessário" });
 
       try {
         await logoutInstance(instance.instance_name);
@@ -532,9 +540,10 @@ export default async function instanceRoutes(app: FastifyInstance) {
       }
 
       const membership = request.user.memberships.find(
-        (m) => m.organization_id === instance.organization_id && m.role !== "agent"
+        (m) => m.organization_id === instance.organization_id
       );
-      if (!membership) return reply.status(403).send({ error: "Acesso de administrador necessário" });
+      if (!membership) return reply.status(404).send({ error: "Instância não encontrada" });
+      if (membership.role === "agent") return reply.status(403).send({ error: "Acesso de administrador necessário" });
 
       const body = request.body as { phone_number?: unknown };
       const phone = String(body?.phone_number ?? "");

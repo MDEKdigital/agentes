@@ -169,7 +169,7 @@ export function startProcessMessageWorker() {
         // Fix #9: Parallelize agent + conversation fetch
         const [agent, conversation] = (await Promise.all([
           getAgentById(db, agentId),
-          getConversationById(db, conversationId),
+          getConversationById(db, conversationId, organizationId),
         ])) as [Awaited<ReturnType<typeof getAgentById>>, ConversationRow];
 
         if (!agent.is_active) {

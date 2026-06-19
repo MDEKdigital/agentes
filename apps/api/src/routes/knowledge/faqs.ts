@@ -74,9 +74,10 @@ export default async function knowledgeFaqRoutes(app: FastifyInstance) {
       if (!faq) return reply.status(404).send({ error: "FAQ não encontrada" });
 
       const membership = request.user.memberships.find(
-        (m) => m.organization_id === faq.organization_id && m.role !== "agent"
+        (m) => m.organization_id === faq.organization_id
       );
-      if (!membership) return reply.status(403).send({ error: "Acesso de administrador necessário" });
+      if (!membership) return reply.status(404).send({ error: "FAQ não encontrada" });
+      if (membership.role === "agent") return reply.status(403).send({ error: "Acesso de administrador necessário" });
 
       const updated = await updateFaq(db, request.params.faqId, faq.organization_id, parseResult.data);
       return updated;
@@ -97,9 +98,10 @@ export default async function knowledgeFaqRoutes(app: FastifyInstance) {
       if (!faq) return reply.status(404).send({ error: "FAQ não encontrada" });
 
       const membership = request.user.memberships.find(
-        (m) => m.organization_id === faq.organization_id && m.role !== "agent"
+        (m) => m.organization_id === faq.organization_id
       );
-      if (!membership) return reply.status(403).send({ error: "Acesso de administrador necessário" });
+      if (!membership) return reply.status(404).send({ error: "FAQ não encontrada" });
+      if (membership.role === "agent") return reply.status(403).send({ error: "Acesso de administrador necessário" });
 
       await deleteFaq(db, request.params.faqId, faq.organization_id);
       return reply.status(204).send();

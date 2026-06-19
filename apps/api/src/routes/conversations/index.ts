@@ -57,13 +57,20 @@ export default async function conversationRoutes(app: FastifyInstance) {
       const { conversationId } = request.params;
       const db = getAdminClient();
 
-      const conv = await getConversationById(db, conversationId);
-      if (!conv) return reply.status(404).send({ error: "Conversa não encontrada" });
+      const { data: orgData } = await db
+        .from("conversations")
+        .select("organization_id")
+        .eq("id", conversationId)
+        .single();
+      if (!orgData) return reply.status(404).send({ error: "Conversa não encontrada" });
 
       const membership = request.user.memberships.find(
-        (m) => m.organization_id === (conv as Record<string, unknown>).organization_id
+        (m) => m.organization_id === orgData.organization_id
       );
       if (!membership) return reply.status(403).send({ error: "Acesso negado" });
+
+      const conv = await getConversationById(db, conversationId, orgData.organization_id);
+      if (!conv) return reply.status(404).send({ error: "Conversa não encontrada" });
 
       return reply.send(conv);
     }
@@ -75,11 +82,15 @@ export default async function conversationRoutes(app: FastifyInstance) {
       const { conversationId } = request.params;
       const db = getAdminClient();
 
-      const conv = await getConversationById(db, conversationId);
-      if (!conv) return reply.status(404).send({ error: "Conversa não encontrada" });
+      const { data: orgData } = await db
+        .from("conversations")
+        .select("organization_id")
+        .eq("id", conversationId)
+        .single();
+      if (!orgData) return reply.status(404).send({ error: "Conversa não encontrada" });
 
       const membership = request.user.memberships.find(
-        (m) => m.organization_id === (conv as Record<string, unknown>).organization_id
+        (m) => m.organization_id === orgData.organization_id
       );
       if (!membership) return reply.status(403).send({ error: "Acesso negado" });
 
@@ -94,13 +105,20 @@ export default async function conversationRoutes(app: FastifyInstance) {
       const { conversationId } = request.params;
       const db = getAdminClient();
 
-      const conv = await getConversationById(db, conversationId);
-      if (!conv) return reply.status(404).send({ error: "Conversa não encontrada" });
+      const { data: orgData } = await db
+        .from("conversations")
+        .select("organization_id")
+        .eq("id", conversationId)
+        .single();
+      if (!orgData) return reply.status(404).send({ error: "Conversa não encontrada" });
 
       const membership = request.user.memberships.find(
-        (m) => m.organization_id === (conv as Record<string, unknown>).organization_id
+        (m) => m.organization_id === orgData.organization_id
       );
       if (!membership) return reply.status(403).send({ error: "Acesso negado" });
+
+      const conv = await getConversationById(db, conversationId, orgData.organization_id);
+      if (!conv) return reply.status(404).send({ error: "Conversa não encontrada" });
 
       const messages = await getMessagesByConversation(db, conversationId);
       return reply.send({ conversation: conv, messages });
@@ -126,7 +144,7 @@ export default async function conversationRoutes(app: FastifyInstance) {
       );
       if (!membership) return reply.status(403).send({ error: "Acesso negado" });
 
-      const notes = await getConversationNotes(db, conversationId);
+      const notes = await getConversationNotes(db, conversationId, conv.organization_id);
       return reply.send({ notes });
     }
   );

@@ -17,18 +17,28 @@ export default async function messageSendRoutes(app: FastifyInstance) {
       const { conversation_id, content } = parseResult.data;
       const db = getAdminClient();
 
-      // Get conversation
-      const conversation = await getConversationById(db, conversation_id);
-      if (!conversation) {
+      // Lightweight org lookup for auth check before full fetch
+      const { data: convOrg } = await db
+        .from("conversations")
+        .select("organization_id")
+        .eq("id", conversation_id)
+        .single();
+      if (!convOrg) {
         return reply.status(404).send({ error: "Conversa não encontrada" });
       }
 
       // Check user has access to this org
       const membership = request.user.memberships.find(
-        (m) => m.organization_id === conversation.organization_id
+        (m) => m.organization_id === convOrg.organization_id
       );
       if (!membership) {
         return reply.status(403).send({ error: "Acesso negado" });
+      }
+
+      // Full fetch scoped to org (defense-in-depth)
+      const conversation = await getConversationById(db, conversation_id, convOrg.organization_id);
+      if (!conversation) {
+        return reply.status(404).send({ error: "Conversa não encontrada" });
       }
 
       // Save human agent message

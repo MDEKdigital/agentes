@@ -141,7 +141,7 @@ export async function processRemarketingCycle() {
       }
 
       // ── Buscar conversa e telefone do contato ─────────────────────────────
-      const conversation = await getConversationById(db, enrollment.conversation_id);
+      const conversation = await getConversationById(db, enrollment.conversation_id, enrollment.organization_id);
       if (!conversation) {
         console.error(`[remarketing] Conversation ${enrollment.conversation_id} not found, skipping`);
         continue;

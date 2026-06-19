@@ -98,13 +98,13 @@ describe("GET /instances/:instanceId", () => {
     expect(res.statusCode).toBe(404);
   });
 
-  it("usuário não é membro da org da instância → 403", async () => {
+  it("(S8) usuário não é membro da org da instância → 404 (anti-enumeração)", async () => {
     mockGetInstanceById.mockResolvedValue(INSTANCE_FIXTURE);
     const app = await buildApp("outra-org");
     const res = await app.inject({
       method: "GET",
       url: `/instances/${INST_ID}`,
     });
-    expect(res.statusCode).toBe(403);
+    expect(res.statusCode).toBe(404);
   });
 });
