@@ -22,14 +22,14 @@ function makeChain(resolvedValue: Record<string, unknown>) {
   for (const m of methods) {
     (self as any)[m] = vi.fn().mockReturnValue(self);
   }
-  return self as ReturnType<typeof makeChain>;
+  return self;
 }
 
 type MockClient = {
   from: ReturnType<typeof vi.fn>;
-  _convChain: ReturnType<typeof makeChain>;
-  _enrollChain: ReturnType<typeof makeChain>;
-  _msgChain: ReturnType<typeof makeChain>;
+  _convChain: Record<string, unknown>;
+  _enrollChain: Record<string, unknown>;
+  _msgChain: Record<string, unknown>;
 };
 
 function buildMockClient({
@@ -56,6 +56,8 @@ function buildMockClient({
 const BASE_FLOW = {
   id: "flow-1",
   organization_id: "org-1",
+  name: "Fluxo Teste",
+  product_campaign: "campanha-1",
   agent_id: "agent-1",
   instance_id: "inst-1",
   status: "active" as const,
@@ -63,6 +65,11 @@ const BASE_FLOW = {
   cancel_on_resolved: true,
   cancel_on_opt_out: false,
   entry_silence_minutes: 15,
+  system_prompt: "",
+  last_executed_at: null,
+  next_check_at: null,
+  created_at: "2026-01-01T00:00:00Z",
+  updated_at: "2026-01-01T00:00:00Z",
 };
 
 const makeConv = (id: string) => ({ id, organization_id: "org-1" });
@@ -84,7 +91,7 @@ describe("getConversationsEligibleForEnrollment — eliminação N+1", () => {
     await getConversationsEligibleForEnrollment(client as any, BASE_FLOW);
 
     const messagesCalls = (client.from as ReturnType<typeof vi.fn>).mock.calls.filter(
-      ([table]: [string]) => table === "messages"
+      (args: unknown[]) => args[0] === "messages"
     );
     // Antes da correção: 3 chamadas (uma por candidata)
     // Depois da correção: 1 chamada (batch com .in())
@@ -123,7 +130,7 @@ describe("getConversationsEligibleForEnrollment — eliminação N+1", () => {
     const result = await getConversationsEligibleForEnrollment(client as any, BASE_FLOW);
 
     const messagesCalls = (client.from as ReturnType<typeof vi.fn>).mock.calls.filter(
-      ([table]: [string]) => table === "messages"
+      (args: unknown[]) => args[0] === "messages"
     );
     expect(messagesCalls).toHaveLength(0);
     expect(result).toEqual([]);
@@ -142,7 +149,7 @@ describe("getConversationsEligibleForEnrollment — eliminação N+1", () => {
     const result = await getConversationsEligibleForEnrollment(client as any, BASE_FLOW);
 
     const messagesCalls = (client.from as ReturnType<typeof vi.fn>).mock.calls.filter(
-      ([table]: [string]) => table === "messages"
+      (args: unknown[]) => args[0] === "messages"
     );
     expect(messagesCalls).toHaveLength(0);
     expect(result).toEqual([]);

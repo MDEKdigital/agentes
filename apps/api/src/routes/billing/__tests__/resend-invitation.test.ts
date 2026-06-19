@@ -15,8 +15,8 @@ const {
   mockFindInvitationByEmailForResend: vi.fn(),
   mockRenewInvitationExpiry: vi.fn(),
   mockSendWelcomeEmailApi: vi.fn(),
-  mockAuthMiddleware: vi.fn(async () => {}),
-  mockRequireOrg: vi.fn(async () => {}),
+  mockAuthMiddleware: vi.fn(async (_request: any) => {}),
+  mockRequireOrg: vi.fn(async (_request: any) => {}),
   mockCreateAuditLog: vi.fn(),
 }));
 

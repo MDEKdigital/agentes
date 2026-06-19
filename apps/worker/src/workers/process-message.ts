@@ -169,9 +169,14 @@ export function startProcessMessageWorker() {
 
         // Fix #9: Parallelize agent + conversation fetch
         const [agent, conversation] = (await Promise.all([
-          getAgentById(db, agentId),
+          getAgentById(db, agentId, organizationId),
           getConversationById(db, conversationId, organizationId),
         ])) as [Awaited<ReturnType<typeof getAgentById>>, ConversationRow];
+
+        if (!agent) {
+          console.log(`Agent ${agentId} not found in org ${organizationId}, skipping`);
+          return;
+        }
 
         if (!agent.is_active) {
           console.log(`Agent ${agentId} is inactive, skipping`);

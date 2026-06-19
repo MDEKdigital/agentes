@@ -66,7 +66,7 @@ describe("checkResourceLimit — 3 queries sequenciais → 2 paralelas", () => {
     await checkResourceLimit(client as any, ORG_ID, "agents");
 
     const plansCalls = (client.from as ReturnType<typeof vi.fn>).mock.calls.filter(
-      ([table]: [string]) => table === "plans"
+      (args: unknown[]) => args[0] === "plans"
     );
     // Antes: from("plans") era chamado explicitamente (query 2 de 3)
     // Depois: plans vêm embutidos na query de subscriptions
@@ -79,7 +79,7 @@ describe("checkResourceLimit — 3 queries sequenciais → 2 paralelas", () => {
     await checkResourceLimit(client as any, ORG_ID, "agents");
 
     const subsCalls = (client.from as ReturnType<typeof vi.fn>).mock.calls.filter(
-      ([table]: [string]) => table === "subscriptions"
+      (args: unknown[]) => args[0] === "subscriptions"
     );
     expect(subsCalls).toHaveLength(1);
   });
@@ -144,7 +144,7 @@ describe("getOrgPlanLimits — JOIN subscriptions+plans em 1 query", () => {
     await getOrgPlanLimits(client as any, ORG_ID);
 
     const plansCalls = (client.from as ReturnType<typeof vi.fn>).mock.calls.filter(
-      ([table]: [string]) => table === "plans"
+      (args: unknown[]) => args[0] === "plans"
     );
     expect(plansCalls).toHaveLength(0);
   });

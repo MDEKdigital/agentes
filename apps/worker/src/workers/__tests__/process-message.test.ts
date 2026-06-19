@@ -391,7 +391,7 @@ describe("audit logs — process-message", () => {
     await runJob();
 
     const keywordCalls = mockCreateAuditLog.mock.calls.filter(
-      ([, params]: [unknown, { action: string }]) => params.action === "conversation.keyword_activated"
+      (args: unknown[]) => (args[1] as { action: string })?.action === "conversation.keyword_activated"
     );
     expect(keywordCalls).toHaveLength(0);
   });
@@ -430,7 +430,7 @@ describe("audit logs — process-message", () => {
     await runJob();
 
     const resolvedCalls = mockCreateAuditLog.mock.calls.filter(
-      ([, params]: [unknown, { action: string }]) => params.action === "conversation.resolved"
+      (args: unknown[]) => (args[1] as { action: string })?.action === "conversation.resolved"
     );
     expect(resolvedCalls).toHaveLength(0);
   });
