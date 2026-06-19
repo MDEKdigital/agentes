@@ -29,6 +29,7 @@ if (missing.length > 0) {
   process.exit(1);
 }
 import cors from "@fastify/cors";
+import { parseAllowedOrigins, isOriginAllowed } from "./lib/cors";
 import evolutionWebhookRoutes from "./routes/webhooks/evolution";
 import messageSendRoutes from "./routes/messages/send";
 import instanceRoutes from "./routes/instances/index";
@@ -65,8 +66,15 @@ server.addContentTypeParser(
 );
 
 // Plugins
+const allowedOrigins = parseAllowedOrigins(process.env.ALLOWED_ORIGINS);
 server.register(cors, {
-  origin: true,
+  origin: (origin, callback) => {
+    if (isOriginAllowed(origin, allowedOrigins)) {
+      callback(null, true);
+    } else {
+      callback(new Error(`Origin '${origin}' not allowed by CORS`), false);
+    }
+  },
   methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
 });
 
