@@ -185,7 +185,8 @@ describe("startProcessMessageWorker", () => {
     expect(updateConversation).toHaveBeenCalledWith(
       expect.anything(),
       "conv-1",
-      expect.objectContaining({ status: "waiting" })
+      expect.objectContaining({ status: "waiting" }),
+      "org-1"
     );
   });
 
@@ -203,7 +204,8 @@ describe("startProcessMessageWorker", () => {
     expect(updateConversation).toHaveBeenCalledWith(
       expect.anything(),
       "conv-1",
-      expect.objectContaining({ status: "resolved" })
+      expect.objectContaining({ status: "resolved" }),
+      "org-1"
     );
   });
 });
@@ -264,7 +266,8 @@ describe("keyword gate", () => {
     expect(updateConversation).toHaveBeenCalledWith(
       expect.anything(),
       "conv-1",
-      expect.objectContaining({ is_keyword_activated: true })
+      expect.objectContaining({ is_keyword_activated: true }),
+      "org-1"
     );
     expect(createMessage).toHaveBeenCalled();
   });
@@ -338,7 +341,8 @@ describe("keyword gate", () => {
     expect(updateConversation).toHaveBeenCalledWith(
       expect.anything(),
       "conv-1",
-      expect.objectContaining({ is_keyword_activated: true })
+      expect.objectContaining({ is_keyword_activated: true }),
+      "org-1"
     );
   });
 });

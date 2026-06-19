@@ -51,12 +51,14 @@ export async function findReopenableConversation(
 
 export async function reopenConversation(
   client: SupabaseClient,
-  id: string
+  id: string,
+  organizationId: string
 ): Promise<Conversation> {
   const { data, error } = await client
     .from("conversations")
     .update({ status: "open" })
     .eq("id", id)
+    .eq("organization_id", organizationId)
     .eq("status", "resolved")
     .select()
     .maybeSingle();
@@ -82,12 +84,14 @@ export async function createConversation(
 export async function updateConversation(
   client: SupabaseClient,
   id: string,
-  updates: Partial<Conversation>
+  updates: Partial<Conversation>,
+  organizationId: string
 ) {
   const { data, error } = await client
     .from("conversations")
     .update(updates)
     .eq("id", id)
+    .eq("organization_id", organizationId)
     .select()
     .single();
   if (error) throw error;

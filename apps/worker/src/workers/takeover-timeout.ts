@@ -17,7 +17,7 @@ export function startTakeoverTimeoutWorker() {
           await updateConversation(db, conversation.id, {
             is_human_takeover: false,
             human_takeover_at: null,
-          });
+          }, conversation.organization_id);
           console.log(`Auto-released takeover for conversation ${conversation.id}`);
         } catch (err) {
           console.error(`Failed to release takeover for conversation ${conversation.id}:`, err);

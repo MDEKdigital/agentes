@@ -69,7 +69,7 @@ describe("ensureConversation", () => {
 
     const result = await ensureConversation(baseParams);
 
-    expect(mockReopenConversation).toHaveBeenCalledWith(expect.anything(), "conv-resolved");
+    expect(mockReopenConversation).toHaveBeenCalledWith(expect.anything(), "conv-resolved", "org-1");
     expect(result.conversation).toEqual(reopenedConv);
     expect(result.isNew).toBe(false);
     expect(mockCreateConversation).not.toHaveBeenCalled();

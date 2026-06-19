@@ -47,7 +47,7 @@ export async function saveMessage(params: SaveMessageParams) {
   // Update conversation last_message_at
   await updateConversation(db, params.conversationId, {
     last_message_at: new Date().toISOString(),
-  });
+  }, params.organizationId);
 
   return message;
 }

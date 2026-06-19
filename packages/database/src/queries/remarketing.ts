@@ -153,19 +153,22 @@ export async function getStepById(
 export async function cancelEnrollment(
   client: SupabaseClient,
   enrollmentId: string,
-  reason: string
+  reason: string,
+  organizationId: string
 ): Promise<void> {
   const { error } = await client
     .from("remarketing_enrollments")
     .update({ status: "cancelled", cancel_reason: reason })
-    .eq("id", enrollmentId);
+    .eq("id", enrollmentId)
+    .eq("organization_id", organizationId);
   if (error) throw error;
 }
 
 export async function advanceEnrollment(
   client: SupabaseClient,
   enrollmentId: string,
-  nextStepId: string | null
+  nextStepId: string | null,
+  organizationId: string
 ): Promise<void> {
   const { error } = await client
     .from("remarketing_enrollments")
@@ -174,7 +177,8 @@ export async function advanceEnrollment(
       last_step_sent_at: new Date().toISOString(),
       status: nextStepId === null ? "completed" : "active",
     })
-    .eq("id", enrollmentId);
+    .eq("id", enrollmentId)
+    .eq("organization_id", organizationId);
   if (error) throw error;
 }
 
@@ -243,12 +247,14 @@ export async function isConversationResolved(
 export async function returnConversationToAgent(
   client: SupabaseClient,
   conversationId: string,
-  agentId: string
+  agentId: string,
+  organizationId: string
 ): Promise<void> {
   const { error } = await client
     .from("conversations")
     .update({ agent_id: agentId, status: "open" })
-    .eq("id", conversationId);
+    .eq("id", conversationId)
+    .eq("organization_id", organizationId);
   if (error) throw error;
 }
 

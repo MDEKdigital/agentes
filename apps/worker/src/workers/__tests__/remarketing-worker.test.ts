@@ -315,7 +315,7 @@ describe("processRemarketingCycle — eliminação N+1", () => {
 
     await processRemarketingCycle();
 
-    expect(mockCancelEnrollment).toHaveBeenCalledWith(expect.anything(), "enr-resolved", "resolved");
+    expect(mockCancelEnrollment).toHaveBeenCalledWith(expect.anything(), "enr-resolved", "resolved", "org-1");
     expect(mockUpdateFlowLastExecuted).not.toHaveBeenCalled();
   });
 });

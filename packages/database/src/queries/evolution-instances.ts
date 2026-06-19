@@ -47,12 +47,14 @@ export async function createInstance(
 export async function updateInstance(
   client: SupabaseClient,
   id: string,
-  updates: Partial<EvolutionInstance>
+  updates: Partial<EvolutionInstance>,
+  organizationId: string
 ) {
   const { data, error } = await client
     .from("evolution_instances")
     .update(updates)
     .eq("id", id)
+    .eq("organization_id", organizationId)
     .select()
     .single();
   if (error) throw error;

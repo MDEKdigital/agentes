@@ -151,7 +151,7 @@ export default async function instanceRoutes(app: FastifyInstance) {
         await updateInstance(db, instance.id, {
           status: newStatus,
           phone_number: phoneNumber || instance.phone_number,
-        });
+        }, instance.organization_id);
       }
 
       return { ...instance, status: newStatus, phone_number: phoneNumber || instance.phone_number, live: status };
@@ -192,7 +192,7 @@ export default async function instanceRoutes(app: FastifyInstance) {
 
         // Persist phone_number if not set yet
         if (!instance.phone_number && phoneNumber) {
-          await updateInstance(db, instance.id, { phone_number: phoneNumber });
+          await updateInstance(db, instance.id, { phone_number: phoneNumber }, instance.organization_id);
         }
 
         let bioText: string | null = null;
@@ -323,7 +323,7 @@ export default async function instanceRoutes(app: FastifyInstance) {
         return reply.status(400).send({ error: parseResult.error.issues });
       }
 
-      const updated = await updateInstance(db, instance.id, parseResult.data);
+      const updated = await updateInstance(db, instance.id, parseResult.data, instance.organization_id);
       return updated;
     }
   );
@@ -503,7 +503,7 @@ export default async function instanceRoutes(app: FastifyInstance) {
       } catch (err) {
         request.log.warn({ err }, "logoutInstance failed on Evolution API");
       }
-      await updateInstance(db, instance.id, { status: "disconnected" });
+      await updateInstance(db, instance.id, { status: "disconnected" }, instance.organization_id);
 
       return { ok: true };
     }

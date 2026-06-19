@@ -273,7 +273,7 @@ export function startProcessMessageWorker() {
             await updateConversation(db, conversationId, {
               awaiting_activation_confirmation: true,
               last_message_at: new Date().toISOString(),
-            });
+            }, organizationId);
             const sendQueue = getSendMessageQueue();
             await sendQueue.add("send-message", {
               conversationId,
@@ -296,7 +296,7 @@ export function startProcessMessageWorker() {
           await updateConversation(db, conversationId, {
             is_keyword_activated: true,
             awaiting_activation_confirmation: false,
-          });
+          }, organizationId);
         }
 
         const result = await runAgent({
@@ -330,7 +330,7 @@ export function startProcessMessageWorker() {
           last_message_at: new Date().toISOString(),
           status: wasResolved ? "resolved" : "waiting",
           // is_keyword_activated already committed above when needed
-        });
+        }, organizationId);
 
         const sendQueue = getSendMessageQueue();
         await sendQueue.add("send-message", {

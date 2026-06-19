@@ -93,7 +93,7 @@ export async function processRemarketingCycle() {
 
       const step = stepMap.get(enrollment.next_step_id);
       if (!step) {
-        await cancelEnrollment(db, enrollment.id, "step_not_found");
+        await cancelEnrollment(db, enrollment.id, "step_not_found", enrollment.organization_id);
         continue;
       }
 
@@ -110,7 +110,7 @@ export async function processRemarketingCycle() {
 
       const resolved = await isConversationResolved(db, enrollment.conversation_id);
       if (resolved) {
-        await cancelEnrollment(db, enrollment.id, "resolved");
+        await cancelEnrollment(db, enrollment.id, "resolved", enrollment.organization_id);
         console.log(`[remarketing] Cancelled enrollment ${enrollment.id}: conversation resolved`);
         continue;
       }
@@ -122,9 +122,9 @@ export async function processRemarketingCycle() {
           enrollment.enrolled_at
         );
         if (replied) {
-          await cancelEnrollment(db, enrollment.id, "reply");
+          await cancelEnrollment(db, enrollment.id, "reply", enrollment.organization_id);
           if (flow.agent_id) {
-            await returnConversationToAgent(db, enrollment.conversation_id, flow.agent_id);
+            await returnConversationToAgent(db, enrollment.conversation_id, flow.agent_id, enrollment.organization_id);
           }
           console.log(`[remarketing] Cancelled enrollment ${enrollment.id}: client replied`);
           continue;
@@ -134,7 +134,7 @@ export async function processRemarketingCycle() {
       if (flow?.cancel_on_opt_out) {
         const lastMsg = await getLastContactMessage(db, enrollment.conversation_id);
         if (lastMsg && isOptOutMessage(lastMsg.content)) {
-          await cancelEnrollment(db, enrollment.id, "opt_out");
+          await cancelEnrollment(db, enrollment.id, "opt_out", enrollment.organization_id);
           console.log(`[remarketing] Cancelled enrollment ${enrollment.id}: opt-out detected`);
           continue;
         }
@@ -192,7 +192,7 @@ export async function processRemarketingCycle() {
 
       // ── Avançar para próxima etapa ─────────────────────────────────────────
       const nextStep = await getNextActiveStep(db, enrollment.flow_id, step.step_order);
-      await advanceEnrollment(db, enrollment.id, nextStep?.id ?? null);
+      await advanceEnrollment(db, enrollment.id, nextStep?.id ?? null, enrollment.organization_id);
 
       // Registrar flow e menor delay observado para next_check_at
       processedFlowIds.add(enrollment.flow_id);

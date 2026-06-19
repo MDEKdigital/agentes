@@ -32,7 +32,7 @@ export async function ensureConversation(params: EnsureConversationParams) {
 
   if (existing) {
     if (existing.status === "resolved") {
-      const reopened = await reopenConversation(db, existing.id);
+      const reopened = await reopenConversation(db, existing.id, params.organizationId);
       return { conversation: reopened, contact, isNew: false };
     }
     return { conversation: existing, contact, isNew: false };
@@ -57,10 +57,10 @@ export async function ensureConversation(params: EnsureConversationParams) {
   return { conversation, contact, isNew: true };
 }
 
-export async function setHumanTakeover(conversationId: string, takeover: boolean) {
+export async function setHumanTakeover(conversationId: string, organizationId: string, takeover: boolean) {
   const db = getAdminClient();
   return updateConversation(db, conversationId, {
     is_human_takeover: takeover,
     human_takeover_at: takeover ? new Date().toISOString() : null,
-  });
+  }, organizationId);
 }
