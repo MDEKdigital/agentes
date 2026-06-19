@@ -218,6 +218,16 @@ export default async function conversationRoutes(app: FastifyInstance) {
         .eq("organization_id", conv.organization_id);
 
       if (error) return reply.status(500).send({ error: "Falha ao atualizar status da conversa" });
+
+      createAuditLog(db, {
+        organization_id: conv.organization_id,
+        user_id: request.user.id,
+        action: "conversation.status_changed",
+        entity_type: "conversation",
+        entity_id: conversationId,
+        metadata: { status },
+      }).catch((err) => request.log.error({ err }, "audit: conversation.status_changed failed"));
+
       return reply.status(204).send();
     }
   );
@@ -298,6 +308,16 @@ export default async function conversationRoutes(app: FastifyInstance) {
       if (!membership) return reply.status(403).send({ error: "Acesso negado" });
 
       await updateConversationTags(db, conversationId, conv.organization_id, tags);
+
+      createAuditLog(db, {
+        organization_id: conv.organization_id,
+        user_id: request.user.id,
+        action: "conversation.tags_updated",
+        entity_type: "conversation",
+        entity_id: conversationId,
+        metadata: { tags },
+      }).catch((err) => request.log.error({ err }, "audit: conversation.tags_updated failed"));
+
       return reply.status(204).send();
     }
   );
@@ -334,6 +354,16 @@ export default async function conversationRoutes(app: FastifyInstance) {
         .eq("organization_id", conv.organization_id);
 
       if (error) return reply.status(500).send({ error: "Falha ao atualizar atribuição" });
+
+      createAuditLog(db, {
+        organization_id: conv.organization_id,
+        user_id: request.user.id,
+        action: "conversation.assignment_changed",
+        entity_type: "conversation",
+        entity_id: conversationId,
+        metadata: { assigned_to: assignedTo },
+      }).catch((err) => request.log.error({ err }, "audit: conversation.assignment_changed failed"));
+
       return reply.status(204).send();
     }
   );
@@ -364,6 +394,15 @@ export default async function conversationRoutes(app: FastifyInstance) {
         .eq("organization_id", conv.organization_id);
 
       if (error) return reply.status(500).send({ error: "Falha ao deletar conversa" });
+
+      createAuditLog(db, {
+        organization_id: conv.organization_id,
+        user_id: request.user.id,
+        action: "conversation.deleted",
+        entity_type: "conversation",
+        entity_id: conversationId,
+      }).catch((err) => request.log.error({ err }, "audit: conversation.deleted failed"));
+
       return reply.status(204).send();
     }
   );

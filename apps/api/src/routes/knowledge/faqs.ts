@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { createFaqSchema, updateFaqSchema } from "@aula-agente/shared";
-import { getAdminClient, getFaqsByAgent, createFaq, updateFaq, deleteFaq, getAgentById } from "@aula-agente/database";
+import { getAdminClient, getFaqsByAgent, createFaq, updateFaq, deleteFaq, getAgentById, createAuditLog } from "@aula-agente/database";
 import { authMiddleware } from "../../middleware/auth";
 
 export default async function knowledgeFaqRoutes(app: FastifyInstance) {
@@ -51,6 +51,15 @@ export default async function knowledgeFaqRoutes(app: FastifyInstance) {
         is_active: true,
       });
 
+      createAuditLog(db, {
+        organization_id: organizationId,
+        user_id: request.user.id,
+        action: "faq.created",
+        entity_type: "faq",
+        entity_id: faq.id,
+        metadata: { agent_id: parseResult.data.agent_id },
+      }).catch((err) => request.log.error({ err }, "audit: faq.created failed"));
+
       return reply.status(201).send(faq);
     }
   );
@@ -80,6 +89,15 @@ export default async function knowledgeFaqRoutes(app: FastifyInstance) {
       if (membership.role === "agent") return reply.status(403).send({ error: "Acesso de administrador necessário" });
 
       const updated = await updateFaq(db, request.params.faqId, faq.organization_id, parseResult.data);
+
+      createAuditLog(db, {
+        organization_id: faq.organization_id,
+        user_id: request.user.id,
+        action: "faq.updated",
+        entity_type: "faq",
+        entity_id: request.params.faqId,
+      }).catch((err) => request.log.error({ err }, "audit: faq.updated failed"));
+
       return updated;
     }
   );
@@ -104,6 +122,15 @@ export default async function knowledgeFaqRoutes(app: FastifyInstance) {
       if (membership.role === "agent") return reply.status(403).send({ error: "Acesso de administrador necessário" });
 
       await deleteFaq(db, request.params.faqId, faq.organization_id);
+
+      createAuditLog(db, {
+        organization_id: faq.organization_id,
+        user_id: request.user.id,
+        action: "faq.deleted",
+        entity_type: "faq",
+        entity_id: request.params.faqId,
+      }).catch((err) => request.log.error({ err }, "audit: faq.deleted failed"));
+
       return reply.status(204).send();
     }
   );

@@ -18,6 +18,12 @@ vi.mock("../../../middleware/auth", () => ({
 vi.mock("@aula-agente/database", () => ({
   getAdminClient: mockGetAdminClient,
   updateConversationTags: mockUpdateConversationTags,
+  createAuditLog: vi.fn().mockResolvedValue({}),
+  getConversationNotes: vi.fn(),
+  addConversationNote: vi.fn(),
+  getConversationById: vi.fn(),
+  getMessagesByConversation: vi.fn(),
+  getInboxConversations: vi.fn(),
 }));
 
 import conversationRoutes from "../index";

@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { getAdminClient } from "@aula-agente/database";
+import { getAdminClient, createAuditLog } from "@aula-agente/database";
 import { authMiddleware } from "../../middleware/auth";
 import { encrypt } from "../../lib/crypto";
 
@@ -61,6 +61,16 @@ export default async function secretsRoutes(app: FastifyInstance) {
       );
 
       if (error) return reply.status(500).send({ error: "Erro interno ao processar chave" });
+
+      createAuditLog(db, {
+        organization_id: organizationId,
+        user_id: request.user.id,
+        action: "secret.upserted",
+        entity_type: "secret",
+        entity_id: `${organizationId}:${provider}`,
+        metadata: { provider },
+      }).catch((err) => request.log.error({ err }, "audit: secret.upserted failed"));
+
       return reply.status(204).send();
     }
   );
@@ -85,6 +95,16 @@ export default async function secretsRoutes(app: FastifyInstance) {
         .eq("provider", provider);
 
       if (error) return reply.status(500).send({ error: "Erro interno ao processar chave" });
+
+      createAuditLog(db, {
+        organization_id: organizationId,
+        user_id: request.user.id,
+        action: "secret.deleted",
+        entity_type: "secret",
+        entity_id: `${organizationId}:${provider}`,
+        metadata: { provider },
+      }).catch((err) => request.log.error({ err }, "audit: secret.deleted failed"));
+
       return reply.status(204).send();
     }
   );

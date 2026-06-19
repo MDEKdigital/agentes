@@ -10,6 +10,7 @@ const {
   mockCreateFaq,
   mockUpdateFaq,
   mockDeleteFaq,
+  mockCreateAuditLog,
 } = vi.hoisted(() => ({
   mockAuthMiddleware: vi.fn(),
   mockGetAdminClient: vi.fn(),
@@ -18,6 +19,7 @@ const {
   mockCreateFaq: vi.fn(),
   mockUpdateFaq: vi.fn(),
   mockDeleteFaq: vi.fn(),
+  mockCreateAuditLog: vi.fn().mockResolvedValue({}),
 }));
 
 vi.mock("../../../middleware/auth", () => ({
@@ -31,6 +33,7 @@ vi.mock("@aula-agente/database", () => ({
   createFaq: mockCreateFaq,
   updateFaq: mockUpdateFaq,
   deleteFaq: mockDeleteFaq,
+  createAuditLog: mockCreateAuditLog,
 }));
 
 import knowledgeFaqRoutes from "../faqs";
@@ -90,6 +93,7 @@ beforeEach(() => {
   mockCreateFaq.mockResolvedValue(mockFaq);
   mockUpdateFaq.mockResolvedValue({ ...mockFaq, is_active: false });
   mockDeleteFaq.mockResolvedValue(undefined);
+  mockCreateAuditLog.mockResolvedValue({});
 });
 
 // ── GET /organizations/:orgId/agents/:agentId/faqs ────────────────────────────
@@ -297,5 +301,67 @@ describe("DELETE /faqs/:faqId", () => {
     });
     expect(res.statusCode).toBe(403);
     expect(mockDeleteFaq).not.toHaveBeenCalled();
+  });
+});
+
+// ── Audit logs ────────────────────────────────────────────────────────────────
+
+describe("Audit logs — faqs", () => {
+  it("faq.created é auditado ao criar FAQ", async () => {
+    const app = await buildApp("admin");
+    const res = await app.inject({
+      method: "POST",
+      url: `/organizations/${ORG_ID}/faqs`,
+      payload: { agent_id: AGENT_ID, question: "Como funciona?", answer: "Assim." },
+    });
+    expect(res.statusCode).toBe(201);
+    expect(mockCreateAuditLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        action: "faq.created",
+        entity_type: "faq",
+        organization_id: ORG_ID,
+        user_id: USER_ID,
+      })
+    );
+  });
+
+  it("faq.updated é auditado ao atualizar FAQ", async () => {
+    const app = await buildApp("admin");
+    const res = await app.inject({
+      method: "PATCH",
+      url: `/faqs/${FAQ_ID}`,
+      payload: { is_active: false },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(mockCreateAuditLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        action: "faq.updated",
+        entity_type: "faq",
+        entity_id: FAQ_ID,
+        organization_id: ORG_ID,
+        user_id: USER_ID,
+      })
+    );
+  });
+
+  it("faq.deleted é auditado ao deletar FAQ", async () => {
+    const app = await buildApp("admin");
+    const res = await app.inject({
+      method: "DELETE",
+      url: `/faqs/${FAQ_ID}`,
+    });
+    expect(res.statusCode).toBe(204);
+    expect(mockCreateAuditLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        action: "faq.deleted",
+        entity_type: "faq",
+        entity_id: FAQ_ID,
+        organization_id: ORG_ID,
+        user_id: USER_ID,
+      })
+    );
   });
 });

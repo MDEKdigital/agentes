@@ -26,6 +26,8 @@ vi.mock("@aula-agente/database", () => ({
   updateInstance: vi.fn(),
   deleteInstance: vi.fn(),
   checkResourceLimit: mockCheckResourceLimit,
+  getAgentById: vi.fn(),
+  createAuditLog: vi.fn().mockResolvedValue({}),
 }));
 
 vi.mock("../../../services/evolution.service", () => ({
