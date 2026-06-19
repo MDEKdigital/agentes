@@ -8,12 +8,14 @@ const {
   mockGetOrganizationById,
   mockIsSlugAvailableForOrg,
   mockCompleteOrganizationOnboarding,
+  mockCreateAuditLog,
 } = vi.hoisted(() => ({
   mockAuthMiddleware: vi.fn(),
   mockGetAdminClient: vi.fn(),
   mockGetOrganizationById: vi.fn(),
   mockIsSlugAvailableForOrg: vi.fn(),
   mockCompleteOrganizationOnboarding: vi.fn(),
+  mockCreateAuditLog: vi.fn(),
 }));
 
 vi.mock("../../../middleware/auth", () => ({
@@ -25,6 +27,8 @@ vi.mock("@aula-agente/database", () => ({
   getOrganizationById: mockGetOrganizationById,
   isSlugAvailableForOrg: mockIsSlugAvailableForOrg,
   completeOrganizationOnboarding: mockCompleteOrganizationOnboarding,
+  createAuditLog: mockCreateAuditLog,
+  updateOrganizationName: vi.fn(),
 }));
 
 import organizationRoutes from "../index";
@@ -69,6 +73,7 @@ beforeEach(() => {
     name: "Novo Nome",
     slug: "novo-nome",
   });
+  mockCreateAuditLog.mockResolvedValue({ id: "audit-uuid" });
 });
 
 // ── tests ─────────────────────────────────────────────────────────────────────
@@ -199,6 +204,26 @@ describe("PATCH /organizations/:organizationId/onboarding", () => {
 
     expect(res.statusCode).toBe(404);
     expect(mockCompleteOrganizationOnboarding).not.toHaveBeenCalled();
+  });
+
+  it("(audit): onboarding concluído → registra organization.onboarding_completed", async () => {
+    const app = await buildApp();
+    await app.inject({
+      method: "PATCH",
+      url: `/organizations/${ORG_ID}/onboarding`,
+      payload: { name: "Novo Nome", slug: "novo-nome" },
+    });
+
+    expect(mockCreateAuditLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        organization_id: ORG_ID,
+        user_id: USER_ID,
+        action: "organization.onboarding_completed",
+        entity_type: "organization",
+        entity_id: ORG_ID,
+      })
+    );
   });
 
   it("cenário 11: erro no banco (update) → 500", async () => {

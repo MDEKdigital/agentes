@@ -9,6 +9,7 @@ const {
   mockSendWelcomeEmailApi,
   mockAuthMiddleware,
   mockRequireOrg,
+  mockCreateAuditLog,
 } = vi.hoisted(() => ({
   mockGetAdminClient: vi.fn(),
   mockFindInvitationByEmailForResend: vi.fn(),
@@ -16,12 +17,14 @@ const {
   mockSendWelcomeEmailApi: vi.fn(),
   mockAuthMiddleware: vi.fn(async () => {}),
   mockRequireOrg: vi.fn(async () => {}),
+  mockCreateAuditLog: vi.fn(),
 }));
 
 vi.mock("@aula-agente/database", () => ({
   getAdminClient: mockGetAdminClient,
   findInvitationByEmailForResend: mockFindInvitationByEmailForResend,
   renewInvitationExpiry: mockRenewInvitationExpiry,
+  createAuditLog: mockCreateAuditLog,
 }));
 
 vi.mock("../../../middleware/auth", () => ({
@@ -79,6 +82,7 @@ beforeEach(() => {
   mockFindInvitationByEmailForResend.mockResolvedValue(mockInvitation);
   mockRenewInvitationExpiry.mockResolvedValue(mockRenewedInvitation);
   mockSendWelcomeEmailApi.mockResolvedValue(undefined);
+  mockCreateAuditLog.mockResolvedValue({ id: "audit-uuid" });
 });
 
 // ── tests ─────────────────────────────────────────────────────────────────────
@@ -195,5 +199,24 @@ describe("POST /billing/resend-invitation", () => {
     // Must NOT renew expiry or send email for a foreign org
     expect(mockRenewInvitationExpiry).not.toHaveBeenCalled();
     expect(mockSendWelcomeEmailApi).not.toHaveBeenCalled();
+  });
+
+  it("(audit): reenvio bem-sucedido → registra invitation.resent", async () => {
+    const app = await buildApp();
+    await app.inject({
+      method: "POST",
+      url: "/billing/resend-invitation",
+      payload: { email: "cliente@empresa.com" },
+    });
+
+    expect(mockCreateAuditLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        organization_id: mockInvitation.organization_id,
+        action: "invitation.resent",
+        entity_type: "invitation",
+        entity_id: mockInvitation.id,
+      })
+    );
   });
 });

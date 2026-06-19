@@ -15,6 +15,7 @@ import {
   isSlugAvailable,
   updateBillingEventStatus,
   createInvitation,
+  createAuditLog,
 } from "@aula-agente/database";
 import { sendWelcomeEmail } from "./email-service";
 
@@ -148,6 +149,22 @@ export async function handleSubscriptionActivated(
       err
     );
   }
+
+  createAuditLog(client, {
+    organization_id: orgId,
+    action: "organization.created",
+    entity_type: "organization",
+    entity_id: orgId,
+    metadata: { plan_id: planId, email: normalized.customer.email },
+  }).catch((err) => console.error("[audit] organization.created failed", err));
+
+  createAuditLog(client, {
+    organization_id: orgId,
+    action: "plan.activated",
+    entity_type: "plan",
+    entity_id: subscription.id,
+    metadata: { plan_id: planId, plan_name: planName, gateway: normalized.gateway },
+  }).catch((err) => console.error("[audit] plan.activated failed", err));
 }
 
 // ─── subscription.renewed ────────────────────────────────────────────────────
@@ -184,6 +201,14 @@ export async function handleSubscriptionRenewed(
     normalized_payload: normalized as unknown as Record<string, unknown>,
     event_type: "subscription.renewed",
   });
+
+  createAuditLog(client, {
+    organization_id: subscription.organization_id,
+    action: "plan.renewed",
+    entity_type: "plan",
+    entity_id: subscription.id,
+    metadata: { gateway: normalized.gateway },
+  }).catch((err) => console.error("[audit] plan.renewed failed", err));
 }
 
 // ─── subscription.cancelled ──────────────────────────────────────────────────
@@ -224,6 +249,14 @@ export async function handleSubscriptionCancelled(
     normalized_payload: normalized as unknown as Record<string, unknown>,
     event_type: "subscription.cancelled",
   });
+
+  createAuditLog(client, {
+    organization_id: subscription.organization_id,
+    action: "plan.cancelled",
+    entity_type: "plan",
+    entity_id: subscription.id,
+    metadata: { gateway: normalized.gateway },
+  }).catch((err) => console.error("[audit] plan.cancelled failed", err));
 }
 
 // ─── subscription.past_due ───────────────────────────────────────────────────
@@ -258,4 +291,12 @@ export async function handleSubscriptionPastDue(
     processed_at: new Date().toISOString(),
     event_type: "subscription.past_due",
   });
+
+  createAuditLog(client, {
+    organization_id: subscription.organization_id,
+    action: "plan.past_due",
+    entity_type: "plan",
+    entity_id: subscription.id,
+    metadata: { gateway: normalized.gateway },
+  }).catch((err) => console.error("[audit] plan.past_due failed", err));
 }

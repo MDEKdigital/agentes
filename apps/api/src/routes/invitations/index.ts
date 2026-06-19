@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { getAdminClient, createInvitation, checkResourceLimit, getOrgInvitations } from "@aula-agente/database";
+import { getAdminClient, createInvitation, checkResourceLimit, getOrgInvitations, createAuditLog } from "@aula-agente/database";
 import { authMiddleware } from "../../middleware/auth";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -72,6 +72,15 @@ export default async function invitationRoutes(app: FastifyInstance) {
         role: role as InvitationRole,
         invited_by: request.user.id,
       });
+
+      createAuditLog(db, {
+        organization_id: organizationId,
+        user_id: request.user.id,
+        action: "invitation.sent",
+        entity_type: "invitation",
+        entity_id: invitation.id,
+        metadata: { email, role },
+      }).catch((err) => request.log.error({ err }, "audit: invitation.sent failed"));
 
       return reply.status(201).send(invitation);
     }

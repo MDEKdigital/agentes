@@ -3,6 +3,7 @@ import {
   getAdminClient,
   findInvitationByEmailForResend,
   renewInvitationExpiry,
+  createAuditLog,
 } from "@aula-agente/database";
 import { authMiddleware } from "../../middleware/auth";
 import { sendWelcomeEmailApi } from "../../lib/email";
@@ -64,6 +65,15 @@ export default async function resendInvitationRoute(app: FastifyInstance) {
     } catch (err) {
       request.log.error({ err }, "resend-invitation: email send failed (non-fatal)");
     }
+
+    createAuditLog(db, {
+      organization_id: invitation.organization_id,
+      user_id: request.user?.id ?? null,
+      action: "invitation.resent",
+      entity_type: "invitation",
+      entity_id: invitation.id,
+      metadata: { email },
+    }).catch((err) => request.log.error({ err }, "audit: invitation.resent failed"));
 
     return reply.send({ message: NEUTRAL_MSG });
   });

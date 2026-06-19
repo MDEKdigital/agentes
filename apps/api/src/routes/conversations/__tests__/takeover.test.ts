@@ -5,10 +5,12 @@ const {
   mockAuthMiddleware,
   mockGetAdminClient,
   mockDbFrom,
+  mockCreateAuditLog,
 } = vi.hoisted(() => ({
   mockAuthMiddleware: vi.fn(),
   mockGetAdminClient: vi.fn(),
   mockDbFrom: vi.fn(),
+  mockCreateAuditLog: vi.fn(),
 }));
 
 vi.mock("../../../middleware/auth", () => ({
@@ -17,6 +19,7 @@ vi.mock("../../../middleware/auth", () => ({
 
 vi.mock("@aula-agente/database", () => ({
   getAdminClient: mockGetAdminClient,
+  createAuditLog: mockCreateAuditLog,
 }));
 
 import conversationRoutes from "../index";
@@ -70,6 +73,7 @@ async function buildApp(role = "member", userId = USER_ID) {
 beforeEach(() => {
   vi.clearAllMocks();
   mockGetAdminClient.mockReturnValue(makeDb());
+  mockCreateAuditLog.mockResolvedValue({ id: "audit-uuid" });
 });
 
 // ── PATCH /conversations/:id/takeover ────────────────────────────────────────
@@ -115,6 +119,46 @@ describe("PATCH /conversations/:conversationId/takeover", () => {
       payload: { takeover: true },
     });
     expect(res.statusCode).toBe(403);
+  });
+
+  it("(audit): ativa takeover → registra conversation.takeover_started", async () => {
+    const app = await buildApp();
+    await app.inject({
+      method: "PATCH",
+      url: `/conversations/${CONV_ID}/takeover`,
+      payload: { takeover: true },
+    });
+
+    expect(mockCreateAuditLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        organization_id: ORG_ID,
+        user_id: USER_ID,
+        action: "conversation.takeover_started",
+        entity_type: "conversation",
+        entity_id: CONV_ID,
+      })
+    );
+  });
+
+  it("(audit): desativa takeover → registra conversation.takeover_ended", async () => {
+    const app = await buildApp();
+    await app.inject({
+      method: "PATCH",
+      url: `/conversations/${CONV_ID}/takeover`,
+      payload: { takeover: false },
+    });
+
+    expect(mockCreateAuditLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        organization_id: ORG_ID,
+        user_id: USER_ID,
+        action: "conversation.takeover_ended",
+        entity_type: "conversation",
+        entity_id: CONV_ID,
+      })
+    );
   });
 
   it("body inválido (sem takeover) → 400", async () => {

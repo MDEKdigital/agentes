@@ -15,6 +15,7 @@ const {
   mockCreateInvitation,
   mockSendWelcomeEmail,
   mockGetAdminClient,
+  mockCreateAuditLog,
 } = vi.hoisted(() => ({
   mockGetPlanByGatewayProduct: vi.fn(),
   mockGetPlanBySlug: vi.fn(),
@@ -29,6 +30,7 @@ const {
   mockCreateInvitation: vi.fn(),
   mockSendWelcomeEmail: vi.fn(),
   mockGetAdminClient: vi.fn(() => ({})),
+  mockCreateAuditLog: vi.fn(),
 }));
 
 vi.mock("@aula-agente/database", () => ({
@@ -44,6 +46,7 @@ vi.mock("@aula-agente/database", () => ({
   isSlugAvailable: mockIsSlugAvailable,
   updateBillingEventStatus: mockUpdateBillingEventStatus,
   createInvitation: mockCreateInvitation,
+  createAuditLog: mockCreateAuditLog,
 }));
 
 vi.mock("../email-service", () => ({
@@ -93,6 +96,7 @@ beforeEach(() => {
   mockCreateSubscription.mockResolvedValue({ id: "sub-uuid", organization_id: "org-uuid" });
   mockUpdateBillingEventStatus.mockResolvedValue(undefined);
   mockSendWelcomeEmail.mockResolvedValue(undefined);
+  mockCreateAuditLog.mockResolvedValue({ id: "audit-uuid" });
 });
 
 // ─── handleSubscriptionActivated ─────────────────────────────────────────────
@@ -315,6 +319,85 @@ describe("handleSubscriptionPastDue", () => {
       "be-4",
       "processed",
       expect.objectContaining({ event_type: "subscription.past_due" })
+    );
+  });
+});
+
+// ─── audit log assertions ─────────────────────────────────────────────────────
+
+describe("audit logs no worker", () => {
+  const normalized = makeNormalized();
+
+  it("(audit): handleSubscriptionActivated → registra organization.created", async () => {
+    await handleSubscriptionActivated(CLIENT, "be-audit", normalized);
+    expect(mockCreateAuditLog).toHaveBeenCalledWith(
+      CLIENT,
+      expect.objectContaining({
+        action: "organization.created",
+        entity_type: "organization",
+        entity_id: "org-uuid",
+      })
+    );
+  });
+
+  it("(audit): handleSubscriptionActivated → registra plan.activated", async () => {
+    await handleSubscriptionActivated(CLIENT, "be-audit", normalized);
+    expect(mockCreateAuditLog).toHaveBeenCalledWith(
+      CLIENT,
+      expect.objectContaining({
+        action: "plan.activated",
+        entity_type: "plan",
+        entity_id: "sub-uuid",
+      })
+    );
+  });
+
+  it("(audit): handleSubscriptionRenewed → registra plan.renewed", async () => {
+    const sub = { id: "sub-uuid", organization_id: "org-uuid" };
+    mockFindSubscriptionByGatewayId.mockResolvedValue(sub);
+    mockUpdateSubscriptionStatus.mockResolvedValue(undefined);
+    await handleSubscriptionRenewed(CLIENT, "be-audit", normalized);
+    expect(mockCreateAuditLog).toHaveBeenCalledWith(
+      CLIENT,
+      expect.objectContaining({
+        action: "plan.renewed",
+        entity_type: "plan",
+        entity_id: "sub-uuid",
+        organization_id: "org-uuid",
+      })
+    );
+  });
+
+  it("(audit): handleSubscriptionCancelled → registra plan.cancelled", async () => {
+    const sub = { id: "sub-uuid", organization_id: "org-uuid" };
+    mockFindSubscriptionByGatewayId.mockResolvedValue(sub);
+    mockUpdateSubscriptionStatus.mockResolvedValue(undefined);
+    mockUpdateOrganizationOnboardingStatus.mockResolvedValue(undefined);
+    await handleSubscriptionCancelled(CLIENT, "be-audit", normalized);
+    expect(mockCreateAuditLog).toHaveBeenCalledWith(
+      CLIENT,
+      expect.objectContaining({
+        action: "plan.cancelled",
+        entity_type: "plan",
+        entity_id: "sub-uuid",
+        organization_id: "org-uuid",
+      })
+    );
+  });
+
+  it("(audit): handleSubscriptionPastDue → registra plan.past_due", async () => {
+    const sub = { id: "sub-uuid", organization_id: "org-uuid" };
+    mockFindSubscriptionByGatewayId.mockResolvedValue(sub);
+    mockUpdateSubscriptionStatus.mockResolvedValue(undefined);
+    await handleSubscriptionPastDue(CLIENT, "be-audit", normalized);
+    expect(mockCreateAuditLog).toHaveBeenCalledWith(
+      CLIENT,
+      expect.objectContaining({
+        action: "plan.past_due",
+        entity_type: "plan",
+        entity_id: "sub-uuid",
+        organization_id: "org-uuid",
+      })
     );
   });
 });

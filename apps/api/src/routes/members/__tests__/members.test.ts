@@ -9,6 +9,7 @@ const {
   mockGetMemberById,
   mockUpdateMemberRole,
   mockRemoveMember,
+  mockCreateAuditLog,
 } = vi.hoisted(() => ({
   mockAuthMiddleware: vi.fn(),
   mockGetAdminClient: vi.fn(() => ({})),
@@ -16,6 +17,7 @@ const {
   mockGetMemberById: vi.fn(),
   mockUpdateMemberRole: vi.fn(),
   mockRemoveMember: vi.fn(),
+  mockCreateAuditLog: vi.fn(),
 }));
 
 vi.mock("../../../middleware/auth", () => ({
@@ -28,6 +30,7 @@ vi.mock("@aula-agente/database", () => ({
   getMemberById: mockGetMemberById,
   updateMemberRole: mockUpdateMemberRole,
   removeMember: mockRemoveMember,
+  createAuditLog: mockCreateAuditLog,
 }));
 
 import membersRoutes from "../index";
@@ -77,6 +80,7 @@ beforeEach(() => {
   mockGetMemberById.mockResolvedValue(mockAgentMember);
   mockUpdateMemberRole.mockResolvedValue({ ...mockAgentMember, role: "admin" });
   mockRemoveMember.mockResolvedValue(undefined);
+  mockCreateAuditLog.mockResolvedValue({ id: "audit-uuid" });
 });
 
 // ── tests: GET /members ───────────────────────────────────────────────────────
@@ -239,6 +243,26 @@ describe("PATCH /organizations/:organizationId/members/:memberId", () => {
     expect(mockUpdateMemberRole).not.toHaveBeenCalled();
   });
 
+  it("(audit): altera role com sucesso → registra member.role_changed", async () => {
+    const app = await buildApp("owner");
+    await app.inject({
+      method: "PATCH",
+      url: `/organizations/${ORG_ID}/members/${MEMBER_ID}`,
+      payload: { role: "admin" },
+    });
+
+    expect(mockCreateAuditLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        organization_id: ORG_ID,
+        user_id: USER_ID,
+        action: "member.role_changed",
+        entity_type: "member",
+        entity_id: MEMBER_ID,
+      })
+    );
+  });
+
   it("cenário 6: owner tenta alterar o próprio role → 403 sem alterar", async () => {
     // Target tem user_id igual ao actor — self-modification deve ser bloqueada
     mockGetMemberById.mockResolvedValue({
@@ -308,6 +332,25 @@ describe("DELETE /organizations/:organizationId/members/:memberId", () => {
 
     expect(res.statusCode).toBe(404);
     expect(mockRemoveMember).not.toHaveBeenCalled();
+  });
+
+  it("(audit): remove membro com sucesso → registra member.removed", async () => {
+    const app = await buildApp("owner");
+    await app.inject({
+      method: "DELETE",
+      url: `/organizations/${ORG_ID}/members/${MEMBER_ID}`,
+    });
+
+    expect(mockCreateAuditLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        organization_id: ORG_ID,
+        user_id: USER_ID,
+        action: "member.removed",
+        entity_type: "member",
+        entity_id: MEMBER_ID,
+      })
+    );
   });
 
   it("cenário 5: owner tenta remover a própria membership → 403 sem remover", async () => {

@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { getAdminClient, getConversationNotes, addConversationNote, updateConversationTags, getConversationById, getMessagesByConversation, getInboxConversations } from "@aula-agente/database";
+import { getAdminClient, getConversationNotes, addConversationNote, updateConversationTags, getConversationById, getMessagesByConversation, getInboxConversations, createAuditLog } from "@aula-agente/database";
 import { authMiddleware } from "../../middleware/auth";
 
 const STATUS_SCHEMA = {
@@ -240,6 +240,16 @@ export default async function conversationRoutes(app: FastifyInstance) {
         .eq("organization_id", conv.organization_id);
 
       if (error) return reply.status(500).send({ error: "Falha ao atualizar takeover" });
+
+      createAuditLog(db, {
+        organization_id: conv.organization_id,
+        user_id: request.user.id,
+        action: takeover ? "conversation.takeover_started" : "conversation.takeover_ended",
+        entity_type: "conversation",
+        entity_id: conversationId,
+        metadata: { takeover },
+      }).catch((err) => request.log.error({ err }, "audit: conversation.takeover failed"));
+
       return reply.status(204).send();
     }
   );

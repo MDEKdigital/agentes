@@ -6,6 +6,7 @@ import {
   isSlugAvailableForOrg,
   completeOrganizationOnboarding,
   updateOrganizationName,
+  createAuditLog,
 } from "@aula-agente/database";
 import { authMiddleware } from "../../middleware/auth";
 import { deleteInstance } from "../../services/evolution.service";
@@ -69,6 +70,16 @@ export default async function organizationRoutes(app: FastifyInstance) {
 
       try {
         const updated = await completeOrganizationOnboarding(db, organizationId, name, slug);
+
+        createAuditLog(db, {
+          organization_id: organizationId,
+          user_id: request.user.id,
+          action: "organization.onboarding_completed",
+          entity_type: "organization",
+          entity_id: organizationId,
+          metadata: { name, slug },
+        }).catch((err) => request.log.error({ err }, "audit: organization.onboarding_completed failed"));
+
         return reply.send(updated);
       } catch (err) {
         request.log.error({ err }, "onboarding: db error updating org");
@@ -97,6 +108,16 @@ export default async function organizationRoutes(app: FastifyInstance) {
 
       const db = getAdminClient();
       const org = await updateOrganizationName(db, organizationId, name);
+
+      createAuditLog(db, {
+        organization_id: organizationId,
+        user_id: request.user.id,
+        action: "organization.updated",
+        entity_type: "organization",
+        entity_id: organizationId,
+        metadata: { name },
+      }).catch((err) => request.log.error({ err }, "audit: organization.updated failed"));
+
       return reply.send(org);
     }
   );
@@ -140,6 +161,14 @@ export default async function organizationRoutes(app: FastifyInstance) {
         request.log.error({ error }, "Falha ao excluir organização");
         return reply.status(500).send({ error: "Erro ao excluir organização" });
       }
+
+      createAuditLog(db, {
+        organization_id: organizationId,
+        user_id: request.user.id,
+        action: "organization.deleted",
+        entity_type: "organization",
+        entity_id: organizationId,
+      }).catch((err) => request.log.error({ err }, "audit: organization.deleted failed"));
 
       return reply.status(204).send();
     }

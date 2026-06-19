@@ -11,6 +11,8 @@ const {
   mockGetAgentById,
   mockUpdateAgent,
   mockDeleteAgent,
+  mockCreateAuditLog,
+  mockResetAgentConversationsKeywordActivation,
 } = vi.hoisted(() => ({
   mockAuthMiddleware: vi.fn(),
   mockGetAdminClient: vi.fn(() => ({})),
@@ -20,6 +22,8 @@ const {
   mockGetAgentById: vi.fn(),
   mockUpdateAgent: vi.fn(),
   mockDeleteAgent: vi.fn(),
+  mockCreateAuditLog: vi.fn(),
+  mockResetAgentConversationsKeywordActivation: vi.fn(),
 }));
 
 vi.mock("../../../middleware/auth", () => ({
@@ -34,6 +38,8 @@ vi.mock("@aula-agente/database", () => ({
   getAgentById: mockGetAgentById,
   updateAgent: mockUpdateAgent,
   deleteAgent: mockDeleteAgent,
+  createAuditLog: mockCreateAuditLog,
+  resetAgentConversationsKeywordActivation: mockResetAgentConversationsKeywordActivation,
 }));
 
 import agentRoutes from "../index";
@@ -90,6 +96,8 @@ beforeEach(() => {
   mockGetAgentById.mockResolvedValue(mockCreatedAgent);
   mockUpdateAgent.mockResolvedValue({ ...mockCreatedAgent, name: "Atualizado" });
   mockDeleteAgent.mockResolvedValue(undefined);
+  mockCreateAuditLog.mockResolvedValue({ id: "audit-uuid" });
+  mockResetAgentConversationsKeywordActivation.mockResolvedValue(undefined);
 });
 
 // ── tests ─────────────────────────────────────────────────────────────────────
@@ -179,6 +187,26 @@ describe("POST /organizations/:organizationId/agents", () => {
       expect.anything(),
       ORG_ID,
       "agents"
+    );
+  });
+
+  it("cenário 7 (audit): cria agente com sucesso → registra agent.created no audit log", async () => {
+    const app = await buildApp();
+    await app.inject({
+      method: "POST",
+      url: `/organizations/${ORG_ID}/agents`,
+      payload: validAgentBody,
+    });
+
+    expect(mockCreateAuditLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        organization_id: ORG_ID,
+        user_id: USER_ID,
+        action: "agent.created",
+        entity_type: "agent",
+        entity_id: mockCreatedAgent.id,
+      })
     );
   });
 });
@@ -287,6 +315,26 @@ describe("PATCH /organizations/:organizationId/agents/:agentId", () => {
     expect(res.statusCode).toBe(404);
     expect(mockUpdateAgent).not.toHaveBeenCalled();
   });
+
+  it("(audit): atualiza agente com sucesso → registra agent.updated no audit log", async () => {
+    const app = await buildApp("admin");
+    await app.inject({
+      method: "PATCH",
+      url: `/organizations/${ORG_ID}/agents/${AGENT_ID}`,
+      payload: { name: "Atualizado" },
+    });
+
+    expect(mockCreateAuditLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        organization_id: ORG_ID,
+        user_id: USER_ID,
+        action: "agent.updated",
+        entity_type: "agent",
+        entity_id: AGENT_ID,
+      })
+    );
+  });
 });
 
 describe("DELETE /organizations/:organizationId/agents/:agentId", () => {
@@ -322,5 +370,24 @@ describe("DELETE /organizations/:organizationId/agents/:agentId", () => {
 
     expect(res.statusCode).toBe(404);
     expect(mockDeleteAgent).not.toHaveBeenCalled();
+  });
+
+  it("(audit): deleta agente com sucesso → registra agent.deleted no audit log", async () => {
+    const app = await buildApp("admin");
+    await app.inject({
+      method: "DELETE",
+      url: `/organizations/${ORG_ID}/agents/${AGENT_ID}`,
+    });
+
+    expect(mockCreateAuditLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        organization_id: ORG_ID,
+        user_id: USER_ID,
+        action: "agent.deleted",
+        entity_type: "agent",
+        entity_id: AGENT_ID,
+      })
+    );
   });
 });

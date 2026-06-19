@@ -8,12 +8,14 @@ const {
   mockCreateInvitation,
   mockCheckResourceLimit,
   mockGetOrgInvitations,
+  mockCreateAuditLog,
 } = vi.hoisted(() => ({
   mockAuthMiddleware: vi.fn(),
   mockGetAdminClient: vi.fn(() => ({})),
   mockCreateInvitation: vi.fn(),
   mockCheckResourceLimit: vi.fn(),
   mockGetOrgInvitations: vi.fn(),
+  mockCreateAuditLog: vi.fn(),
 }));
 
 vi.mock("../../../middleware/auth", () => ({
@@ -25,6 +27,7 @@ vi.mock("@aula-agente/database", () => ({
   createInvitation: mockCreateInvitation,
   checkResourceLimit: mockCheckResourceLimit,
   getOrgInvitations: mockGetOrgInvitations,
+  createAuditLog: mockCreateAuditLog,
 }));
 
 import invitationRoutes from "../index";
@@ -79,6 +82,7 @@ beforeEach(() => {
   mockCreateInvitation.mockResolvedValue(mockCreatedInvitation);
   mockCheckResourceLimit.mockResolvedValue({ allowed: true, current: 2, max: 10 });
   mockGetOrgInvitations.mockResolvedValue(mockPendingInvitations);
+  mockCreateAuditLog.mockResolvedValue({ id: "audit-uuid" });
 });
 
 // ── tests ─────────────────────────────────────────────────────────────────────
@@ -221,6 +225,26 @@ describe("POST /organizations/:organizationId/invitations", () => {
 
     expect(res.statusCode).toBe(400);
     expect(mockCreateInvitation).not.toHaveBeenCalled();
+  });
+
+  it("(audit): cria convite com sucesso → registra invitation.sent", async () => {
+    const app = await buildApp();
+    await app.inject({
+      method: "POST",
+      url: `/organizations/${ORG_ID}/invitations`,
+      payload: { email: "novo@membro.com", role: "agent" },
+    });
+
+    expect(mockCreateAuditLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        organization_id: ORG_ID,
+        user_id: USER_ID,
+        action: "invitation.sent",
+        entity_type: "invitation",
+        entity_id: mockCreatedInvitation.id,
+      })
+    );
   });
 
   it("cenário 7: checkResourceLimit chamado com 'members' e org correta", async () => {

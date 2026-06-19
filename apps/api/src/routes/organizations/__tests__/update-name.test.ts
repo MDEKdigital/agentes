@@ -6,11 +6,13 @@ const {
   mockGetAdminClient,
   mockUpdateOrganizationName,
   mockDeleteInstance,
+  mockCreateAuditLog,
 } = vi.hoisted(() => ({
   mockAuthMiddleware: vi.fn(),
   mockGetAdminClient: vi.fn(() => ({})),
   mockUpdateOrganizationName: vi.fn(),
   mockDeleteInstance: vi.fn(),
+  mockCreateAuditLog: vi.fn(),
 }));
 
 vi.mock("../../../middleware/auth", () => ({
@@ -23,6 +25,7 @@ vi.mock("@aula-agente/database", () => ({
   isSlugAvailableForOrg: vi.fn(),
   completeOrganizationOnboarding: vi.fn(),
   updateOrganizationName: mockUpdateOrganizationName,
+  createAuditLog: mockCreateAuditLog,
 }));
 
 vi.mock("../../../services/evolution.service", () => ({
@@ -53,10 +56,27 @@ async function buildApp(role = "owner") {
   return app;
 }
 
+function makeDb(rows: unknown[] = []) {
+  const selectResult = { data: rows, error: null };
+  const deleteResult = { error: null };
+  return {
+    from: vi.fn().mockReturnValue({
+      select: vi.fn().mockReturnValue({
+        eq: vi.fn().mockResolvedValue(selectResult),
+      }),
+      delete: vi.fn().mockReturnValue({
+        eq: vi.fn().mockResolvedValue(deleteResult),
+      }),
+    }),
+  };
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
-  mockGetAdminClient.mockReturnValue({});
+  mockGetAdminClient.mockReturnValue(makeDb());
   mockUpdateOrganizationName.mockResolvedValue(mockUpdatedOrg);
+  mockCreateAuditLog.mockResolvedValue({ id: "audit-uuid" });
+  mockDeleteInstance.mockResolvedValue(undefined);
 });
 
 describe("PATCH /organizations/:organizationId", () => {
@@ -120,5 +140,64 @@ describe("PATCH /organizations/:organizationId", () => {
 
     expect(res.statusCode).toBe(400);
     expect(mockUpdateOrganizationName).not.toHaveBeenCalled();
+  });
+
+  it("(audit): atualiza nome com sucesso → registra organization.updated", async () => {
+    const app = await buildApp("owner");
+    await app.inject({
+      method: "PATCH",
+      url: `/organizations/${ORG_ID}`,
+      payload: { name: "Novo Nome" },
+    });
+
+    expect(mockCreateAuditLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        organization_id: ORG_ID,
+        user_id: USER_ID,
+        action: "organization.updated",
+        entity_type: "organization",
+        entity_id: ORG_ID,
+      })
+    );
+  });
+});
+
+describe("DELETE /organizations/:organizationId", () => {
+  it("owner deleta org → 204", async () => {
+    const app = await buildApp("owner");
+    const res = await app.inject({
+      method: "DELETE",
+      url: `/organizations/${ORG_ID}`,
+    });
+    expect(res.statusCode).toBe(204);
+  });
+
+  it("não-owner → 403 sem deletar", async () => {
+    const app = await buildApp("admin");
+    const res = await app.inject({
+      method: "DELETE",
+      url: `/organizations/${ORG_ID}`,
+    });
+    expect(res.statusCode).toBe(403);
+  });
+
+  it("(audit): deleta org com sucesso → registra organization.deleted", async () => {
+    const app = await buildApp("owner");
+    await app.inject({
+      method: "DELETE",
+      url: `/organizations/${ORG_ID}`,
+    });
+
+    expect(mockCreateAuditLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        organization_id: ORG_ID,
+        user_id: USER_ID,
+        action: "organization.deleted",
+        entity_type: "organization",
+        entity_id: ORG_ID,
+      })
+    );
   });
 });

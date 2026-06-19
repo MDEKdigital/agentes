@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { getAdminClient, createAgent, checkResourceLimit, getAgentsByOrganization, getAgentById, updateAgent, deleteAgent, resetAgentConversationsKeywordActivation } from "@aula-agente/database";
+import { getAdminClient, createAgent, checkResourceLimit, getAgentsByOrganization, getAgentById, updateAgent, deleteAgent, resetAgentConversationsKeywordActivation, createAuditLog } from "@aula-agente/database";
 import { createAgentSchema, updateAgentSchema } from "@aula-agente/shared";
 import { authMiddleware } from "../../middleware/auth";
 
@@ -38,6 +38,15 @@ export default async function agentRoutes(app: FastifyInstance) {
         organization_id: organizationId,
         is_active: true,
       });
+
+      createAuditLog(db, {
+        organization_id: organizationId,
+        user_id: request.user.id,
+        action: "agent.created",
+        entity_type: "agent",
+        entity_id: agent.id,
+        metadata: { name: agent.name },
+      }).catch((err) => request.log.error({ err }, "audit: agent.created failed"));
 
       return reply.status(201).send(agent);
     }
@@ -89,6 +98,15 @@ export default async function agentRoutes(app: FastifyInstance) {
       }
       const updated = await updateAgent(db, agentId, organizationId, parseResult.data);
 
+      createAuditLog(db, {
+        organization_id: organizationId,
+        user_id: request.user.id,
+        action: "agent.updated",
+        entity_type: "agent",
+        entity_id: agentId,
+        metadata: { fields: Object.keys(parseResult.data) },
+      }).catch((err) => request.log.error({ err }, "audit: agent.updated failed"));
+
       const oldRules = existing.activation_rules ?? [];
       const newRules = parseResult.data.activation_rules ?? oldRules;
       const hadRules = oldRules.length > 0;
@@ -117,6 +135,16 @@ export default async function agentRoutes(app: FastifyInstance) {
       if (!existing) return reply.status(404).send({ error: "Agente não encontrado." });
 
       await deleteAgent(db, agentId, organizationId);
+
+      createAuditLog(db, {
+        organization_id: organizationId,
+        user_id: request.user.id,
+        action: "agent.deleted",
+        entity_type: "agent",
+        entity_id: agentId,
+        metadata: { name: existing.name },
+      }).catch((err) => request.log.error({ err }, "audit: agent.deleted failed"));
+
       return reply.status(204).send();
     }
   );
