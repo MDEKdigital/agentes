@@ -434,6 +434,29 @@ describe("audit logs — process-message", () => {
     );
     expect(resolvedCalls).toHaveLength(0);
   });
+
+  it("R14: conversation.keyword_activated carrega actor=system no metadata", async () => {
+    vi.mocked(getAgentById).mockResolvedValue({
+      ...activeAgent,
+      activation_rules: [{ type: "single_word", value: "suporte" }],
+    } as never);
+    vi.mocked(getConversationById).mockResolvedValue({
+      ...conversation,
+      is_keyword_activated: false,
+      awaiting_activation_confirmation: false,
+    } as never);
+    mockEvaluateActivation.mockResolvedValue({ action: "activate" as const });
+
+    await runJob();
+
+    expect(mockCreateAuditLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        action: "conversation.keyword_activated",
+        metadata: expect.objectContaining({ actor: "system" }),
+      })
+    );
+  });
 });
 
 // ── R6: idempotência em retry de conversa já resolvida ─────────────────────────

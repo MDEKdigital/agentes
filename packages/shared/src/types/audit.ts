@@ -62,7 +62,8 @@ export type AuditAction =
   | "conversation.status_changed"
   | "conversation.deleted"
   | "conversation.keyword_activated"
-  | "conversation.resolved";
+  | "conversation.resolved"
+  | "conversation.note_created";
 
 export type AuditEntityType =
   | "agent"

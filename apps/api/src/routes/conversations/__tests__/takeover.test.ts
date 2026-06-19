@@ -28,7 +28,7 @@ const ORG_ID = "org-uuid-1";
 const USER_ID = "user-uuid-1";
 const CONV_ID = "conv-uuid-1";
 
-function makeDb(convOrgId: string | null = ORG_ID) {
+function makeDb(convOrgId: string | null = ORG_ID, convAssignedTo: string | null = null) {
   const updateChain = {
     eq: vi.fn().mockReturnThis(),
     then: vi.fn(),
@@ -36,7 +36,7 @@ function makeDb(convOrgId: string | null = ORG_ID) {
   (updateChain as any).mockResolvedValue = () => {};
 
   const selectResult = convOrgId
-    ? { data: { organization_id: convOrgId }, error: null }
+    ? { data: { organization_id: convOrgId, assigned_to: convAssignedTo }, error: null }
     : { data: null, error: null };
 
   const updateResult = { error: null };
@@ -169,6 +169,23 @@ describe("PATCH /conversations/:conversationId/takeover", () => {
       payload: {},
     });
     expect(res.statusCode).toBe(400);
+  });
+
+  it("R12: takeover_started inclui previous_assigned_to no metadata", async () => {
+    mockGetAdminClient.mockReturnValue(makeDb(ORG_ID, "prev-assigned-user"));
+    const app = await buildApp();
+    await app.inject({
+      method: "PATCH",
+      url: `/conversations/${CONV_ID}/takeover`,
+      payload: { takeover: true },
+    });
+    expect(mockCreateAuditLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        action: "conversation.takeover_started",
+        metadata: expect.objectContaining({ previous_assigned_to: "prev-assigned-user" }),
+      })
+    );
   });
 });
 

@@ -20,6 +20,7 @@ export async function processTakeoverTimeouts() {
         action: "conversation.takeover_expired",
         entity_type: "conversation",
         entity_id: conversation.id,
+        metadata: { actor: "system" },
       }).catch((err) =>
         console.error(`[audit] conversation.takeover_expired failed for ${conversation.id}:`, err)
       );

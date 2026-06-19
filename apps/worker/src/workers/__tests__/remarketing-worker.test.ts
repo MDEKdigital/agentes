@@ -466,4 +466,26 @@ describe("audit logs — remarketing-worker", () => {
       expect.objectContaining({ action: "remarketing.enrollment_created" })
     );
   });
+
+  it("R14: remarketing.enrollment_created carrega actor=system no metadata", async () => {
+    const flow = makeFlow(FLOW_1_ID);
+    const conv = makeConversation("conv-r14");
+    const step = makeStep(STEP_1_ID, FLOW_1_ID);
+
+    mockGetActiveRemarketingFlows.mockResolvedValue([flow]);
+    mockGetConversationsEligibleForEnrollment.mockResolvedValue([conv]);
+    mockGetFirstActiveStep.mockResolvedValue(step);
+    mockCreateEnrollment.mockResolvedValue({});
+    mockGetActiveEnrollments.mockResolvedValue([]);
+
+    await processRemarketingCycle();
+
+    expect(mockCreateAuditLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        action: "remarketing.enrollment_created",
+        metadata: expect.objectContaining({ actor: "system" }),
+      })
+    );
+  });
 });

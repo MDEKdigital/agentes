@@ -312,7 +312,7 @@ export function startProcessMessageWorker() {
             action: "conversation.keyword_activated",
             entity_type: "conversation",
             entity_id: conversationId,
-            metadata: { agent_id: agentId },
+            metadata: { agent_id: agentId, actor: "system" },
           }).catch((err) =>
             console.error("[audit] conversation.keyword_activated failed:", err)
           );
@@ -357,7 +357,7 @@ export function startProcessMessageWorker() {
             action: "conversation.resolved",
             entity_type: "conversation",
             entity_id: conversationId,
-            metadata: { agent_id: agentId },
+            metadata: { agent_id: agentId, actor: "system" },
           }).catch((err) =>
             console.error("[audit] conversation.resolved failed:", err)
           );

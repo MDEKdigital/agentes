@@ -55,7 +55,7 @@ export async function processRemarketingCycle() {
             action: "remarketing.enrollment_created",
             entity_type: "remarketing_enrollment",
             entity_id: conv.id,
-            metadata: { flow_id: flow.id },
+            metadata: { flow_id: flow.id, actor: "system" },
           }).catch((err) =>
             console.error("[audit] remarketing.enrollment_created failed:", err)
           );
@@ -126,7 +126,7 @@ export async function processRemarketingCycle() {
           action: "remarketing.enrollment_cancelled",
           entity_type: "remarketing_enrollment",
           entity_id: enrollment.id,
-          metadata: { reason: "resolved", conversation_id: enrollment.conversation_id },
+          metadata: { reason: "resolved", conversation_id: enrollment.conversation_id, actor: "system" },
         }).catch((err) => console.error("[audit] remarketing.enrollment_cancelled failed:", err));
         console.log(`[remarketing] Cancelled enrollment ${enrollment.id}: conversation resolved`);
         continue;
@@ -145,7 +145,7 @@ export async function processRemarketingCycle() {
             action: "remarketing.enrollment_cancelled",
             entity_type: "remarketing_enrollment",
             entity_id: enrollment.id,
-            metadata: { reason: "reply", conversation_id: enrollment.conversation_id },
+            metadata: { reason: "reply", conversation_id: enrollment.conversation_id, actor: "system" },
           }).catch((err) => console.error("[audit] remarketing.enrollment_cancelled failed:", err));
           if (flow.agent_id) {
             await returnConversationToAgent(db, enrollment.conversation_id, flow.agent_id, enrollment.organization_id);
@@ -164,7 +164,7 @@ export async function processRemarketingCycle() {
             action: "remarketing.enrollment_cancelled",
             entity_type: "remarketing_enrollment",
             entity_id: enrollment.id,
-            metadata: { reason: "opt_out", conversation_id: enrollment.conversation_id },
+            metadata: { reason: "opt_out", conversation_id: enrollment.conversation_id, actor: "system" },
           }).catch((err) => console.error("[audit] remarketing.enrollment_cancelled failed:", err));
           console.log(`[remarketing] Cancelled enrollment ${enrollment.id}: opt-out detected`);
           continue;
@@ -228,7 +228,7 @@ export async function processRemarketingCycle() {
         action: "remarketing.step_sent",
         entity_type: "remarketing_enrollment",
         entity_id: enrollment.id,
-        metadata: { flow_id: enrollment.flow_id, step_order: step.step_order },
+        metadata: { flow_id: enrollment.flow_id, step_order: step.step_order, actor: "system" },
       }).catch((err) => console.error("[audit] remarketing.step_sent failed:", err));
 
       console.log(

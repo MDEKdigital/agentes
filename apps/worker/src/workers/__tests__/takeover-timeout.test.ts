@@ -83,6 +83,18 @@ describe("processTakeoverTimeouts", () => {
     expect(mockCreateAuditLog).not.toHaveBeenCalled();
   });
 
+  it("R14: conversation.takeover_expired carrega actor=system no metadata", async () => {
+    mockGetExpiredTakeovers.mockResolvedValue([CONV_1]);
+    await processTakeoverTimeouts();
+    expect(mockCreateAuditLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        action: "conversation.takeover_expired",
+        metadata: expect.objectContaining({ actor: "system" }),
+      })
+    );
+  });
+
   it("processa múltiplas conversas expiradas e audita cada uma", async () => {
     mockGetExpiredTakeovers.mockResolvedValue([CONV_1, CONV_2]);
     await processTakeoverTimeouts();

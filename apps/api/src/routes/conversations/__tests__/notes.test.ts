@@ -6,11 +6,13 @@ const {
   mockGetAdminClient,
   mockGetConversationNotes,
   mockAddConversationNote,
+  mockCreateAuditLog,
 } = vi.hoisted(() => ({
   mockAuthMiddleware: vi.fn(),
   mockGetAdminClient: vi.fn(),
   mockGetConversationNotes: vi.fn(),
   mockAddConversationNote: vi.fn(),
+  mockCreateAuditLog: vi.fn().mockResolvedValue({}),
 }));
 
 vi.mock("../../../middleware/auth", () => ({
@@ -21,6 +23,11 @@ vi.mock("@aula-agente/database", () => ({
   getAdminClient: mockGetAdminClient,
   getConversationNotes: mockGetConversationNotes,
   addConversationNote: mockAddConversationNote,
+  createAuditLog: mockCreateAuditLog,
+  updateConversationTags: vi.fn().mockResolvedValue(undefined),
+  getConversationById: vi.fn(),
+  getMessagesByConversation: vi.fn().mockResolvedValue([]),
+  getInboxConversations: vi.fn().mockResolvedValue({ conversations: [], total: 0 }),
 }));
 
 import conversationRoutes from "../index";
@@ -73,6 +80,7 @@ beforeEach(() => {
   mockGetAdminClient.mockReturnValue(makeDb());
   mockGetConversationNotes.mockResolvedValue([mockNote]);
   mockAddConversationNote.mockResolvedValue(mockNote);
+  mockCreateAuditLog.mockResolvedValue({});
 });
 
 // ── GET /conversations/:id/notes ──────────────────────────────────────────────
@@ -197,5 +205,41 @@ describe("POST /conversations/:conversationId/notes", () => {
     });
     expect(res.statusCode).toBe(403);
     expect(mockAddConversationNote).not.toHaveBeenCalled();
+  });
+});
+
+// ── R15: audit ao criar nota ──────────────────────────────────────────────────
+
+describe("R15: POST /notes deve auditar conversation.note_created", () => {
+  it("R15: nota criada com sucesso → audita conversation.note_created", async () => {
+    const app = await buildApp();
+    await app.inject({
+      method: "POST",
+      url: `/conversations/${CONV_ID}/notes`,
+      payload: { content: "Nota de auditoria" },
+    });
+    expect(mockCreateAuditLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        action: "conversation.note_created",
+        entity_type: "conversation",
+        organization_id: ORG_ID,
+        user_id: USER_ID,
+      })
+    );
+  });
+
+  it("R15: addConversationNote falha → NÃO audita note_created", async () => {
+    mockAddConversationNote.mockRejectedValue(new Error("DB error"));
+    const app = await buildApp();
+    await app.inject({
+      method: "POST",
+      url: `/conversations/${CONV_ID}/notes`,
+      payload: { content: "Nota" },
+    });
+    const noteCalls = mockCreateAuditLog.mock.calls.filter(
+      (args: unknown[]) => (args[1] as { action: string })?.action === "conversation.note_created"
+    );
+    expect(noteCalls).toHaveLength(0);
   });
 });

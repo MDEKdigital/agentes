@@ -182,6 +182,14 @@ export default async function conversationRoutes(app: FastifyInstance) {
         content,
       });
 
+      createAuditLog(db, {
+        organization_id: conv.organization_id,
+        user_id: request.user.id,
+        action: "conversation.note_created",
+        entity_type: "conversation",
+        entity_id: conversationId,
+      }).catch((err) => request.log.error({ err }, "audit: conversation.note_created failed"));
+
       return reply.status(201).send(note);
     }
   );
@@ -200,7 +208,7 @@ export default async function conversationRoutes(app: FastifyInstance) {
 
       const { data: conv } = await db
         .from("conversations")
-        .select("organization_id")
+        .select("organization_id, status")
         .eq("id", conversationId)
         .single();
 
@@ -225,7 +233,7 @@ export default async function conversationRoutes(app: FastifyInstance) {
         action: "conversation.status_changed",
         entity_type: "conversation",
         entity_id: conversationId,
-        metadata: { status },
+        metadata: { old_status: (conv as { status?: string }).status, new_status: status },
       }).catch((err) => request.log.error({ err }, "audit: conversation.status_changed failed"));
 
       return reply.status(204).send();
@@ -246,7 +254,7 @@ export default async function conversationRoutes(app: FastifyInstance) {
       const db = getAdminClient();
       const { data: conv } = await db
         .from("conversations")
-        .select("organization_id")
+        .select("organization_id, assigned_to")
         .eq("id", conversationId)
         .single();
 
@@ -275,7 +283,7 @@ export default async function conversationRoutes(app: FastifyInstance) {
         action: takeover ? "conversation.takeover_started" : "conversation.takeover_ended",
         entity_type: "conversation",
         entity_id: conversationId,
-        metadata: { takeover },
+        metadata: { previous_assigned_to: (conv as { assigned_to?: string | null }).assigned_to ?? null },
       }).catch((err) => request.log.error({ err }, "audit: conversation.takeover failed"));
 
       return reply.status(204).send();
@@ -315,7 +323,7 @@ export default async function conversationRoutes(app: FastifyInstance) {
         action: "conversation.tags_updated",
         entity_type: "conversation",
         entity_id: conversationId,
-        metadata: { tags },
+        metadata: { tag_count: tags.length, changed: true },
       }).catch((err) => request.log.error({ err }, "audit: conversation.tags_updated failed"));
 
       return reply.status(204).send();
@@ -336,7 +344,7 @@ export default async function conversationRoutes(app: FastifyInstance) {
       const db = getAdminClient();
       const { data: conv } = await db
         .from("conversations")
-        .select("organization_id")
+        .select("organization_id, assigned_to")
         .eq("id", conversationId)
         .single();
 
@@ -361,7 +369,10 @@ export default async function conversationRoutes(app: FastifyInstance) {
         action: "conversation.assignment_changed",
         entity_type: "conversation",
         entity_id: conversationId,
-        metadata: { assigned_to: assignedTo },
+        metadata: {
+          previous_assigned_to: (conv as { assigned_to?: string | null }).assigned_to ?? null,
+          assigned_to: assignedTo,
+        },
       }).catch((err) => request.log.error({ err }, "audit: conversation.assignment_changed failed"));
 
       return reply.status(204).send();

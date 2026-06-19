@@ -34,10 +34,14 @@ const ORG_ID = "org-uuid-1";
 const USER_ID = "user-uuid-1";
 const CONV_ID = "conv-uuid-1";
 
-function makeDb(convOrgId: string | null = ORG_ID) {
+function makeDb(
+  convOrgId: string | null = ORG_ID,
+  convStatus: string = "open",
+  convAssignedTo: string | null = null
+) {
   const single = vi.fn().mockResolvedValue(
     convOrgId
-      ? { data: { organization_id: convOrgId }, error: null }
+      ? { data: { organization_id: convOrgId, status: convStatus, assigned_to: convAssignedTo }, error: null }
       : { data: null, error: null }
   );
   const updateResult = { error: null };
@@ -134,7 +138,7 @@ describe("Audit logs — conversations", () => {
         entity_id: CONV_ID,
         organization_id: ORG_ID,
         user_id: USER_ID,
-        metadata: expect.objectContaining({ status: "resolved" }),
+        metadata: expect.objectContaining({ new_status: "resolved" }),
       })
     );
   });
@@ -154,6 +158,84 @@ describe("Audit logs — conversations", () => {
         entity_id: CONV_ID,
         organization_id: ORG_ID,
         user_id: USER_ID,
+      })
+    );
+  });
+});
+
+// ── R12: metadados de estado anterior ─────────────────────────────────────────
+
+describe("R12: estado anterior nos eventos de conversa", () => {
+  it("R12: conversation.status_changed inclui old_status e new_status", async () => {
+    const app = await buildApp();
+    await app.inject({
+      method: "PATCH",
+      url: `/conversations/${CONV_ID}/status`,
+      payload: { status: "resolved" },
+    });
+    expect(mockCreateAuditLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        action: "conversation.status_changed",
+        metadata: expect.objectContaining({
+          old_status: expect.anything(),
+          new_status: "resolved",
+        }),
+      })
+    );
+  });
+
+  it("R12: conversation.assignment_changed inclui previous_assigned_to", async () => {
+    mockGetAdminClient.mockReturnValue(makeDb(ORG_ID, "open", "prev-user-uuid"));
+    const app = await buildApp();
+    await app.inject({
+      method: "PATCH",
+      url: `/conversations/${CONV_ID}/assignment`,
+      payload: { assigned_to: "new-user-uuid" },
+    });
+    expect(mockCreateAuditLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        action: "conversation.assignment_changed",
+        metadata: expect.objectContaining({
+          previous_assigned_to: "prev-user-uuid",
+          assigned_to: "new-user-uuid",
+        }),
+      })
+    );
+  });
+});
+
+// ── R13: tags sem PII ─────────────────────────────────────────────────────────
+
+describe("R13: tags_updated não deve persistir array bruto de tags", () => {
+  it("R13: metadata NÃO contém o array de tags brutas", async () => {
+    const app = await buildApp();
+    await app.inject({
+      method: "PATCH",
+      url: `/conversations/${CONV_ID}/tags`,
+      payload: { tags: ["urgente", "vip", "cpf:123456789"] },
+    });
+    expect(mockCreateAuditLog).not.toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        metadata: expect.objectContaining({ tags: expect.anything() }),
+      })
+    );
+  });
+
+  it("R13: metadata contém tag_count em vez do conteúdo das tags", async () => {
+    const app = await buildApp();
+    await app.inject({
+      method: "PATCH",
+      url: `/conversations/${CONV_ID}/tags`,
+      payload: { tags: ["urgente", "vip"] },
+    });
+    expect(mockCreateAuditLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        action: "conversation.tags_updated",
+        metadata: expect.objectContaining({ tag_count: 2 }),
       })
     );
   });
