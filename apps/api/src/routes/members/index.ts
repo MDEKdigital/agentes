@@ -5,9 +5,9 @@ import {
   getMemberById,
   updateMemberRole,
   removeMember,
-  createAuditLog,
 } from "@aula-agente/database";
 import { authMiddleware } from "../../middleware/auth";
+import { fireAudit } from "../../lib/audit";
 
 const VALID_ROLES = ["owner", "admin", "agent"] as const;
 type MemberRoleType = (typeof VALID_ROLES)[number];
@@ -71,14 +71,14 @@ export default async function membersRoutes(app: FastifyInstance) {
 
       const updated = await updateMemberRole(db, organizationId, memberId, role as MemberRoleType);
 
-      createAuditLog(db, {
+      fireAudit(db, {
         organization_id: organizationId,
         user_id: request.user.id,
         action: "member.role_changed",
         entity_type: "member",
         entity_id: memberId,
         metadata: { old_role: target.role, new_role: role },
-      }).catch((err) => request.log.error({ err }, "audit: member.role_changed failed"));
+      }, request.log);
 
       return reply.send(updated);
     }
@@ -110,14 +110,14 @@ export default async function membersRoutes(app: FastifyInstance) {
 
       await removeMember(db, organizationId, memberId);
 
-      createAuditLog(db, {
+      fireAudit(db, {
         organization_id: organizationId,
         user_id: request.user.id,
         action: "member.removed",
         entity_type: "member",
         entity_id: memberId,
         metadata: { removed_user_id: target.user_id, role: target.role },
-      }).catch((err) => request.log.error({ err }, "audit: member.removed failed"));
+      }, request.log);
 
       return reply.status(204).send();
     }

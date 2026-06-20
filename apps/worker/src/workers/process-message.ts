@@ -13,8 +13,8 @@ import {
   createMessage,
   updateConversation,
   getInstanceById,
-  createAuditLog,
 } from "@aula-agente/database";
+import { fireAudit } from "../lib/audit";
 import { acquireConversationLock, releaseConversationLock } from "../lib/lock";
 import { resolveApiKey } from "../lib/vault";
 import { runAgent } from "../agents/agent-runner";
@@ -307,15 +307,13 @@ export function startProcessMessageWorker() {
             is_keyword_activated: true,
             awaiting_activation_confirmation: false,
           }, organizationId);
-          createAuditLog(db, {
+          fireAudit(db, {
             organization_id: organizationId,
             action: "conversation.keyword_activated",
             entity_type: "conversation",
             entity_id: conversationId,
             metadata: { agent_id: agentId, actor: "system" },
-          }).catch((err) =>
-            console.error("[audit] conversation.keyword_activated failed:", err)
-          );
+          });
         }
 
         const result = await runAgent({
@@ -352,15 +350,13 @@ export function startProcessMessageWorker() {
         }, organizationId);
 
         if (wasResolved) {
-          createAuditLog(db, {
+          fireAudit(db, {
             organization_id: organizationId,
             action: "conversation.resolved",
             entity_type: "conversation",
             entity_id: conversationId,
             metadata: { agent_id: agentId, actor: "system" },
-          }).catch((err) =>
-            console.error("[audit] conversation.resolved failed:", err)
-          );
+          });
         }
 
         const sendQueue = getSendMessageQueue();

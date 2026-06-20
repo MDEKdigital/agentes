@@ -3,7 +3,8 @@ import { QUEUE_NAMES, HUMAN_TAKEOVER_TIMEOUT_MS } from "@aula-agente/shared";
 import type { TakeoverTimeoutJobData } from "@aula-agente/queue";
 import { getTakeoverTimeoutQueue } from "@aula-agente/queue";
 import { getConnectionOptions } from "../lib/redis";
-import { getAdminClient, getExpiredTakeovers, updateConversation, createAuditLog } from "@aula-agente/database";
+import { getAdminClient, getExpiredTakeovers, updateConversation } from "@aula-agente/database";
+import { fireAudit } from "../lib/audit";
 
 export async function processTakeoverTimeouts() {
   const db = getAdminClient();
@@ -15,15 +16,13 @@ export async function processTakeoverTimeouts() {
         is_human_takeover: false,
         human_takeover_at: null,
       }, conversation.organization_id);
-      createAuditLog(db, {
+      fireAudit(db, {
         organization_id: conversation.organization_id,
         action: "conversation.takeover_expired",
         entity_type: "conversation",
         entity_id: conversation.id,
         metadata: { actor: "system" },
-      }).catch((err) =>
-        console.error(`[audit] conversation.takeover_expired failed for ${conversation.id}:`, err)
-      );
+      });
       console.log(`Auto-released takeover for conversation ${conversation.id}`);
     } catch (err) {
       console.error(`Failed to release takeover for conversation ${conversation.id}:`, err);

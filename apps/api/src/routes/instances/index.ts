@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { createInstanceSchema, updateInstanceSchema, updateProfileSchema } from "@aula-agente/shared";
-import { getAdminClient, createAuditLog } from "@aula-agente/database";
+import { getAdminClient } from "@aula-agente/database";
+import { fireAudit } from "../../lib/audit";
 import {
   getInstancesByOrganization,
   getInstanceById,
@@ -92,14 +93,14 @@ export default async function instanceRoutes(app: FastifyInstance) {
         webhook_url: webhookUrl,
       });
 
-      createAuditLog(db, {
+      fireAudit(db, {
         organization_id: organizationId,
         user_id: request.user.id,
         action: "instance.created",
         entity_type: "instance",
         entity_id: instance.id,
         metadata: { instance_name, instance_id: instance.id },
-      }).catch((err) => request.log.error({ err }, "audit: instance.created failed"));
+      }, request.log);
 
       return reply.status(201).send(instance);
     }
@@ -282,14 +283,14 @@ export default async function instanceRoutes(app: FastifyInstance) {
         return reply.status(500).send({ error: "Erro ao atualizar um ou mais campos do perfil na Evolution API" });
       }
 
-      createAuditLog(db, {
+      fireAudit(db, {
         organization_id: instance.organization_id,
         user_id: request.user.id,
         action: "instance.profile_updated",
         entity_type: "instance",
         entity_id: instance.id,
         metadata: { instance_name: instance.instance_name },
-      }).catch((err) => request.log.error({ err }, "audit: instance.profile_updated failed"));
+      }, request.log);
 
       return { ok: true };
     }
@@ -354,14 +355,14 @@ export default async function instanceRoutes(app: FastifyInstance) {
 
       const updated = await updateInstance(db, instance.id, parseResult.data, instance.organization_id);
 
-      createAuditLog(db, {
+      fireAudit(db, {
         organization_id: instance.organization_id,
         user_id: request.user.id,
         action: "instance.updated",
         entity_type: "instance",
         entity_id: instance.id,
         metadata: { instance_name: instance.instance_name },
-      }).catch((err) => request.log.error({ err }, "audit: instance.updated failed"));
+      }, request.log);
 
       return updated;
     }
@@ -396,14 +397,14 @@ export default async function instanceRoutes(app: FastifyInstance) {
 
       await deleteInstanceRecord(db, instance.id, instance.organization_id);
 
-      createAuditLog(db, {
+      fireAudit(db, {
         organization_id: instance.organization_id,
         user_id: request.user.id,
         action: "instance.deleted",
         entity_type: "instance",
         entity_id: instance.id,
         metadata: { instance_name: instance.instance_name },
-      }).catch((err) => request.log.error({ err }, "audit: instance.deleted failed"));
+      }, request.log);
 
       return reply.status(204).send();
     }
@@ -453,14 +454,14 @@ export default async function instanceRoutes(app: FastifyInstance) {
       if (membership.role === "agent") return reply.status(403).send({ error: "Acesso de administrador necessário" });
       await setInstanceSettings(instance.instance_name, request.body as Record<string, unknown>);
 
-      createAuditLog(db, {
+      fireAudit(db, {
         organization_id: instance.organization_id,
         user_id: request.user.id,
         action: "instance.settings_updated",
         entity_type: "instance",
         entity_id: instance.id,
         metadata: { instance_name: instance.instance_name },
-      }).catch((err) => request.log.error({ err }, "audit: instance.settings_updated failed"));
+      }, request.log);
 
       return { ok: true };
     }
@@ -512,14 +513,14 @@ export default async function instanceRoutes(app: FastifyInstance) {
       if (instance.status !== "connected") return reply.status(422).send({ error: "Instância não está conectada" });
       await updatePrivacySettings(instance.instance_name, request.body as Record<string, unknown>);
 
-      createAuditLog(db, {
+      fireAudit(db, {
         organization_id: instance.organization_id,
         user_id: request.user.id,
         action: "instance.privacy_updated",
         entity_type: "instance",
         entity_id: instance.id,
         metadata: { instance_name: instance.instance_name },
-      }).catch((err) => request.log.error({ err }, "audit: instance.privacy_updated failed"));
+      }, request.log);
 
       return { ok: true };
     }
@@ -550,14 +551,14 @@ export default async function instanceRoutes(app: FastifyInstance) {
         return reply.status(502).send({ error: "Falha ao reiniciar instância na Evolution API" });
       }
 
-      createAuditLog(db, {
+      fireAudit(db, {
         organization_id: instance.organization_id,
         user_id: request.user.id,
         action: "instance.restarted",
         entity_type: "instance",
         entity_id: instance.id,
         metadata: { instance_name: instance.instance_name },
-      }).catch((err) => request.log.error({ err }, "audit: instance.restarted failed"));
+      }, request.log);
 
       return { ok: true };
     }
@@ -590,14 +591,14 @@ export default async function instanceRoutes(app: FastifyInstance) {
       }
       await updateInstance(db, instance.id, { status: "disconnected" }, instance.organization_id);
 
-      createAuditLog(db, {
+      fireAudit(db, {
         organization_id: instance.organization_id,
         user_id: request.user.id,
         action: "instance.logged_out",
         entity_type: "instance",
         entity_id: instance.id,
         metadata: { instance_name: instance.instance_name },
-      }).catch((err) => request.log.error({ err }, "audit: instance.logged_out failed"));
+      }, request.log);
 
       return { ok: true };
     }

@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
-import { getAdminClient, createAuditLog } from "@aula-agente/database";
+import { getAdminClient } from "@aula-agente/database";
 import { authMiddleware } from "../../middleware/auth";
+import { fireAudit } from "../../lib/audit";
 
 export default async function remarketingFlowRoutes(app: FastifyInstance) {
   app.addHook("preHandler", authMiddleware);
@@ -76,14 +77,14 @@ export default async function remarketingFlowRoutes(app: FastifyInstance) {
 
     if (error) return reply.status(500).send({ error: "Erro ao criar fluxo" });
 
-    createAuditLog(db, {
+    fireAudit(db, {
       organization_id: orgId,
       user_id: request.user.id,
       action: "remarketing_flow.created",
       entity_type: "remarketing_flow",
       entity_id: data.id,
       metadata: { name: data.name },
-    }).catch((err) => request.log.error({ err }, "audit: remarketing_flow.created failed"));
+    }, request.log);
 
     return reply.status(201).send(data);
   });
@@ -146,13 +147,13 @@ export default async function remarketingFlowRoutes(app: FastifyInstance) {
 
     if (error) return reply.status(500).send({ error: "Erro ao atualizar fluxo" });
 
-    createAuditLog(db, {
+    fireAudit(db, {
       organization_id: orgId,
       user_id: request.user.id,
       action: "remarketing_flow.updated",
       entity_type: "remarketing_flow",
       entity_id: request.params.id,
-    }).catch((err) => request.log.error({ err }, "audit: remarketing_flow.updated failed"));
+    }, request.log);
 
     return reply.send(data);
   });
@@ -193,13 +194,13 @@ export default async function remarketingFlowRoutes(app: FastifyInstance) {
 
     if (error) return reply.status(500).send({ error: "Erro ao deletar fluxo" });
 
-    createAuditLog(db, {
+    fireAudit(db, {
       organization_id: orgId,
       user_id: request.user.id,
       action: "remarketing_flow.deleted",
       entity_type: "remarketing_flow",
       entity_id: request.params.id,
-    }).catch((err) => request.log.error({ err }, "audit: remarketing_flow.deleted failed"));
+    }, request.log);
 
     return reply.status(204).send();
   });
@@ -242,14 +243,14 @@ export default async function remarketingFlowRoutes(app: FastifyInstance) {
         if (stepsErr) return reply.status(500).send({ error: "Erro ao duplicar etapas" });
       }
 
-      createAuditLog(db, {
+      fireAudit(db, {
         organization_id: orgId,
         user_id: request.user.id,
         action: "remarketing_flow.duplicated",
         entity_type: "remarketing_flow",
         entity_id: newFlow.id,
         metadata: { original_id: request.params.id },
-      }).catch((err) => request.log.error({ err }, "audit: remarketing_flow.duplicated failed"));
+      }, request.log);
 
       return reply.status(201).send(newFlow);
     }
@@ -296,14 +297,14 @@ export default async function remarketingFlowRoutes(app: FastifyInstance) {
 
       if (error) return reply.status(500).send({ error: "Erro ao atualizar status" });
 
-      createAuditLog(db, {
+      fireAudit(db, {
         organization_id: orgId,
         user_id: request.user.id,
         action: "remarketing_flow.status_changed",
         entity_type: "remarketing_flow",
         entity_id: request.params.id,
         metadata: { status },
-      }).catch((err) => request.log.error({ err }, "audit: remarketing_flow.status_changed failed"));
+      }, request.log);
 
       return reply.send(data);
     }

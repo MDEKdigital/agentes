@@ -3,10 +3,10 @@ import {
   getAdminClient,
   findInvitationByEmailForResend,
   renewInvitationExpiry,
-  createAuditLog,
 } from "@aula-agente/database";
 import { authMiddleware } from "../../middleware/auth";
 import { sendWelcomeEmailApi } from "../../lib/email";
+import { fireAudit } from "../../lib/audit";
 
 const NEUTRAL_MSG = "Se um convite estiver disponível, o email foi reenviado.";
 
@@ -66,14 +66,14 @@ export default async function resendInvitationRoute(app: FastifyInstance) {
       request.log.error({ err }, "resend-invitation: email send failed (non-fatal)");
     }
 
-    createAuditLog(db, {
+    fireAudit(db, {
       organization_id: invitation.organization_id,
       user_id: request.user?.id ?? null,
       action: "invitation.resent",
       entity_type: "invitation",
       entity_id: invitation.id,
       metadata: { email },
-    }).catch((err) => request.log.error({ err }, "audit: invitation.resent failed"));
+    }, request.log);
 
     return reply.send({ message: NEUTRAL_MSG });
   });

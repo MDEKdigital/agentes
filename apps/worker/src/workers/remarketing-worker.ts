@@ -22,8 +22,8 @@ import {
   isConversationResolved,
   returnConversationToAgent,
   getConversationById,
-  createAuditLog,
 } from "@aula-agente/database";
+import { fireAudit } from "../lib/audit";
 
 function toMinutes(value: number, unit: string): number {
   if (unit === "hours") return value * 60;
@@ -50,15 +50,13 @@ export async function processRemarketingCycle() {
             organization_id: conv.organization_id,
             next_step_id: firstStep.id,
           });
-          createAuditLog(db, {
+          fireAudit(db, {
             organization_id: conv.organization_id,
             action: "remarketing.enrollment_created",
             entity_type: "remarketing_enrollment",
             entity_id: conv.id,
             metadata: { flow_id: flow.id, actor: "system" },
-          }).catch((err) =>
-            console.error("[audit] remarketing.enrollment_created failed:", err)
-          );
+          });
           console.log(`[remarketing] Enrolled conversation ${conv.id} in flow ${flow.id}`);
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : String(err);
@@ -121,13 +119,13 @@ export async function processRemarketingCycle() {
       const resolved = await isConversationResolved(db, enrollment.conversation_id);
       if (resolved) {
         await cancelEnrollment(db, enrollment.id, "resolved", enrollment.organization_id);
-        createAuditLog(db, {
+        fireAudit(db, {
           organization_id: enrollment.organization_id,
           action: "remarketing.enrollment_cancelled",
           entity_type: "remarketing_enrollment",
           entity_id: enrollment.id,
           metadata: { reason: "resolved", conversation_id: enrollment.conversation_id, actor: "system" },
-        }).catch((err) => console.error("[audit] remarketing.enrollment_cancelled failed:", err));
+        });
         console.log(`[remarketing] Cancelled enrollment ${enrollment.id}: conversation resolved`);
         continue;
       }
@@ -140,13 +138,13 @@ export async function processRemarketingCycle() {
         );
         if (replied) {
           await cancelEnrollment(db, enrollment.id, "reply", enrollment.organization_id);
-          createAuditLog(db, {
+          fireAudit(db, {
             organization_id: enrollment.organization_id,
             action: "remarketing.enrollment_cancelled",
             entity_type: "remarketing_enrollment",
             entity_id: enrollment.id,
             metadata: { reason: "reply", conversation_id: enrollment.conversation_id, actor: "system" },
-          }).catch((err) => console.error("[audit] remarketing.enrollment_cancelled failed:", err));
+          });
           if (flow.agent_id) {
             await returnConversationToAgent(db, enrollment.conversation_id, flow.agent_id, enrollment.organization_id);
           }
@@ -159,13 +157,13 @@ export async function processRemarketingCycle() {
         const lastMsg = await getLastContactMessage(db, enrollment.conversation_id);
         if (lastMsg && isOptOutMessage(lastMsg.content)) {
           await cancelEnrollment(db, enrollment.id, "opt_out", enrollment.organization_id);
-          createAuditLog(db, {
+          fireAudit(db, {
             organization_id: enrollment.organization_id,
             action: "remarketing.enrollment_cancelled",
             entity_type: "remarketing_enrollment",
             entity_id: enrollment.id,
             metadata: { reason: "opt_out", conversation_id: enrollment.conversation_id, actor: "system" },
-          }).catch((err) => console.error("[audit] remarketing.enrollment_cancelled failed:", err));
+          });
           console.log(`[remarketing] Cancelled enrollment ${enrollment.id}: opt-out detected`);
           continue;
         }
@@ -223,13 +221,13 @@ export async function processRemarketingCycle() {
         organizationId: enrollment.organization_id,
       });
 
-      createAuditLog(db, {
+      fireAudit(db, {
         organization_id: enrollment.organization_id,
         action: "remarketing.step_sent",
         entity_type: "remarketing_enrollment",
         entity_id: enrollment.id,
         metadata: { flow_id: enrollment.flow_id, step_order: step.step_order, actor: "system" },
-      }).catch((err) => console.error("[audit] remarketing.step_sent failed:", err));
+      });
 
       console.log(
         `[remarketing] Queued step ${step.step_order} → conversation ${enrollment.conversation_id} (phone ${contact.phone})`

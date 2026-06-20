@@ -1,7 +1,8 @@
 import type { FastifyInstance } from "fastify";
-import { getAdminClient, createAgent, checkResourceLimit, getAgentsByOrganization, getAgentById, updateAgent, deleteAgent, resetAgentConversationsKeywordActivation, createAuditLog } from "@aula-agente/database";
+import { getAdminClient, createAgent, checkResourceLimit, getAgentsByOrganization, getAgentById, updateAgent, deleteAgent, resetAgentConversationsKeywordActivation } from "@aula-agente/database";
 import { createAgentSchema, updateAgentSchema } from "@aula-agente/shared";
 import { authMiddleware } from "../../middleware/auth";
+import { fireAudit } from "../../lib/audit";
 
 export default async function agentRoutes(app: FastifyInstance) {
   app.addHook("preHandler", authMiddleware);
@@ -39,14 +40,14 @@ export default async function agentRoutes(app: FastifyInstance) {
         is_active: true,
       });
 
-      createAuditLog(db, {
+      fireAudit(db, {
         organization_id: organizationId,
         user_id: request.user.id,
         action: "agent.created",
         entity_type: "agent",
         entity_id: agent.id,
         metadata: { name: agent.name },
-      }).catch((err) => request.log.error({ err }, "audit: agent.created failed"));
+      }, request.log);
 
       return reply.status(201).send(agent);
     }
@@ -109,14 +110,14 @@ export default async function agentRoutes(app: FastifyInstance) {
       }
 
       // R7: audit fires AFTER side effects — if reset throws above, no false-success audit
-      createAuditLog(db, {
+      fireAudit(db, {
         organization_id: organizationId,
         user_id: request.user.id,
         action: "agent.updated",
         entity_type: "agent",
         entity_id: agentId,
         metadata: { fields: Object.keys(parseResult.data) },
-      }).catch((err) => request.log.error({ err }, "audit: agent.updated failed"));
+      }, request.log);
 
       return reply.send(updated);
     }
@@ -137,14 +138,14 @@ export default async function agentRoutes(app: FastifyInstance) {
 
       await deleteAgent(db, agentId, organizationId);
 
-      createAuditLog(db, {
+      fireAudit(db, {
         organization_id: organizationId,
         user_id: request.user.id,
         action: "agent.deleted",
         entity_type: "agent",
         entity_id: agentId,
         metadata: { name: existing.name },
-      }).catch((err) => request.log.error({ err }, "audit: agent.deleted failed"));
+      }, request.log);
 
       return reply.status(204).send();
     }

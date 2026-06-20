@@ -1,7 +1,8 @@
 import type { FastifyInstance } from "fastify";
 import multipart from "@fastify/multipart";
-import { getAdminClient, getDocumentsByAgent, getDocumentById, deleteDocument, getAgentById, createAuditLog } from "@aula-agente/database";
+import { getAdminClient, getDocumentsByAgent, getDocumentById, deleteDocument, getAgentById } from "@aula-agente/database";
 import { authMiddleware } from "../../middleware/auth";
+import { fireAudit } from "../../lib/audit";
 import { uploadDocument } from "../../services/knowledge.service";
 import type { DocumentFileType } from "@aula-agente/shared";
 
@@ -62,14 +63,14 @@ export default async function knowledgeDocumentRoutes(app: FastifyInstance) {
         fileType: ext,
       });
 
-      createAuditLog(db, {
+      fireAudit(db, {
         organization_id: organizationId,
         user_id: request.user.id,
         action: "document.uploaded",
         entity_type: "document",
         entity_id: document.id,
         metadata: { agent_id: agentId, file_name: fileName, file_type: ext },
-      }).catch((err) => request.log.error({ err }, "audit: document.uploaded failed"));
+      }, request.log);
 
       return reply.status(201).send(document);
     }
@@ -113,14 +114,14 @@ export default async function knowledgeDocumentRoutes(app: FastifyInstance) {
 
       await deleteDocument(db, doc.id, doc.organization_id);
 
-      createAuditLog(db, {
+      fireAudit(db, {
         organization_id: doc.organization_id,
         user_id: request.user.id,
         action: "document.deleted",
         entity_type: "document",
         entity_id: doc.id,
         metadata: { agent_id: doc.agent_id },
-      }).catch((err) => request.log.error({ err }, "audit: document.deleted failed"));
+      }, request.log);
 
       return reply.status(204).send();
     }

@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
-import { getAdminClient, createAuditLog } from "@aula-agente/database";
+import { getAdminClient } from "@aula-agente/database";
 import { authMiddleware } from "../../middleware/auth";
+import { fireAudit } from "../../lib/audit";
 
 async function resolveFlow(
   db: ReturnType<typeof getAdminClient>,
@@ -78,14 +79,14 @@ export default async function remarketingStepRoutes(app: FastifyInstance) {
 
     if (error) return reply.status(500).send({ error: "Erro ao criar etapa" });
 
-    createAuditLog(db, {
+    fireAudit(db, {
       organization_id: orgId,
       user_id: request.user.id,
       action: "remarketing_step.created",
       entity_type: "remarketing_step",
       entity_id: data.id,
       metadata: { flow_id: request.params.id },
-    }).catch((err) => request.log.error({ err }, "audit: remarketing_step.created failed"));
+    }, request.log);
 
     return reply.status(201).send(data);
   });
@@ -122,14 +123,14 @@ export default async function remarketingStepRoutes(app: FastifyInstance) {
 
     if (error) return reply.status(500).send({ error: "Erro ao atualizar etapa" });
 
-    createAuditLog(db, {
+    fireAudit(db, {
       organization_id: orgId,
       user_id: request.user.id,
       action: "remarketing_step.updated",
       entity_type: "remarketing_step",
       entity_id: request.params.stepId,
       metadata: { flow_id: request.params.id },
-    }).catch((err) => request.log.error({ err }, "audit: remarketing_step.updated failed"));
+    }, request.log);
 
     return reply.send(data);
   });
@@ -158,14 +159,14 @@ export default async function remarketingStepRoutes(app: FastifyInstance) {
 
       if (error) return reply.status(500).send({ error: "Erro ao deletar etapa" });
 
-      createAuditLog(db, {
+      fireAudit(db, {
         organization_id: orgId,
         user_id: request.user.id,
         action: "remarketing_step.deleted",
         entity_type: "remarketing_step",
         entity_id: request.params.stepId,
         metadata: { flow_id: request.params.id },
-      }).catch((err) => request.log.error({ err }, "audit: remarketing_step.deleted failed"));
+      }, request.log);
 
       return reply.status(204).send();
     }
@@ -197,14 +198,14 @@ export default async function remarketingStepRoutes(app: FastifyInstance) {
 
       if (error) return reply.status(500).send({ error: "Erro ao atualizar etapa" });
 
-      createAuditLog(db, {
+      fireAudit(db, {
         organization_id: orgId,
         user_id: request.user.id,
         action: "remarketing_step.status_changed",
         entity_type: "remarketing_step",
         entity_id: request.params.stepId,
         metadata: { flow_id: request.params.id, is_active: request.body.is_active },
-      }).catch((err) => request.log.error({ err }, "audit: remarketing_step.status_changed failed"));
+      }, request.log);
 
       return reply.send(data);
     }

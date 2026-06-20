@@ -17,6 +17,7 @@ import {
   createInvitation,
   createAuditLog,
 } from "@aula-agente/database";
+import { fireAudit } from "../lib/audit";
 import { sendWelcomeEmail } from "./email-service";
 
 // ─── Slug generation ─────────────────────────────────────────────────────────
@@ -204,13 +205,13 @@ export async function handleSubscriptionRenewed(
     event_type: "subscription.renewed",
   });
 
-  createAuditLog(client, {
+  fireAudit(client, {
     organization_id: subscription.organization_id,
     action: "plan.renewed",
     entity_type: "plan",
     entity_id: subscription.id,
     metadata: { gateway: normalized.gateway },
-  }).catch((err) => console.error("[audit] plan.renewed failed", err));
+  });
 }
 
 // ─── subscription.cancelled ──────────────────────────────────────────────────
@@ -252,13 +253,13 @@ export async function handleSubscriptionCancelled(
     event_type: "subscription.cancelled",
   });
 
-  createAuditLog(client, {
+  fireAudit(client, {
     organization_id: subscription.organization_id,
     action: "plan.cancelled",
     entity_type: "plan",
     entity_id: subscription.id,
     metadata: { gateway: normalized.gateway },
-  }).catch((err) => console.error("[audit] plan.cancelled failed", err));
+  });
 }
 
 // ─── subscription.past_due ───────────────────────────────────────────────────
@@ -294,11 +295,11 @@ export async function handleSubscriptionPastDue(
     event_type: "subscription.past_due",
   });
 
-  createAuditLog(client, {
+  fireAudit(client, {
     organization_id: subscription.organization_id,
     action: "plan.past_due",
     entity_type: "plan",
     entity_id: subscription.id,
     metadata: { gateway: normalized.gateway },
-  }).catch((err) => console.error("[audit] plan.past_due failed", err));
+  });
 }

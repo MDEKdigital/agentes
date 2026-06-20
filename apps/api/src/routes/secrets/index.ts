@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
-import { getAdminClient, createAuditLog } from "@aula-agente/database";
+import { getAdminClient } from "@aula-agente/database";
 import { authMiddleware } from "../../middleware/auth";
+import { fireAudit } from "../../lib/audit";
 import { encrypt } from "../../lib/crypto";
 
 const ALLOWED_PROVIDERS = ["openai", "anthropic", "google"] as const;
@@ -62,14 +63,14 @@ export default async function secretsRoutes(app: FastifyInstance) {
 
       if (error) return reply.status(500).send({ error: "Erro interno ao processar chave" });
 
-      createAuditLog(db, {
+      fireAudit(db, {
         organization_id: organizationId,
         user_id: request.user.id,
         action: "secret.upserted",
         entity_type: "secret",
         entity_id: `${organizationId}:${provider}`,
         metadata: { provider },
-      }).catch((err) => request.log.error({ err }, "audit: secret.upserted failed"));
+      }, request.log);
 
       return reply.status(204).send();
     }
@@ -99,14 +100,14 @@ export default async function secretsRoutes(app: FastifyInstance) {
 
       // R8: only audit when a row was actually deleted
       if (deleted && deleted.length > 0) {
-        createAuditLog(db, {
+        fireAudit(db, {
           organization_id: organizationId,
           user_id: request.user.id,
           action: "secret.deleted",
           entity_type: "secret",
           entity_id: `${organizationId}:${provider}`,
           metadata: { provider },
-        }).catch((err) => request.log.error({ err }, "audit: secret.deleted failed"));
+        }, request.log);
       }
 
       return reply.status(204).send();
