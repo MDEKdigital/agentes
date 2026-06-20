@@ -6,6 +6,7 @@ import {
   getInstancesByOrganization,
   getInstanceByIdForUser,
   createInstance as createInstanceRecord,
+  createInstanceAtomically,
   updateInstance,
   deleteInstance as deleteInstanceRecord,
   checkResourceLimit,
@@ -84,14 +85,21 @@ export default async function instanceRoutes(app: FastifyInstance) {
         });
       }
 
-      // DB-first: persist local record before calling external API
-      const pendingInstance = await createInstanceRecord(db, {
-        organization_id: organizationId,
+      // C7: atomic slot reservation — check-and-insert in one DB operation
+      // Only call Evolution API after the slot is successfully reserved
+      const pendingInstance = await createInstanceAtomically(db, organizationId, {
         instance_name,
         instance_id: instance_name,
         webhook_url: webhookUrl,
         status: "connecting",
       });
+
+      if (!pendingInstance) {
+        return reply.status(403).send({
+          error: `Limite de instâncias atingido. Seu plano permite ${limit.max} instância(s).`,
+          limit_exceeded: true,
+        });
+      }
 
       // Call Evolution API — if this fails, local record remains in "connecting" state (detectable/recoverable)
       let evolutionResult: Record<string, Record<string, string>>;

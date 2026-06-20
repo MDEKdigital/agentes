@@ -29,6 +29,7 @@ vi.mock("@aula-agente/database", () => ({
   getInstancesByOrganization: vi.fn(),
   getInstanceByIdForUser: vi.fn(),
   createInstance: mockCreateInstanceRecord,
+  createInstanceAtomically: mockCreateInstanceRecord,
   updateInstance: mockUpdateInstance,
   deleteInstance: vi.fn(),
   checkResourceLimit: mockCheckResourceLimit,
@@ -164,8 +165,11 @@ describe("POST /organizations/:organizationId/instances — DB-first provisionin
       payload: { instance_name: "whatsapp-principal" },
     });
 
+    // C7: createInstanceAtomically (aliased to mockCreateInstanceRecord) receives orgId as 2nd arg
+    // and instance data as 3rd arg — both are now routed through the atomic helper
     expect(mockCreateInstanceRecord).toHaveBeenCalledWith(
       expect.anything(),
+      ORG_ID,
       expect.objectContaining({ status: "connecting" })
     );
   });

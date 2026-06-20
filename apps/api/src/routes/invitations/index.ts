@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { getAdminClient, createInvitation, checkResourceLimit, getOrgInvitations } from "@aula-agente/database";
+import { getAdminClient, createInvitation, createInvitationAtomically, checkResourceLimit, getOrgInvitations } from "@aula-agente/database";
 import { authMiddleware } from "../../middleware/auth";
 import { fireAudit } from "../../lib/audit";
 
@@ -67,12 +67,19 @@ export default async function invitationRoutes(app: FastifyInstance) {
         });
       }
 
-      const invitation = await createInvitation(db, {
-        organization_id: organizationId,
+      // C6: atomic check-and-insert eliminates the TOCTOU window
+      const invitation = await createInvitationAtomically(db, organizationId, {
         email,
         role: role as InvitationRole,
         invited_by: request.user.id,
       });
+
+      if (!invitation) {
+        return reply.status(403).send({
+          error: `Limite de membros atingido. Seu plano permite ${limit.max} membro(s).`,
+          limit_exceeded: true,
+        });
+      }
 
       fireAudit(db, {
         organization_id: organizationId,

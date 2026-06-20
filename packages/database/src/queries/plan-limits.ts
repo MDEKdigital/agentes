@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { EvolutionInstance } from "@aula-agente/shared";
 
 export type PlanResource = "agents" | "instances" | "members";
 
@@ -62,4 +63,56 @@ export async function checkResourceLimit(
 
   const max = limits[RESOURCE_LIMIT_KEY[resource]];
   return { allowed: current < max, current, max };
+}
+
+/**
+ * C6: Atomic invitation creation — calls a DB function that checks the member count
+ * and inserts the invitation in a single operation, eliminating the TOCTOU window.
+ * Returns null when the limit is already reached (concurrent request won the race).
+ *
+ * Production requires the PostgreSQL function `create_invitation_if_under_member_limit`.
+ */
+export async function createInvitationAtomically(
+  client: SupabaseClient,
+  organizationId: string,
+  data: { email: string; role: string; invited_by: string }
+): Promise<{ id: string; [key: string]: unknown } | null> {
+  const { data: result, error } = await (client as any).rpc(
+    "create_invitation_if_under_member_limit",
+    {
+      p_organization_id: organizationId,
+      p_email: data.email,
+      p_role: data.role,
+      p_invited_by: data.invited_by,
+    }
+  );
+  if (error) throw error;
+  return result ?? null;
+}
+
+/**
+ * C7: Atomic instance slot reservation — calls a DB function that checks the instance
+ * count and inserts the local record in a single operation.
+ * Returns null when the limit is already reached (concurrent request won the race).
+ * The external Evolution API call must only happen after this succeeds.
+ *
+ * Production requires the PostgreSQL function `create_instance_if_under_limit`.
+ */
+export async function createInstanceAtomically(
+  client: SupabaseClient,
+  organizationId: string,
+  data: Pick<EvolutionInstance, "instance_name" | "instance_id" | "webhook_url"> & { status?: string }
+): Promise<EvolutionInstance | null> {
+  const { data: result, error } = await (client as any).rpc(
+    "create_instance_if_under_limit",
+    {
+      p_organization_id: organizationId,
+      p_instance_name: data.instance_name,
+      p_instance_id: data.instance_id,
+      p_webhook_url: data.webhook_url,
+      p_status: data.status ?? "connecting",
+    }
+  );
+  if (error) throw error;
+  return result ?? null;
 }

@@ -25,6 +25,7 @@ vi.mock("../../../middleware/auth", () => ({
 vi.mock("@aula-agente/database", () => ({
   getAdminClient: mockGetAdminClient,
   createInvitation: mockCreateInvitation,
+  createInvitationAtomically: mockCreateInvitation, // same mock — same shape
   checkResourceLimit: mockCheckResourceLimit,
   getOrgInvitations: mockGetOrgInvitations,
   createAuditLog: mockCreateAuditLog,
@@ -149,10 +150,11 @@ describe("POST /organizations/:organizationId/invitations", () => {
     expect(res.statusCode).toBe(201);
     const body = JSON.parse(res.body);
     expect(body.id).toBe("inv-uuid-1");
+    // C6: createInvitationAtomically (aliased to mockCreateInvitation) receives orgId as 2nd arg
     expect(mockCreateInvitation).toHaveBeenCalledWith(
       expect.anything(),
+      ORG_ID,
       expect.objectContaining({
-        organization_id: ORG_ID,
         email: "novo@membro.com",
         role: "agent",
         invited_by: USER_ID,

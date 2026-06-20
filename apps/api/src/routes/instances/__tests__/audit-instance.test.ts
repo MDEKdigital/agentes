@@ -28,6 +28,7 @@ vi.mock("@aula-agente/database", () => ({
   getInstanceByIdForUser: mockGetInstanceByIdForUser,
   getInstancesByOrganization: vi.fn(),
   createInstance: mockCreateInstanceRecord,
+  createInstanceAtomically: mockCreateInstanceRecord,
   updateInstance: mockUpdateInstance,
   deleteInstance: mockDeleteInstance,
   checkResourceLimit: mockCheckResourceLimit,
