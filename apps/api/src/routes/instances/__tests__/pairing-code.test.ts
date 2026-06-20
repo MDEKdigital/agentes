@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import Fastify from "fastify";
 
-const { mockGetInstanceById, mockRequestPairingCode, mockAuthMiddleware } = vi.hoisted(() => ({
-  mockGetInstanceById: vi.fn(),
+const { mockGetInstanceByIdForUser, mockRequestPairingCode, mockAuthMiddleware } = vi.hoisted(() => ({
+  mockGetInstanceByIdForUser: vi.fn(),
   mockRequestPairingCode: vi.fn(),
   mockAuthMiddleware: vi.fn(async (request: { user: unknown }) => {
     request.user = {
@@ -13,7 +13,7 @@ const { mockGetInstanceById, mockRequestPairingCode, mockAuthMiddleware } = vi.h
 
 vi.mock("@aula-agente/database", () => ({
   getAdminClient: vi.fn(() => ({})),
-  getInstanceById: mockGetInstanceById,
+  getInstanceByIdForUser: mockGetInstanceByIdForUser,
 }));
 
 vi.mock("../../../services/evolution.service", () => ({
@@ -46,7 +46,7 @@ beforeEach(() => {
 
 describe("POST /instances/:instanceId/pairing-code", () => {
   it("retorna código quando número válido (11 dígitos)", async () => {
-    mockGetInstanceById.mockResolvedValue(mockInstance as never);
+    mockGetInstanceByIdForUser.mockResolvedValue(mockInstance as never);
     mockRequestPairingCode.mockResolvedValue({ pairingCode: "ABCD-EFGH" });
 
     const app = await buildApp();
@@ -62,7 +62,7 @@ describe("POST /instances/:instanceId/pairing-code", () => {
   });
 
   it("retorna código quando número válido (10 dígitos)", async () => {
-    mockGetInstanceById.mockResolvedValue(mockInstance as never);
+    mockGetInstanceByIdForUser.mockResolvedValue(mockInstance as never);
     mockRequestPairingCode.mockResolvedValue({ pairingCode: "WXYZ-1234" });
 
     const app = await buildApp();
@@ -77,7 +77,7 @@ describe("POST /instances/:instanceId/pairing-code", () => {
   });
 
   it("retorna 400 quando número tem menos de 10 dígitos", async () => {
-    mockGetInstanceById.mockResolvedValue(mockInstance as never);
+    mockGetInstanceByIdForUser.mockResolvedValue(mockInstance as never);
 
     const app = await buildApp();
     const res = await app.inject({
@@ -90,7 +90,7 @@ describe("POST /instances/:instanceId/pairing-code", () => {
   });
 
   it("retorna 400 quando número contém letras", async () => {
-    mockGetInstanceById.mockResolvedValue(mockInstance as never);
+    mockGetInstanceByIdForUser.mockResolvedValue(mockInstance as never);
 
     const app = await buildApp();
     const res = await app.inject({
@@ -103,7 +103,7 @@ describe("POST /instances/:instanceId/pairing-code", () => {
   });
 
   it("retorna 400 quando número tem mais de 11 dígitos", async () => {
-    mockGetInstanceById.mockResolvedValue(mockInstance as never);
+    mockGetInstanceByIdForUser.mockResolvedValue(mockInstance as never);
 
     const app = await buildApp();
     const res = await app.inject({
@@ -116,7 +116,7 @@ describe("POST /instances/:instanceId/pairing-code", () => {
   });
 
   it("retorna 404 quando instância não existe", async () => {
-    mockGetInstanceById.mockRejectedValue({ code: "PGRST116" });
+    mockGetInstanceByIdForUser.mockResolvedValue(null);
 
     const app = await buildApp();
     const res = await app.inject({
@@ -129,7 +129,7 @@ describe("POST /instances/:instanceId/pairing-code", () => {
   });
 
   it("retorna 500 quando requestPairingCode falha na Evolution API", async () => {
-    mockGetInstanceById.mockResolvedValue(mockInstance);
+    mockGetInstanceByIdForUser.mockResolvedValue(mockInstance);
     mockRequestPairingCode.mockRejectedValue(new Error("Evolution down"));
 
     const app = await buildApp();
@@ -143,12 +143,12 @@ describe("POST /instances/:instanceId/pairing-code", () => {
   });
 
   it("(S8) usuário não é membro da org da instância → 404 (anti-enumeração)", async () => {
+    mockGetInstanceByIdForUser.mockResolvedValue(null);
     mockAuthMiddleware.mockImplementationOnce(async (request: { user: unknown }) => {
       request.user = {
         memberships: [{ organization_id: "other-org", role: "admin" }],
       };
     });
-    mockGetInstanceById.mockResolvedValue(mockInstance);
 
     const app = await buildApp();
     const res = await app.inject({

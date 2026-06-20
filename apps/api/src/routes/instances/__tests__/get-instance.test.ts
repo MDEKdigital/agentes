@@ -1,14 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import Fastify from "fastify";
 
-const { mockGetInstanceById, mockAuthMiddleware } = vi.hoisted(() => ({
-  mockGetInstanceById: vi.fn(),
+const { mockGetInstanceByIdForUser, mockAuthMiddleware } = vi.hoisted(() => ({
+  mockGetInstanceByIdForUser: vi.fn(),
   mockAuthMiddleware: vi.fn(),
 }));
 
 vi.mock("@aula-agente/database", () => ({
   getAdminClient: vi.fn(() => ({})),
-  getInstanceById: mockGetInstanceById,
+  getInstanceByIdForUser: mockGetInstanceByIdForUser,
   getInstancesByOrganization: vi.fn(),
   createInstance: vi.fn(),
   updateInstance: vi.fn(),
@@ -73,7 +73,7 @@ beforeEach(() => {
 
 describe("GET /instances/:instanceId", () => {
   it("membro da org → 200 com dados da instância", async () => {
-    mockGetInstanceById.mockResolvedValue(INSTANCE_FIXTURE);
+    mockGetInstanceByIdForUser.mockResolvedValue(INSTANCE_FIXTURE);
     const app = await buildApp();
     const res = await app.inject({
       method: "GET",
@@ -87,9 +87,7 @@ describe("GET /instances/:instanceId", () => {
   });
 
   it("instância não encontrada → 404", async () => {
-    const err = new Error("not found") as any;
-    err.code = "PGRST116";
-    mockGetInstanceById.mockRejectedValue(err);
+    mockGetInstanceByIdForUser.mockResolvedValue(null);
     const app = await buildApp();
     const res = await app.inject({
       method: "GET",
@@ -98,8 +96,8 @@ describe("GET /instances/:instanceId", () => {
     expect(res.statusCode).toBe(404);
   });
 
-  it("(S8) usuário não é membro da org da instância → 404 (anti-enumeração)", async () => {
-    mockGetInstanceById.mockResolvedValue(INSTANCE_FIXTURE);
+  it("(S8) instância de outra org → 404 (query retorna null para org sem acesso)", async () => {
+    mockGetInstanceByIdForUser.mockResolvedValue(null);
     const app = await buildApp("outra-org");
     const res = await app.inject({
       method: "GET",

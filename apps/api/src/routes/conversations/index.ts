@@ -95,7 +95,7 @@ export default async function conversationRoutes(app: FastifyInstance) {
       );
       if (!membership) return reply.status(403).send({ error: "Acesso negado" });
 
-      const messages = await getMessagesByConversation(db, conversationId);
+      const messages = await getMessagesByConversation(db, conversationId, orgData.organization_id);
       return reply.send({ messages });
     }
   );
@@ -121,7 +121,7 @@ export default async function conversationRoutes(app: FastifyInstance) {
       const conv = await getConversationById(db, conversationId, orgData.organization_id);
       if (!conv) return reply.status(404).send({ error: "Conversa não encontrada" });
 
-      const messages = await getMessagesByConversation(db, conversationId);
+      const messages = await getMessagesByConversation(db, conversationId, orgData.organization_id);
       return reply.send({ conversation: conv, messages });
     }
   );

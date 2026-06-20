@@ -57,10 +57,10 @@ export function startSendMessageWorker() {
   const worker = new Worker<SendMessageJobData>(
     QUEUE_NAMES.SEND_MESSAGE,
     async (job) => {
-      const { instanceId, phone, content } = job.data;
+      const { instanceId, phone, content, organizationId } = job.data;
 
       const db = getAdminClient();
-      const instance = await getInstanceById(db, instanceId);
+      const instance = await getInstanceById(db, instanceId, organizationId);
       if (!instance) {
         throw new Error(`Instance ${instanceId} not found — cannot send message`);
       }

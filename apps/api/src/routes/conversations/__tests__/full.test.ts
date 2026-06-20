@@ -151,6 +151,6 @@ describe("GET /conversations/:conversationId/full", () => {
     const app = await buildApp();
     await app.inject({ method: "GET", url: `/conversations/${CONV_ID}/full` });
 
-    expect(mockGetMessagesByConversation).toHaveBeenCalledWith(expect.anything(), CONV_ID);
+    expect(mockGetMessagesByConversation).toHaveBeenCalledWith(expect.anything(), CONV_ID, expect.any(String));
   });
 });

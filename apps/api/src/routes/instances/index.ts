@@ -4,7 +4,7 @@ import { getAdminClient } from "@aula-agente/database";
 import { fireAudit } from "../../lib/audit";
 import {
   getInstancesByOrganization,
-  getInstanceById,
+  getInstanceByIdForUser,
   createInstance as createInstanceRecord,
   updateInstance,
   deleteInstance as deleteInstanceRecord,
@@ -111,19 +111,16 @@ export default async function instanceRoutes(app: FastifyInstance) {
     "/instances/:instanceId",
     async (request, reply) => {
       const db = getAdminClient();
-      let instance;
-      try {
-        instance = await getInstanceById(db, request.params.instanceId);
-      } catch (err: unknown) {
-        const code = (err as { code?: string })?.code;
-        if (code === "PGRST116") return reply.status(404).send({ error: "Instância não encontrada" });
-        throw err;
-      }
+      const instance = await getInstanceByIdForUser(
+        db,
+        request.params.instanceId,
+        request.user.memberships.map((m) => m.organization_id)
+      );
 
+      if (!instance) return reply.status(404).send({ error: "Instância não encontrada" });
       const membership = request.user.memberships.find(
         (m) => m.organization_id === instance.organization_id
-      );
-      if (!membership) return reply.status(404).send({ error: "Instância não encontrada" });
+      )!;
 
       return reply.send(instance);
     }
@@ -134,19 +131,16 @@ export default async function instanceRoutes(app: FastifyInstance) {
     "/instances/:instanceId/status",
     async (request, reply) => {
       const db = getAdminClient();
-      let instance;
-      try {
-        instance = await getInstanceById(db, request.params.instanceId);
-      } catch (err: unknown) {
-        const code = (err as { code?: string })?.code;
-        if (code === "PGRST116") return reply.status(404).send({ error: "Instância não encontrada" });
-        throw err;
-      }
+      const instance = await getInstanceByIdForUser(
+        db,
+        request.params.instanceId,
+        request.user.memberships.map((m) => m.organization_id)
+      );
 
+      if (!instance) return reply.status(404).send({ error: "Instância não encontrada" });
       const membership = request.user.memberships.find(
         (m) => m.organization_id === instance.organization_id
-      );
-      if (!membership) return reply.status(404).send({ error: "Instância não encontrada" });
+      )!;
 
       const [status, details] = await Promise.all([
         getInstanceStatus(instance.instance_name) as Promise<Record<string, Record<string, string>>>,
@@ -174,19 +168,16 @@ export default async function instanceRoutes(app: FastifyInstance) {
     "/instances/:instanceId/profile",
     async (request, reply) => {
       const db = getAdminClient();
-      let instance;
-      try {
-        instance = await getInstanceById(db, request.params.instanceId);
-      } catch (err: unknown) {
-        const code = (err as { code?: string })?.code;
-        if (code === "PGRST116") return reply.status(404).send({ error: "Instância não encontrada" });
-        throw err;
-      }
+      const instance = await getInstanceByIdForUser(
+        db,
+        request.params.instanceId,
+        request.user.memberships.map((m) => m.organization_id)
+      );
 
+      if (!instance) return reply.status(404).send({ error: "Instância não encontrada" });
       const membership = request.user.memberships.find(
         (m) => m.organization_id === instance.organization_id
-      );
-      if (!membership) return reply.status(404).send({ error: "Instância não encontrada" });
+      )!;
 
       if (instance.status !== "connected") {
         return { name: null, status: null, picture: null };
@@ -236,19 +227,16 @@ export default async function instanceRoutes(app: FastifyInstance) {
     "/instances/:instanceId/profile",
     async (request, reply) => {
       const db = getAdminClient();
-      let instance;
-      try {
-        instance = await getInstanceById(db, request.params.instanceId);
-      } catch (err: unknown) {
-        const code = (err as { code?: string })?.code;
-        if (code === "PGRST116") return reply.status(404).send({ error: "Instância não encontrada" });
-        throw err;
-      }
+      const instance = await getInstanceByIdForUser(
+        db,
+        request.params.instanceId,
+        request.user.memberships.map((m) => m.organization_id)
+      );
 
+      if (!instance) return reply.status(404).send({ error: "Instância não encontrada" });
       const membership = request.user.memberships.find(
         (m) => m.organization_id === instance.organization_id
-      );
-      if (!membership) return reply.status(404).send({ error: "Instância não encontrada" });
+      )!;
       if (membership.role === "agent") return reply.status(403).send({ error: "Acesso de administrador necessário" });
 
       if (instance.status !== "connected") {
@@ -301,19 +289,16 @@ export default async function instanceRoutes(app: FastifyInstance) {
     "/instances/:instanceId/qrcode",
     async (request, reply) => {
       const db = getAdminClient();
-      let instance;
-      try {
-        instance = await getInstanceById(db, request.params.instanceId);
-      } catch (err: unknown) {
-        const code = (err as { code?: string })?.code;
-        if (code === "PGRST116") return reply.status(404).send({ error: "Instância não encontrada" });
-        throw err;
-      }
+      const instance = await getInstanceByIdForUser(
+        db,
+        request.params.instanceId,
+        request.user.memberships.map((m) => m.organization_id)
+      );
 
+      if (!instance) return reply.status(404).send({ error: "Instância não encontrada" });
       const membership = request.user.memberships.find(
         (m) => m.organization_id === instance.organization_id
-      );
-      if (!membership) return reply.status(404).send({ error: "Instância não encontrada" });
+      )!;
       if (membership.role === "agent") return reply.status(403).send({ error: "Acesso de administrador necessário" });
 
       const qrData = await getInstanceQrCode(instance.instance_name);
@@ -326,19 +311,16 @@ export default async function instanceRoutes(app: FastifyInstance) {
     "/instances/:instanceId",
     async (request, reply) => {
       const db = getAdminClient();
-      let instance;
-      try {
-        instance = await getInstanceById(db, request.params.instanceId);
-      } catch (err: unknown) {
-        const code = (err as { code?: string })?.code;
-        if (code === "PGRST116") return reply.status(404).send({ error: "Instância não encontrada" });
-        throw err;
-      }
+      const instance = await getInstanceByIdForUser(
+        db,
+        request.params.instanceId,
+        request.user.memberships.map((m) => m.organization_id)
+      );
 
+      if (!instance) return reply.status(404).send({ error: "Instância não encontrada" });
       const membership = request.user.memberships.find(
         (m) => m.organization_id === instance.organization_id
-      );
-      if (!membership) return reply.status(404).send({ error: "Instância não encontrada" });
+      )!;
       if (membership.role === "agent") return reply.status(403).send({ error: "Acesso de administrador necessário" });
 
       const parseResult = updateInstanceSchema.safeParse(request.body);
@@ -373,19 +355,16 @@ export default async function instanceRoutes(app: FastifyInstance) {
     "/instances/:instanceId",
     async (request, reply) => {
       const db = getAdminClient();
-      let instance;
-      try {
-        instance = await getInstanceById(db, request.params.instanceId);
-      } catch (err: unknown) {
-        const code = (err as { code?: string })?.code;
-        if (code === "PGRST116") return reply.status(404).send({ error: "Instância não encontrada" });
-        throw err;
-      }
+      const instance = await getInstanceByIdForUser(
+        db,
+        request.params.instanceId,
+        request.user.memberships.map((m) => m.organization_id)
+      );
 
+      if (!instance) return reply.status(404).send({ error: "Instância não encontrada" });
       const membership = request.user.memberships.find(
         (m) => m.organization_id === instance.organization_id
-      );
-      if (!membership) return reply.status(404).send({ error: "Instância não encontrada" });
+      )!;
       if (membership.role !== "owner") return reply.status(403).send({ error: "Acesso de proprietário necessário" });
 
       // Delete from Evolution API
@@ -415,16 +394,12 @@ export default async function instanceRoutes(app: FastifyInstance) {
     "/instances/:instanceId/settings",
     async (request, reply) => {
       const db = getAdminClient();
-      let instance;
-      try {
-        instance = await getInstanceById(db, request.params.instanceId);
-      } catch (err: unknown) {
-        const code = (err as { code?: string })?.code;
-        if (code === "PGRST116") return reply.status(404).send({ error: "Instância não encontrada" });
-        throw err;
-      }
-      const membership = request.user.memberships.find((m) => m.organization_id === instance.organization_id);
-      if (!membership) return reply.status(404).send({ error: "Instância não encontrada" });
+      const instance = await getInstanceByIdForUser(
+        db,
+        request.params.instanceId,
+        request.user.memberships.map((m) => m.organization_id)
+      );
+      if (!instance) return reply.status(404).send({ error: "Instância não encontrada" });
       try {
         const settings = await getInstanceSettings(instance.instance_name);
         return settings;
@@ -439,18 +414,15 @@ export default async function instanceRoutes(app: FastifyInstance) {
     "/instances/:instanceId/settings",
     async (request, reply) => {
       const db = getAdminClient();
-      let instance;
-      try {
-        instance = await getInstanceById(db, request.params.instanceId);
-      } catch (err: unknown) {
-        const code = (err as { code?: string })?.code;
-        if (code === "PGRST116") return reply.status(404).send({ error: "Instância não encontrada" });
-        throw err;
-      }
+      const instance = await getInstanceByIdForUser(
+        db,
+        request.params.instanceId,
+        request.user.memberships.map((m) => m.organization_id)
+      );
+      if (!instance) return reply.status(404).send({ error: "Instância não encontrada" });
       const membership = request.user.memberships.find(
         (m) => m.organization_id === instance.organization_id
-      );
-      if (!membership) return reply.status(404).send({ error: "Instância não encontrada" });
+      )!;
       if (membership.role === "agent") return reply.status(403).send({ error: "Acesso de administrador necessário" });
       await setInstanceSettings(instance.instance_name, request.body as Record<string, unknown>);
 
@@ -472,16 +444,12 @@ export default async function instanceRoutes(app: FastifyInstance) {
     "/instances/:instanceId/privacy",
     async (request, reply) => {
       const db = getAdminClient();
-      let instance;
-      try {
-        instance = await getInstanceById(db, request.params.instanceId);
-      } catch (err: unknown) {
-        const code = (err as { code?: string })?.code;
-        if (code === "PGRST116") return reply.status(404).send({ error: "Instância não encontrada" });
-        throw err;
-      }
-      const membership = request.user.memberships.find((m) => m.organization_id === instance.organization_id);
-      if (!membership) return reply.status(404).send({ error: "Instância não encontrada" });
+      const instance = await getInstanceByIdForUser(
+        db,
+        request.params.instanceId,
+        request.user.memberships.map((m) => m.organization_id)
+      );
+      if (!instance) return reply.status(404).send({ error: "Instância não encontrada" });
       if (instance.status !== "connected") return reply.status(422).send({ error: "Instância não está conectada" });
       try {
         const privacy = await getPrivacySettings(instance.instance_name);
@@ -497,18 +465,15 @@ export default async function instanceRoutes(app: FastifyInstance) {
     "/instances/:instanceId/privacy",
     async (request, reply) => {
       const db = getAdminClient();
-      let instance;
-      try {
-        instance = await getInstanceById(db, request.params.instanceId);
-      } catch (err: unknown) {
-        const code = (err as { code?: string })?.code;
-        if (code === "PGRST116") return reply.status(404).send({ error: "Instância não encontrada" });
-        throw err;
-      }
+      const instance = await getInstanceByIdForUser(
+        db,
+        request.params.instanceId,
+        request.user.memberships.map((m) => m.organization_id)
+      );
+      if (!instance) return reply.status(404).send({ error: "Instância não encontrada" });
       const membership = request.user.memberships.find(
         (m) => m.organization_id === instance.organization_id
-      );
-      if (!membership) return reply.status(404).send({ error: "Instância não encontrada" });
+      )!;
       if (membership.role === "agent") return reply.status(403).send({ error: "Acesso de administrador necessário" });
       if (instance.status !== "connected") return reply.status(422).send({ error: "Instância não está conectada" });
       await updatePrivacySettings(instance.instance_name, request.body as Record<string, unknown>);
@@ -531,18 +496,15 @@ export default async function instanceRoutes(app: FastifyInstance) {
     "/instances/:instanceId/restart",
     async (request, reply) => {
       const db = getAdminClient();
-      let instance;
-      try {
-        instance = await getInstanceById(db, request.params.instanceId);
-      } catch (err: unknown) {
-        const code = (err as { code?: string })?.code;
-        if (code === "PGRST116") return reply.status(404).send({ error: "Instância não encontrada" });
-        throw err;
-      }
+      const instance = await getInstanceByIdForUser(
+        db,
+        request.params.instanceId,
+        request.user.memberships.map((m) => m.organization_id)
+      );
+      if (!instance) return reply.status(404).send({ error: "Instância não encontrada" });
       const membership = request.user.memberships.find(
         (m) => m.organization_id === instance.organization_id
-      );
-      if (!membership) return reply.status(404).send({ error: "Instância não encontrada" });
+      )!;
       if (membership.role === "agent") return reply.status(403).send({ error: "Acesso de administrador necessário" });
       try {
         await restartInstance(instance.instance_name);
@@ -569,19 +531,16 @@ export default async function instanceRoutes(app: FastifyInstance) {
     "/instances/:instanceId/logout",
     async (request, reply) => {
       const db = getAdminClient();
-      let instance;
-      try {
-        instance = await getInstanceById(db, request.params.instanceId);
-      } catch (err: unknown) {
-        const code = (err as { code?: string })?.code;
-        if (code === "PGRST116") return reply.status(404).send({ error: "Instância não encontrada" });
-        throw err;
-      }
+      const instance = await getInstanceByIdForUser(
+        db,
+        request.params.instanceId,
+        request.user.memberships.map((m) => m.organization_id)
+      );
 
+      if (!instance) return reply.status(404).send({ error: "Instância não encontrada" });
       const membership = request.user.memberships.find(
         (m) => m.organization_id === instance.organization_id
-      );
-      if (!membership) return reply.status(404).send({ error: "Instância não encontrada" });
+      )!;
       if (membership.role === "agent") return reply.status(403).send({ error: "Acesso de administrador necessário" });
 
       try {
@@ -609,19 +568,16 @@ export default async function instanceRoutes(app: FastifyInstance) {
     "/instances/:instanceId/pairing-code",
     async (request, reply) => {
       const db = getAdminClient();
-      let instance;
-      try {
-        instance = await getInstanceById(db, request.params.instanceId);
-      } catch (err: unknown) {
-        const code = (err as { code?: string })?.code;
-        if (code === "PGRST116") return reply.status(404).send({ error: "Instância não encontrada" });
-        throw err;
-      }
+      const instance = await getInstanceByIdForUser(
+        db,
+        request.params.instanceId,
+        request.user.memberships.map((m) => m.organization_id)
+      );
 
+      if (!instance) return reply.status(404).send({ error: "Instância não encontrada" });
       const membership = request.user.memberships.find(
         (m) => m.organization_id === instance.organization_id
-      );
-      if (!membership) return reply.status(404).send({ error: "Instância não encontrada" });
+      )!;
       if (membership.role === "agent") return reply.status(403).send({ error: "Acesso de administrador necessário" });
 
       const body = request.body as { phone_number?: unknown };

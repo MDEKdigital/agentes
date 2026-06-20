@@ -5,12 +5,12 @@ import Fastify from "fastify";
 
 const {
   mockAuthMiddleware,
-  mockGetInstanceById,
+  mockGetInstanceByIdForUser,
   mockDeleteInstance,
   mockUpdateInstance,
 } = vi.hoisted(() => ({
   mockAuthMiddleware: vi.fn(),
-  mockGetInstanceById: vi.fn(),
+  mockGetInstanceByIdForUser: vi.fn(),
   mockDeleteInstance: vi.fn(),
   mockUpdateInstance: vi.fn(),
 }));
@@ -21,7 +21,7 @@ vi.mock("../../../middleware/auth", () => ({
 
 vi.mock("@aula-agente/database", () => ({
   getAdminClient: vi.fn(() => ({})),
-  getInstanceById: mockGetInstanceById,
+  getInstanceByIdForUser: mockGetInstanceByIdForUser,
   getInstancesByOrganization: vi.fn(),
   createInstance: vi.fn(),
   updateInstance: mockUpdateInstance,
@@ -81,7 +81,7 @@ function buildAppAsOrgB() {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockGetInstanceById.mockResolvedValue(INSTANCE_ORG_A);
+  mockGetInstanceByIdForUser.mockResolvedValue(INSTANCE_ORG_A);
   mockUpdateInstance.mockResolvedValue(INSTANCE_ORG_A);
   mockDeleteInstance.mockResolvedValue(undefined);
 });
@@ -90,12 +90,14 @@ beforeEach(() => {
 
 describe("(S8) anti-enumeração: instância de outra org deve retornar 404", () => {
   it("GET /instances/:instanceId — org errada → 404", async () => {
+    mockGetInstanceByIdForUser.mockResolvedValue(null);
     const app = await buildAppAsOrgB();
     const res = await app.inject({ method: "GET", url: `/instances/${INST_ID}` });
     expect(res.statusCode).toBe(404);
   });
 
   it("DELETE /instances/:instanceId — org errada → 404", async () => {
+    mockGetInstanceByIdForUser.mockResolvedValue(null);
     const app = await buildAppAsOrgB();
     const res = await app.inject({ method: "DELETE", url: `/instances/${INST_ID}` });
     expect(res.statusCode).toBe(404);
@@ -103,20 +105,21 @@ describe("(S8) anti-enumeração: instância de outra org deve retornar 404", ()
   });
 
   it("GET /instances/:instanceId/settings — org errada → 404", async () => {
+    mockGetInstanceByIdForUser.mockResolvedValue(null);
     const app = await buildAppAsOrgB();
     const res = await app.inject({ method: "GET", url: `/instances/${INST_ID}/settings` });
     expect(res.statusCode).toBe(404);
   });
 
   it("GET /instances/:instanceId/qrcode — org errada → 404", async () => {
+    mockGetInstanceByIdForUser.mockResolvedValue(null);
     const app = await buildAppAsOrgB();
     const res = await app.inject({ method: "GET", url: `/instances/${INST_ID}/qrcode` });
     expect(res.statusCode).toBe(404);
   });
 
   it("instância realmente não encontrada → ainda 404 (sem regressão)", async () => {
-    const err = Object.assign(new Error("not found"), { code: "PGRST116" });
-    mockGetInstanceById.mockRejectedValue(err);
+    mockGetInstanceByIdForUser.mockResolvedValue(null);
     const app = await buildAppAsOrgB();
     const res = await app.inject({ method: "GET", url: `/instances/${INST_ID}` });
     expect(res.statusCode).toBe(404);

@@ -3,12 +3,12 @@ import Fastify from "fastify";
 
 const {
   mockAuthMiddleware,
-  mockGetInstanceById,
+  mockGetInstanceByIdForUser,
   mockCreateAuditLog,
   mockRestartInstance,
 } = vi.hoisted(() => ({
   mockAuthMiddleware: vi.fn(async (_request: any) => {}),
-  mockGetInstanceById: vi.fn(),
+  mockGetInstanceByIdForUser: vi.fn(),
   mockCreateAuditLog: vi.fn().mockResolvedValue({}),
   mockRestartInstance: vi.fn().mockResolvedValue({}),
 }));
@@ -19,7 +19,7 @@ vi.mock("../../../middleware/auth", () => ({
 
 vi.mock("@aula-agente/database", () => ({
   getAdminClient: vi.fn(() => ({})),
-  getInstanceById: mockGetInstanceById,
+  getInstanceByIdForUser: mockGetInstanceByIdForUser,
   getInstancesByOrganization: vi.fn(),
   createInstance: vi.fn(),
   updateInstance: vi.fn(),
@@ -73,7 +73,7 @@ async function buildApp(role = "admin") {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockGetInstanceById.mockResolvedValue(mockInstance);
+  mockGetInstanceByIdForUser.mockResolvedValue(mockInstance);
   mockCreateAuditLog.mockResolvedValue({});
   mockRestartInstance.mockResolvedValue({});
 });

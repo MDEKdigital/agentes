@@ -21,7 +21,7 @@ vi.mock("../../../middleware/auth", () => ({
 vi.mock("@aula-agente/database", () => ({
   getAdminClient: mockGetAdminClient,
   getInstancesByOrganization: vi.fn(),
-  getInstanceById: vi.fn(),
+  getInstanceByIdForUser: vi.fn(),
   createInstance: mockCreateInstanceRecord,
   updateInstance: vi.fn(),
   deleteInstance: vi.fn(),

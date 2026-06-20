@@ -4,12 +4,14 @@ import type { Message } from "@aula-agente/shared";
 export async function getMessagesByConversation(
   client: SupabaseClient,
   conversationId: string,
+  organizationId: string,
   limit = 50
 ) {
   const { data, error } = await client
     .from("messages")
     .select("*")
     .eq("conversation_id", conversationId)
+    .eq("organization_id", organizationId)
     .order("created_at", { ascending: true })
     .limit(limit);
   if (error) throw error;
@@ -19,12 +21,14 @@ export async function getMessagesByConversation(
 export async function getRecentMessages(
   client: SupabaseClient,
   conversationId: string,
+  organizationId: string,
   limit = 20
 ) {
   const { data, error } = await client
     .from("messages")
     .select("*")
     .eq("conversation_id", conversationId)
+    .eq("organization_id", organizationId)
     .order("created_at", { ascending: false })
     .limit(limit);
   if (error) throw error;

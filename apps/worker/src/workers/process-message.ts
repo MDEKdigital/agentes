@@ -203,8 +203,8 @@ export function startProcessMessageWorker() {
         // Fix #9 + #8: Parallelize apiKey + recentMessages + instance (always fetched up front)
         const [apiKey, recentMessages, instance] = await Promise.all([
           resolveApiKey(organizationId, agent.provider),
-          getRecentMessages(db, conversationId, 20),
-          getInstanceById(db, evolutionInstanceId),
+          getRecentMessages(db, conversationId, organizationId, 20),
+          getInstanceById(db, evolutionInstanceId, organizationId),
         ]);
 
         const currentMessage = recentMessages.find((m) => m.id === messageId);

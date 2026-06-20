@@ -3,7 +3,7 @@ import Fastify from "fastify";
 
 const {
   mockAuthMiddleware,
-  mockGetInstanceById,
+  mockGetInstanceByIdForUser,
   mockCreateAuditLog,
   mockCreateInstanceRecord,
   mockUpdateInstance,
@@ -11,7 +11,7 @@ const {
   mockCheckResourceLimit,
 } = vi.hoisted(() => ({
   mockAuthMiddleware: vi.fn(),
-  mockGetInstanceById: vi.fn(),
+  mockGetInstanceByIdForUser: vi.fn(),
   mockCreateAuditLog: vi.fn().mockResolvedValue({}),
   mockCreateInstanceRecord: vi.fn(),
   mockUpdateInstance: vi.fn(),
@@ -25,7 +25,7 @@ vi.mock("../../../middleware/auth", () => ({
 
 vi.mock("@aula-agente/database", () => ({
   getAdminClient: vi.fn(() => ({})),
-  getInstanceById: mockGetInstanceById,
+  getInstanceByIdForUser: mockGetInstanceByIdForUser,
   getInstancesByOrganization: vi.fn(),
   createInstance: mockCreateInstanceRecord,
   updateInstance: mockUpdateInstance,
@@ -79,7 +79,7 @@ async function buildApp(role = "admin") {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockGetInstanceById.mockResolvedValue(mockInstance);
+  mockGetInstanceByIdForUser.mockResolvedValue(mockInstance);
   mockUpdateInstance.mockResolvedValue(mockInstance);
   mockDeleteInstance.mockResolvedValue(undefined);
   mockCheckResourceLimit.mockResolvedValue({ allowed: true, current: 0, max: 3 });

@@ -55,7 +55,7 @@ export default async function messageSendRoutes(app: FastifyInstance) {
       }
 
       // Get instance for sending
-      const instance = await getInstanceById(db, conversation.evolution_instance_id);
+      const instance = await getInstanceById(db, conversation.evolution_instance_id, conversation.organization_id);
       if (!instance) {
         return reply.status(404).send({ error: "Instância WhatsApp não encontrada" });
       }

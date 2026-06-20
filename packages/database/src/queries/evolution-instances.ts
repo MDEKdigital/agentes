@@ -11,14 +11,29 @@ export async function getInstancesByOrganization(client: SupabaseClient, organiz
   return data;
 }
 
-export async function getInstanceById(client: SupabaseClient, id: string) {
+export async function getInstanceById(client: SupabaseClient, id: string, organizationId: string) {
   const { data, error } = await client
     .from("evolution_instances")
     .select("*")
     .eq("id", id)
+    .eq("organization_id", organizationId)
     .single();
   if (error) throw error;
   return data as EvolutionInstance;
+}
+
+export async function getInstanceByIdForUser(
+  client: SupabaseClient,
+  id: string,
+  orgIds: string[]
+) {
+  const { data } = await client
+    .from("evolution_instances")
+    .select("*")
+    .eq("id", id)
+    .in("organization_id", orgIds)
+    .maybeSingle();
+  return data as EvolutionInstance | null;
 }
 
 export async function getInstanceByInstanceId(client: SupabaseClient, instanceId: string) {

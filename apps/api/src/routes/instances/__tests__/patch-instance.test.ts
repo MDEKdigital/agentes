@@ -5,12 +5,12 @@ import Fastify from "fastify";
 
 const {
   mockAuthMiddleware,
-  mockGetInstanceById,
+  mockGetInstanceByIdForUser,
   mockGetAgentById,
   mockUpdateInstance,
 } = vi.hoisted(() => ({
   mockAuthMiddleware: vi.fn(),
-  mockGetInstanceById: vi.fn(),
+  mockGetInstanceByIdForUser: vi.fn(),
   mockGetAgentById: vi.fn(),
   mockUpdateInstance: vi.fn(),
 }));
@@ -21,7 +21,7 @@ vi.mock("../../../middleware/auth", () => ({
 
 vi.mock("@aula-agente/database", () => ({
   getAdminClient: vi.fn(() => ({})),
-  getInstanceById: mockGetInstanceById,
+  getInstanceByIdForUser: mockGetInstanceByIdForUser,
   getInstancesByOrganization: vi.fn(),
   createInstance: vi.fn(),
   updateInstance: mockUpdateInstance,
@@ -92,7 +92,7 @@ async function buildApp(role = "admin") {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockGetInstanceById.mockResolvedValue(INSTANCE_ORG_A);
+  mockGetInstanceByIdForUser.mockResolvedValue(INSTANCE_ORG_A);
   mockGetAgentById.mockResolvedValue(AGENT_FIXTURE);
   mockUpdateInstance.mockResolvedValue({ ...INSTANCE_ORG_A, active_agent_id: AGENT_ORG_A });
 });
@@ -145,8 +145,7 @@ describe("PATCH /instances/:instanceId", () => {
   });
 
   it("instância não encontrada → 404", async () => {
-    const err = Object.assign(new Error("not found"), { code: "PGRST116" });
-    mockGetInstanceById.mockRejectedValue(err);
+    mockGetInstanceByIdForUser.mockResolvedValue(null);
 
     const app = await buildApp();
     const res = await app.inject({
@@ -160,6 +159,7 @@ describe("PATCH /instances/:instanceId", () => {
   });
 
   it("(S8): usuário não é membro da org da instância → 404 (anti-enumeração)", async () => {
+    mockGetInstanceByIdForUser.mockResolvedValue(null);
     mockAuthMiddleware.mockImplementation(async (request: any) => {
       request.user = {
         id: USER_ID,
