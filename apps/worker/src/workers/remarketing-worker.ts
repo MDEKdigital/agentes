@@ -188,13 +188,8 @@ export async function processRemarketingCycle() {
         continue;
       }
 
-      // ── R10: Avançar para próxima etapa ANTES de enviar ──────────────────────
-      // Crash after advanceEnrollment but before sendQueue.add → retry sees advanced
-      // next_step_id and skips this step, preventing duplicate step_sent audits.
-      const nextStep = await getNextActiveStep(db, enrollment.flow_id, step.step_order);
-      await advanceEnrollment(db, enrollment.id, nextStep?.id ?? null, enrollment.organization_id);
-
       // ── Inserir mensagem no histórico ──────────────────────────────────────
+      // DB-first: insert before enqueue so we have a messageId for the job.
       const { data: insertedMsg, error: msgError } = await db
         .from("messages")
         .insert({
@@ -211,15 +206,34 @@ export async function processRemarketingCycle() {
       if (msgError) throw msgError;
 
       // ── Enfileirar envio real via WhatsApp ────────────────────────────────
+      // Stable jobId = enrollment_id + step_id → idempotent on retry (no duplicate WhatsApp send).
+      // If enqueue fails: delete the inserted message (C4 — no ghost state in DB) and throw
+      // without advancing the enrollment (C3 — step remains recoverable on next cycle).
       const sendQueue = getSendMessageQueue();
-      await sendQueue.add("send-message", {
-        conversationId: enrollment.conversation_id,
-        messageId: insertedMsg.id,
-        instanceId,
-        phone: contact.phone,
-        content: step.message_content,
-        organizationId: enrollment.organization_id,
-      });
+      try {
+        await sendQueue.add(
+          "send-message",
+          {
+            conversationId: enrollment.conversation_id,
+            messageId: insertedMsg.id,
+            instanceId,
+            phone: contact.phone,
+            content: step.message_content,
+            organizationId: enrollment.organization_id,
+          },
+          { jobId: `${enrollment.id}_${step.id}` }
+        );
+      } catch (queueErr) {
+        // C4: clean up the inserted message so it does not appear as "sent" in history
+        await db.from("messages").delete().eq("id", insertedMsg.id);
+        throw queueErr; // C3: enrollment not advanced → step is recoverable
+      }
+
+      // ── Avançar enrollment (ponto de commit) ─────────────────────────────
+      // Only reached after both the DB insert and the queue add succeeded.
+      // Crash between sendQueue.add and here → retry re-uses same jobId → no duplicate send.
+      const nextStep = await getNextActiveStep(db, enrollment.flow_id, step.step_order);
+      await advanceEnrollment(db, enrollment.id, nextStep?.id ?? null, enrollment.organization_id);
 
       fireAudit(db, {
         organization_id: enrollment.organization_id,

@@ -419,14 +419,15 @@ describe("audit logs — remarketing-worker", () => {
 
   // ── R10: step_sent — idempotência via reordenação ─────────────────────────────
 
-  it("R10: advanceEnrollment é chamado ANTES de sendQueue.add (guarda retry)", async () => {
+  // R10 (updated): envio deve ser garantido ANTES de avançar o enrollment
+  it("R10: sendQueue.add é chamado ANTES de advanceEnrollment (envio garantido antes de avançar)", async () => {
     const callOrder: string[] = [];
 
-    mockAdvanceEnrollment.mockImplementation(async () => {
-      callOrder.push("advanceEnrollment");
-    });
     mockQueueAdd.mockImplementation(async () => {
       callOrder.push("sendQueue.add");
+    });
+    mockAdvanceEnrollment.mockImplementation(async () => {
+      callOrder.push("advanceEnrollment");
     });
 
     const enr = makeEnrollment("enr-order", FLOW_1_ID, STEP_1_ID);
@@ -439,13 +440,138 @@ describe("audit logs — remarketing-worker", () => {
 
     await processRemarketingCycle();
 
-    const advIdx = callOrder.indexOf("advanceEnrollment");
     const addIdx = callOrder.indexOf("sendQueue.add");
+    const advIdx = callOrder.indexOf("advanceEnrollment");
 
-    // Currently: sendQueue.add fires BEFORE advanceEnrollment → advIdx > addIdx → FAILS (RED)
-    expect(advIdx).toBeGreaterThanOrEqual(0);
     expect(addIdx).toBeGreaterThanOrEqual(0);
-    expect(advIdx).toBeLessThan(addIdx);
+    expect(advIdx).toBeGreaterThanOrEqual(0);
+    // sendQueue.add must come BEFORE advanceEnrollment (bug fix: step not permanently lost)
+    expect(addIdx).toBeLessThan(advIdx);
+  });
+
+  // C3 — crash entre insert e sendQueue.add NÃO deve perder o step
+  it("C3: se INSERT da mensagem falha, advanceEnrollment NÃO é chamado (step permanece recuperável)", async () => {
+    // Custom DB mock: messages.insert retorna erro
+    mockGetAdminClient.mockReturnValue({
+      from: vi.fn((table: string) => {
+        if (table === "messages") {
+          return {
+            insert: vi.fn().mockReturnValue({
+              select: vi.fn().mockReturnValue({
+                single: vi.fn().mockResolvedValue({ data: null, error: { message: "DB write error", code: "23505" } }),
+              }),
+            }),
+          };
+        }
+        throw new Error(`Unexpected db.from("${table}")`);
+      }),
+    });
+
+    const enr = makeEnrollment("enr-c3-insert", FLOW_1_ID, STEP_1_ID);
+    mockGetActiveEnrollments.mockResolvedValue([enr]);
+    mockGetRemarketingFlowsByIds.mockResolvedValue([makeFlow(FLOW_1_ID)]);
+    mockGetRemarketingStepsByIds.mockResolvedValue([makeStep(STEP_1_ID, FLOW_1_ID)]);
+    mockIsConversationResolved.mockResolvedValue(false);
+    mockGetConversationById.mockResolvedValue(makeConversation("conv-enr-c3-insert"));
+
+    await processRemarketingCycle();
+
+    // Bug atual: advanceEnrollment É chamado (linha 195, antes do insert) → step perdido
+    // Após correção: insert falha ANTES de advanceEnrollment → step recuperável
+    expect(mockAdvanceEnrollment).not.toHaveBeenCalled();
+  });
+
+  it("C3: se sendQueue.add falha, advanceEnrollment NÃO é chamado (step não avança silenciosamente)", async () => {
+    mockQueueAdd.mockRejectedValue(new Error("Redis/BullMQ unavailable"));
+
+    const enr = makeEnrollment("enr-c3-queue", FLOW_1_ID, STEP_1_ID);
+    mockGetActiveEnrollments.mockResolvedValue([enr]);
+    mockGetRemarketingFlowsByIds.mockResolvedValue([makeFlow(FLOW_1_ID)]);
+    mockGetRemarketingStepsByIds.mockResolvedValue([makeStep(STEP_1_ID, FLOW_1_ID)]);
+    mockIsConversationResolved.mockResolvedValue(false);
+    mockGetConversationById.mockResolvedValue(makeConversation("conv-enr-c3-queue"));
+
+    await processRemarketingCycle();
+
+    // Bug atual: advanceEnrollment É chamado antes de sendQueue.add → step perdido quando queue falha
+    // Após correção: sendQueue.add falha → advanceEnrollment NÃO é chamado → step recuperável
+    expect(mockAdvanceEnrollment).not.toHaveBeenCalled();
+  });
+
+  // C4 — mensagem persistida no banco SEM envio não pode ficar como estado final
+  it("C4: se sendQueue.add falha, mensagem inserida é removida do banco (sem estado falso de 'entregue')", async () => {
+    const mockDeleteEq = vi.fn().mockResolvedValue({ error: null });
+    const mockMsgDelete = vi.fn().mockReturnValue({ eq: mockDeleteEq });
+    const mockMsgInsertSingle = vi.fn().mockResolvedValue({ data: { id: "msg-uuid-c4" }, error: null });
+
+    mockGetAdminClient.mockReturnValue({
+      from: vi.fn((table: string) => {
+        if (table === "messages") {
+          return {
+            insert: vi.fn().mockReturnValue({
+              select: vi.fn().mockReturnValue({ single: mockMsgInsertSingle }),
+            }),
+            delete: mockMsgDelete,
+          };
+        }
+        throw new Error(`Unexpected db.from("${table}")`);
+      }),
+    });
+
+    mockQueueAdd.mockRejectedValue(new Error("queue unavailable"));
+
+    const enr = makeEnrollment("enr-c4", FLOW_1_ID, STEP_1_ID);
+    mockGetActiveEnrollments.mockResolvedValue([enr]);
+    mockGetRemarketingFlowsByIds.mockResolvedValue([makeFlow(FLOW_1_ID)]);
+    mockGetRemarketingStepsByIds.mockResolvedValue([makeStep(STEP_1_ID, FLOW_1_ID)]);
+    mockIsConversationResolved.mockResolvedValue(false);
+    mockGetConversationById.mockResolvedValue(makeConversation("conv-enr-c4"));
+
+    await processRemarketingCycle();
+
+    // Bug atual: mensagem fica no banco indefinidamente quando sendQueue.add falha
+    // Após correção: mensagem é deletada → nenhum estado falso de "entregue"
+    expect(mockMsgDelete).toHaveBeenCalled();
+    expect(mockAdvanceEnrollment).not.toHaveBeenCalled();
+  });
+
+  it("C4: audit remarketing.step_sent NÃO dispara quando sendQueue.add falha (sem falso sucesso)", async () => {
+    mockQueueAdd.mockRejectedValue(new Error("queue fail"));
+
+    const enr = makeEnrollment("enr-c4-audit", FLOW_1_ID, STEP_1_ID);
+    mockGetActiveEnrollments.mockResolvedValue([enr]);
+    mockGetRemarketingFlowsByIds.mockResolvedValue([makeFlow(FLOW_1_ID)]);
+    mockGetRemarketingStepsByIds.mockResolvedValue([makeStep(STEP_1_ID, FLOW_1_ID)]);
+    mockIsConversationResolved.mockResolvedValue(false);
+    mockGetConversationById.mockResolvedValue(makeConversation("conv-enr-c4-audit"));
+
+    await processRemarketingCycle();
+
+    expect(mockCreateAuditLog).not.toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ action: "remarketing.step_sent" })
+    );
+  });
+
+  // Idempotência — jobId estável previne envio duplo no retry
+  it("idempotência: sendQueue.add recebe jobId estável baseado em enrollment_id + step_id", async () => {
+    const enr = makeEnrollment("enr-idem", FLOW_1_ID, STEP_1_ID);
+    mockGetActiveEnrollments.mockResolvedValue([enr]);
+    mockGetRemarketingFlowsByIds.mockResolvedValue([makeFlow(FLOW_1_ID)]);
+    mockGetRemarketingStepsByIds.mockResolvedValue([makeStep(STEP_1_ID, FLOW_1_ID)]);
+    mockIsConversationResolved.mockResolvedValue(false);
+    mockGetConversationById.mockResolvedValue(makeConversation("conv-enr-idem"));
+    mockGetNextActiveStep.mockResolvedValue(null);
+
+    await processRemarketingCycle();
+
+    // Bug atual: sendQueue.add chamado sem jobId → retry pode duplicar envio
+    // Após correção: jobId estável baseado em enrollment_id + step_id
+    expect(mockQueueAdd).toHaveBeenCalledWith(
+      "send-message",
+      expect.any(Object),
+      expect.objectContaining({ jobId: `${enr.id}_${STEP_1_ID}` })
+    );
   });
 
   it("(audit): NÃO audita enrollment_created quando createEnrollment lança erro de duplicata", async () => {
