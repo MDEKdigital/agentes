@@ -3,8 +3,18 @@ import { getAdminClient } from "@aula-agente/database";
 import { authMiddleware } from "../../middleware/auth";
 import { fireAudit } from "../../lib/audit";
 
+const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+
 export default async function remarketingFlowRoutes(app: FastifyInstance) {
   app.addHook("preHandler", authMiddleware);
+
+  // V9: reject malformed org header before membership check
+  app.addHook("preHandler", async (request, reply) => {
+    const orgId = request.headers["x-organization-id"] as string | undefined;
+    if (orgId && !UUID_RE.test(orgId)) {
+      return reply.status(400).send({ error: "x-organization-id deve ser um UUID valido" });
+    }
+  });
 
   app.get("/remarketing/flows", async (request, reply) => {
     const orgId = request.headers["x-organization-id"] as string;

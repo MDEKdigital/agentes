@@ -22,10 +22,10 @@ vi.mock("@aula-agente/database", () => ({
 
 import remarketingStepRoutes from "../steps";
 
-const ORG_ID = "org-uuid-1";
-const FLOW_ID = "flow-uuid-1";
-const STEP_ID = "step-uuid-1";
-const USER_ID = "user-uuid-1";
+const ORG_ID = "00000000-0000-0000-0000-000000000001";
+const FLOW_ID = "00000000-0000-0000-0000-000000000002";
+const STEP_ID = "00000000-0000-0000-0000-000000000003";
+const USER_ID = "00000000-0000-0000-0000-000000000004";
 
 const mockFlow = { id: FLOW_ID, organization_id: ORG_ID };
 const mockStep = {

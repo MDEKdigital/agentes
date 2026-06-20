@@ -1,9 +1,9 @@
-import { timingSafeEqual } from "node:crypto";
+import { timingSafeEqual, createHash } from "node:crypto";
 import type { FastifyRequest, FastifyReply } from "fastify";
 
-const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET;
-
 export async function webhookVerifyMiddleware(request: FastifyRequest, reply: FastifyReply) {
+  // Read at call time so env changes are picked up without module reload
+  const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET;
   if (!WEBHOOK_SECRET) {
     return reply.status(503).send({ error: "Webhook verification not configured" });
   }
@@ -15,17 +15,11 @@ export async function webhookVerifyMiddleware(request: FastifyRequest, reply: Fa
     return reply.status(401).send({ error: "Invalid webhook secret" });
   }
 
-  // Timing-safe comparison to prevent timing oracle attacks
-  let valid = false;
-  try {
-    const a = Buffer.from(apiKey);
-    const b = Buffer.from(WEBHOOK_SECRET);
-    valid = a.length === b.length && timingSafeEqual(a, b);
-  } catch {
-    valid = false;
-  }
+  // Hash both to SHA-256 to normalize length — eliminates timing oracle via length difference
+  const a = createHash("sha256").update(apiKey).digest();
+  const b = createHash("sha256").update(WEBHOOK_SECRET).digest();
 
-  if (!valid) {
+  if (!timingSafeEqual(a, b)) {
     return reply.status(401).send({ error: "Invalid webhook secret" });
   }
 }
