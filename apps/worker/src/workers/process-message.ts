@@ -270,16 +270,34 @@ export function startProcessMessageWorker() {
 
           if (evalResult.action === "confirm") {
             console.log(`[activation-gate] Conversa ${conversationId} — confiança baixa, solicitando confirmação`);
-            const confirmMsg = await createMessage(db, {
-              conversation_id: conversationId,
-              organization_id: organizationId,
-              evolution_message_id: null,
-              role: "agent",
-              content: evalResult.confirmationMessage,
-              media_url: null,
-              media_type: null,
-              metadata: {},
-            });
+
+            // C14 idempotency: reuse existing confirmation on retry so no duplicate DB record
+            const existingConfirmation = recentMessages.find(
+              (m) =>
+                m.role === "agent" &&
+                m.metadata?.source_message_id === messageId &&
+                m.metadata?.type === "activation_confirmation"
+            );
+
+            let confirmMsg: { id: string };
+            if (existingConfirmation) {
+              confirmMsg = existingConfirmation;
+            } else {
+              confirmMsg = await createMessage(db, {
+                conversation_id: conversationId,
+                organization_id: organizationId,
+                evolution_message_id: null,
+                role: "agent",
+                content: evalResult.confirmationMessage,
+                media_url: null,
+                media_type: null,
+                metadata: {
+                  source_message_id: messageId,
+                  type: "activation_confirmation",
+                },
+              });
+            }
+            // Always idempotent: ensures state is consistent even if first run crashed mid-way
             await updateConversation(db, conversationId, {
               awaiting_activation_confirmation: true,
               last_message_at: new Date().toISOString(),
@@ -292,7 +310,7 @@ export function startProcessMessageWorker() {
               phone: contact.phone,
               content: evalResult.confirmationMessage,
               organizationId,
-            });
+            }, { jobId: `${messageId}_confirmation` });
             return;
           }
 
@@ -316,33 +334,51 @@ export function startProcessMessageWorker() {
           });
         }
 
-        const result = await runAgent({
-          agent,
-          messages: history,
-          currentMessage: effectiveMessage,
-          apiKey,
-          organizationId,
-          imageContent,
-          conversationId,
-        });
+        // C1 idempotency: if a response already exists for this trigger message, reuse it so
+        // a retry cannot call runAgent() again and produce a duplicate reply.
+        const existingResponse = recentMessages.find(
+          (m) => m.role === "agent" && m.metadata?.source_message_id === messageId
+        );
 
-        const responseMessage = await createMessage(db, {
-          conversation_id: conversationId,
-          organization_id: organizationId,
-          evolution_message_id: null,
-          role: "agent",
-          content: result.text,
-          media_url: null,
-          media_type: null,
-          metadata: {
-            model: result.model,
-            tokens_used: result.tokensUsed,
-            latency_ms: result.latencyMs,
-            tool_calls: result.toolCalls,
-          },
-        });
+        let responseMessage: { id: string };
+        let wasResolved: boolean;
+        let responseContent: string;
 
-        const wasResolved = result.toolCalls.includes(CLOSE_CONVERSATION_TOOL_NAME);
+        if (existingResponse) {
+          console.log(`[process-message] Retry: reusing existing response ${existingResponse.id} for message ${messageId}`);
+          responseMessage = existingResponse;
+          responseContent = existingResponse.content;
+          wasResolved = (existingResponse.metadata?.tool_calls ?? []).includes(CLOSE_CONVERSATION_TOOL_NAME);
+        } else {
+          const result = await runAgent({
+            agent,
+            messages: history,
+            currentMessage: effectiveMessage,
+            apiKey,
+            organizationId,
+            imageContent,
+            conversationId,
+          });
+          responseContent = result.text;
+          wasResolved = result.toolCalls.includes(CLOSE_CONVERSATION_TOOL_NAME);
+          responseMessage = await createMessage(db, {
+            conversation_id: conversationId,
+            organization_id: organizationId,
+            evolution_message_id: null,
+            role: "agent",
+            content: result.text,
+            media_url: null,
+            media_type: null,
+            metadata: {
+              source_message_id: messageId,
+              model: result.model,
+              tokens_used: result.tokensUsed,
+              latency_ms: result.latencyMs,
+              tool_calls: result.toolCalls,
+            },
+          });
+        }
+
         await updateConversation(db, conversationId, {
           last_message_at: new Date().toISOString(),
           status: wasResolved ? "resolved" : "waiting",
@@ -360,14 +396,15 @@ export function startProcessMessageWorker() {
         }
 
         const sendQueue = getSendMessageQueue();
+        // Stable jobId prevents duplicate WhatsApp delivery when retry hits the queue add twice
         await sendQueue.add("send-message", {
           conversationId,
           messageId: responseMessage.id,
           instanceId: instance.id,
           phone: contact.phone,
-          content: result.text,
+          content: responseContent,
           organizationId,
-        });
+        }, { jobId: `${messageId}_agent_response` });
 
         console.log(`Processed message ${messageId} -> response ${responseMessage.id}`);
       } finally {

@@ -20,4 +20,6 @@ export interface MessageMetadata {
   tokens_used?: number;
   latency_ms?: number;
   tool_calls?: string[];
+  source_message_id?: string;
+  type?: string;
 }

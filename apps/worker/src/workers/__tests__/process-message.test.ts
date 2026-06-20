@@ -159,7 +159,8 @@ describe("startProcessMessageWorker", () => {
     );
     expect(sendQueue.add).toHaveBeenCalledWith(
       "send-message",
-      expect.objectContaining({ phone: "5511999999999" })
+      expect.objectContaining({ phone: "5511999999999" }),
+      expect.objectContaining({ jobId: "msg-1_agent_response" })
     );
   });
 
@@ -481,5 +482,202 @@ describe("R6: retry com conversa já resolved — NÃO emite segundo conversatio
       (args: unknown[]) => (args[1] as { action: string })?.action === "conversation.resolved"
     );
     expect(resolvedCalls).toHaveLength(0);
+  });
+});
+
+// ── C1 + C14: idempotência em retry de process-message ─────────────────────────
+
+describe("C1 — resposta do agente não deve ser duplicada em retry", () => {
+  it("C1 nominal: createMessage de resposta inclui source_message_id no metadata", async () => {
+    await runJob();
+
+    expect(createMessage).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        role: "agent",
+        metadata: expect.objectContaining({ source_message_id: "msg-1" }),
+      })
+    );
+  });
+
+  it("C1: sendQueue.add para resposta usa jobId estável baseado em messageId", async () => {
+    const sendQueue = { add: vi.fn() };
+    vi.mocked(getSendMessageQueue).mockReturnValue(sendQueue as never);
+
+    await runJob();
+
+    expect(sendQueue.add).toHaveBeenCalledWith(
+      "send-message",
+      expect.any(Object),
+      expect.objectContaining({ jobId: "msg-1_agent_response" })
+    );
+  });
+
+  it("C1: retry não chama runAgent quando resposta já existe no histórico para messageId", async () => {
+    vi.mocked(getRecentMessages).mockResolvedValue([
+      { id: "msg-1", role: "contact", content: "Olá", metadata: null },
+      {
+        id: "msg-resp-existing",
+        role: "agent",
+        content: "Resposta anterior",
+        metadata: { source_message_id: "msg-1", tool_calls: [] },
+      },
+    ] as never);
+
+    await runJob();
+
+    expect(mockRunAgent).not.toHaveBeenCalled();
+  });
+
+  it("C1: retry não cria segunda mensagem de resposta do agente", async () => {
+    vi.mocked(getRecentMessages).mockResolvedValue([
+      { id: "msg-1", role: "contact", content: "Olá", metadata: null },
+      {
+        id: "msg-resp-existing",
+        role: "agent",
+        content: "Resposta anterior",
+        metadata: { source_message_id: "msg-1", tool_calls: [] },
+      },
+    ] as never);
+
+    await runJob();
+
+    expect(createMessage).not.toHaveBeenCalled();
+  });
+
+  it("C1: retry enfileira send-message usando id da resposta existente (garante entrega)", async () => {
+    vi.mocked(getRecentMessages).mockResolvedValue([
+      { id: "msg-1", role: "contact", content: "Olá", metadata: null },
+      {
+        id: "msg-resp-existing",
+        role: "agent",
+        content: "Resposta anterior",
+        metadata: { source_message_id: "msg-1", tool_calls: [] },
+      },
+    ] as never);
+    const sendQueue = { add: vi.fn() };
+    vi.mocked(getSendMessageQueue).mockReturnValue(sendQueue as never);
+
+    await runJob();
+
+    expect(sendQueue.add).toHaveBeenCalledWith(
+      "send-message",
+      expect.objectContaining({ messageId: "msg-resp-existing" }),
+      expect.any(Object)
+    );
+  });
+
+  it("C1: audit conversation.resolved dispara corretamente via metadata da resposta existente", async () => {
+    vi.mocked(getRecentMessages).mockResolvedValue([
+      { id: "msg-1", role: "contact", content: "Olá", metadata: null },
+      {
+        id: "msg-resp-existing",
+        role: "agent",
+        content: "Até logo!",
+        metadata: { source_message_id: "msg-1", tool_calls: ["close_conversation"] },
+      },
+    ] as never);
+
+    await runJob();
+
+    const resolvedCalls = mockCreateAuditLog.mock.calls.filter(
+      (args: unknown[]) => (args[1] as { action: string })?.action === "conversation.resolved"
+    );
+    // current code: runAgent returns [] toolCalls → no audit → 0 calls → FAIL (expects 1)
+    // after fix: reads tool_calls from metadata → wasResolved=true → audit fires → 1 call
+    expect(resolvedCalls).toHaveLength(1);
+  });
+});
+
+describe("C14 — mensagem de confirmação não deve ser duplicada em retry", () => {
+  const withActivationRules = {
+    ...activeAgent,
+    activation_rules: [{ type: "single_word", value: "suporte" }],
+  };
+  const unactivatedConv = {
+    ...conversation,
+    is_keyword_activated: false,
+    awaiting_activation_confirmation: false,
+  };
+
+  beforeEach(() => {
+    mockEvaluateActivation.mockResolvedValue({
+      action: "confirm" as const,
+      confirmationMessage: "Você quis dizer 'suporte'?",
+    });
+    vi.mocked(getAgentById).mockResolvedValue(withActivationRules as never);
+    vi.mocked(getConversationById).mockResolvedValue(unactivatedConv as never);
+    vi.mocked(getRecentMessages).mockResolvedValue([
+      { id: "msg-1", role: "contact", content: "suporte", metadata: null },
+    ] as never);
+    vi.mocked(createMessage).mockResolvedValue({ id: "confirm-new" } as never);
+  });
+
+  it("C14 nominal: createMessage de confirmação inclui source_message_id e type no metadata", async () => {
+    await runJob();
+
+    expect(createMessage).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        role: "agent",
+        metadata: expect.objectContaining({
+          source_message_id: "msg-1",
+          type: "activation_confirmation",
+        }),
+      })
+    );
+  });
+
+  it("C14: sendQueue.add para confirmação usa jobId estável baseado em messageId", async () => {
+    const sendQueue = { add: vi.fn() };
+    vi.mocked(getSendMessageQueue).mockReturnValue(sendQueue as never);
+
+    await runJob();
+
+    expect(sendQueue.add).toHaveBeenCalledWith(
+      "send-message",
+      expect.any(Object),
+      expect.objectContaining({ jobId: "msg-1_confirmation" })
+    );
+  });
+
+  it("C14: retry não cria segunda mensagem de confirmação quando já existe no histórico", async () => {
+    vi.mocked(getRecentMessages).mockResolvedValue([
+      { id: "msg-1", role: "contact", content: "suporte", metadata: null },
+      {
+        id: "confirm-existing",
+        role: "agent",
+        content: "Você quis dizer 'suporte'?",
+        metadata: { source_message_id: "msg-1", type: "activation_confirmation" },
+      },
+    ] as never);
+
+    await runJob();
+
+    // current code: createMessage IS called again → FAIL → RED
+    // after fix: existing found → createMessage NOT called → GREEN
+    expect(createMessage).not.toHaveBeenCalled();
+  });
+
+  it("C14: retry enfileira send-message de confirmação com id existente", async () => {
+    vi.mocked(getRecentMessages).mockResolvedValue([
+      { id: "msg-1", role: "contact", content: "suporte", metadata: null },
+      {
+        id: "confirm-existing",
+        role: "agent",
+        content: "Você quis dizer 'suporte'?",
+        metadata: { source_message_id: "msg-1", type: "activation_confirmation" },
+      },
+    ] as never);
+    const sendQueue = { add: vi.fn() };
+    vi.mocked(getSendMessageQueue).mockReturnValue(sendQueue as never);
+
+    await runJob();
+
+    expect(sendQueue.add).toHaveBeenCalledWith(
+      "send-message",
+      expect.objectContaining({ messageId: "confirm-existing" }),
+      expect.any(Object)
+    );
   });
 });
