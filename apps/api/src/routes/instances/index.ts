@@ -84,14 +84,29 @@ export default async function instanceRoutes(app: FastifyInstance) {
         });
       }
 
-      // Create in Evolution API
-      const evolutionResult = await createEvolutionInstance(instance_name, webhookUrl) as Record<string, Record<string, string>>;
-      const instance = await createInstanceRecord(db, {
+      // DB-first: persist local record before calling external API
+      const pendingInstance = await createInstanceRecord(db, {
         organization_id: organizationId,
         instance_name,
-        instance_id: evolutionResult.instance?.instanceName || instance_name,
+        instance_id: instance_name,
         webhook_url: webhookUrl,
+        status: "connecting",
       });
+
+      // Call Evolution API — if this fails, local record remains in "connecting" state (detectable/recoverable)
+      let evolutionResult: Record<string, Record<string, string>>;
+      try {
+        evolutionResult = await createEvolutionInstance(instance_name, webhookUrl) as Record<string, Record<string, string>>;
+      } catch (err) {
+        request.log.error({ err, instanceId: pendingInstance.id }, "Evolution API failed after local record created — instance left in connecting state");
+        return reply.status(502).send({ error: "Falha ao provisionar instância na Evolution API" });
+      }
+
+      // Update local record with actual Evolution ID and transition to final state
+      const instance = await updateInstance(db, pendingInstance.id, {
+        instance_id: evolutionResult.instance?.instanceName || instance_name,
+        status: "disconnected",
+      }, organizationId);
 
       fireAudit(db, {
         organization_id: organizationId,

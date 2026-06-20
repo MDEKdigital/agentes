@@ -6,11 +6,13 @@ const {
   mockAuthMiddleware,
   mockGetAdminClient,
   mockCreateInstanceRecord,
+  mockUpdateInstance,
   mockCheckResourceLimit,
 } = vi.hoisted(() => ({
   mockAuthMiddleware: vi.fn(),
   mockGetAdminClient: vi.fn(() => ({})),
   mockCreateInstanceRecord: vi.fn(),
+  mockUpdateInstance: vi.fn(),
   mockCheckResourceLimit: vi.fn(),
 }));
 
@@ -23,7 +25,7 @@ vi.mock("@aula-agente/database", () => ({
   getInstancesByOrganization: vi.fn(),
   getInstanceByIdForUser: vi.fn(),
   createInstance: mockCreateInstanceRecord,
-  updateInstance: vi.fn(),
+  updateInstance: mockUpdateInstance,
   deleteInstance: vi.fn(),
   checkResourceLimit: mockCheckResourceLimit,
   getAgentById: vi.fn(),
@@ -82,6 +84,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockGetAdminClient.mockReturnValue({});
   mockCreateInstanceRecord.mockResolvedValue(mockCreatedInstance);
+  mockUpdateInstance.mockResolvedValue(mockCreatedInstance);
   // Default: under limit
   mockCheckResourceLimit.mockResolvedValue({ allowed: true, current: 1, max: 3 });
 });

@@ -48,11 +48,11 @@ export async function getInstanceByInstanceId(client: SupabaseClient, instanceId
 
 export async function createInstance(
   client: SupabaseClient,
-  instance: Pick<EvolutionInstance, "organization_id" | "instance_name" | "instance_id" | "webhook_url">
+  instance: Pick<EvolutionInstance, "organization_id" | "instance_name" | "instance_id" | "webhook_url"> & { status?: EvolutionInstance["status"] }
 ) {
   const { data, error } = await client
     .from("evolution_instances")
-    .insert({ ...instance, status: "disconnected" })
+    .insert({ status: "disconnected", ...instance })
     .select()
     .single();
   if (error) throw error;
