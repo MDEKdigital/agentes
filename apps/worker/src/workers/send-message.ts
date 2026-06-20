@@ -65,19 +65,12 @@ export function startSendMessageWorker() {
         throw new Error(`Instance ${instanceId} not found — cannot send message`);
       }
 
-      const parts = splitMessage(content);
-      for (let i = 0; i < parts.length; i++) {
-        const part = parts[i];
-        await sendPresence(instance.instance_name, phone, "composing");
-        await typingDelay(part);
-        try {
-          await sendEvolutionText(instance.instance_name, phone, part);
-        } finally {
-          await sendPresence(instance.instance_name, phone, "paused");
-        }
-        if (i < parts.length - 1) {
-          await shortPause();
-        }
+      await sendPresence(instance.instance_name, phone, "composing");
+      await typingDelay(content);
+      try {
+        await sendEvolutionText(instance.instance_name, phone, content);
+      } finally {
+        await sendPresence(instance.instance_name, phone, "paused");
       }
 
       console.log(`Sent message to ${phone} via instance ${instance.instance_name}`);

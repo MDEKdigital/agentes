@@ -111,6 +111,23 @@ export async function getExpiredTakeovers(client: SupabaseClient, timeoutMs: num
   return data as Conversation[];
 }
 
+export async function releaseExpiredTakeover(
+  client: SupabaseClient,
+  id: string,
+  organizationId: string,
+  originalTimestamp: string
+): Promise<boolean> {
+  const { data, error } = await client
+    .from("conversations")
+    .update({ is_human_takeover: false, human_takeover_at: null })
+    .eq("id", id)
+    .eq("organization_id", organizationId)
+    .eq("human_takeover_at", originalTimestamp)
+    .select("id");
+  if (error) throw error;
+  return (data ?? []).length > 0;
+}
+
 export async function addConversationNote(
   client: SupabaseClient,
   note: Omit<ConversationNote, "id" | "created_at" | "updated_at">

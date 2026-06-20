@@ -206,14 +206,14 @@ describe("startSendMessageWorker", () => {
     expect(lastPresenceBody.options.presence).toBe("paused");
   });
 
-  it("mensagem com 2 parágrafos gera 2 composing + 2 paused + 2 sendText na ordem correta", async () => {
+  // C2 — RED: conteúdo multipart deve ser enviado como mensagem única (sem split no worker)
+  it("C2: mensagem com parágrafos é enviada como uma única mensagem, sem divisão em partes", async () => {
     const multiPartJob = {
       ...jobData,
       content: "Primeiro parágrafo.\n\nSegundo parágrafo.",
     };
 
     const { Worker } = await import("bullmq");
-    // Reset e recria worker com novo jobData
     vi.clearAllMocks();
     vi.mocked(getInstanceById).mockResolvedValue({
       id: "inst-1",
@@ -228,23 +228,54 @@ describe("startSendMessageWorker", () => {
     await vi.runAllTimersAsync();
     await jobPromise;
 
-    const calls = mockFetch.mock.calls;
+    const sendTextCalls = mockFetch.mock.calls.filter((c) =>
+      (c[0] as string).includes("/message/sendText/")
+    );
+    // Deve haver exatamente 1 sendText com o conteúdo completo (sem split)
+    expect(sendTextCalls.length).toBe(1);
+    const body = JSON.parse(sendTextCalls[0][1].body as string);
+    expect(body.text).toBe("Primeiro parágrafo.\n\nSegundo parágrafo.");
+  });
 
-    // Verificar sequência completa: composing → sendText → paused → composing → sendText → paused
-    const allCallTypes = calls.map((c) => {
-      const url = c[0] as string;
-      if (url.includes("/chat/sendPresence/")) {
-        return JSON.parse(c[1].body as string).options.presence as string;
-      }
-      return "sendText";
-    });
-    expect(allCallTypes).toEqual(["composing", "sendText", "paused", "composing", "sendText", "paused"]);
+  // C2 — RED: retry não re-envia partes já enviadas
+  it("C2: retry após falha não re-envia partes já enviadas de mensagem multipart", async () => {
+    const multiPartJob = { ...jobData, content: "Parte A\n\nParte B" };
 
-    // Verificar textos enviados
-    const sendTextCalls = calls.filter((c) => (c[0] as string).includes("/message/sendText/"));
-    const [firstText, secondText] = sendTextCalls.map((c) => JSON.parse(c[1].body as string).text);
-    expect(firstText).toBe("Primeiro parágrafo.");
-    expect(secondText).toBe("Segundo parágrafo.");
+    const { Worker } = await import("bullmq");
+    vi.clearAllMocks();
+    vi.mocked(getInstanceById).mockResolvedValue({
+      id: "inst-1",
+      instance_name: "minha-instancia",
+    } as never);
+
+    // Primeira execução: falha no único sendText
+    mockFetch
+      .mockResolvedValueOnce({ ok: true, json: async () => ({}) } as never) // composing
+      .mockResolvedValueOnce({ ok: false, text: async () => "Erro simulado" } as never); // sendText falha
+
+    startSendMessageWorker();
+    const workerInstance = vi.mocked(Worker).mock.results.at(-1)!.value;
+
+    const run1 = workerInstance._processor({ data: multiPartJob });
+    run1.catch(() => {});
+    await vi.runAllTimersAsync();
+    await expect(run1).rejects.toThrow();
+
+    // Retry: reset mocks, tudo OK
+    mockFetch.mockReset();
+    mockFetch.mockResolvedValue({ ok: true, json: async () => ({}) } as never);
+
+    const run2 = workerInstance._processor({ data: multiPartJob });
+    run2.catch(() => {});
+    await vi.runAllTimersAsync();
+    await run2;
+
+    const sendTextOnRetry = mockFetch.mock.calls.filter((c) =>
+      (c[0] as string).includes("/message/sendText/")
+    );
+    // Com single-message fix: apenas 1 sendText no retry (não 2 partes separadas)
+    // Bug antigo (split): enviaria 2 sendText no retry ("Parte A" duplicada + "Parte B")
+    expect(sendTextOnRetry.length).toBe(1);
   });
 
   it("mensagem sem parágrafo gera 1 composing + 1 paused + 1 sendText", async () => {
