@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { getAdminClient, getConversationNotes, addConversationNote, updateConversationTags, getConversationById, getMessagesByConversation, getInboxConversations } from "@aula-agente/database";
+import { getAdminClient, getConversationNotes, addConversationNote, updateConversationTags, getConversationById, getMessagesByConversation, getInboxConversations, activateHumanTakeover } from "@aula-agente/database";
 import { authMiddleware } from "../../middleware/auth";
 import { fireAudit } from "../../lib/audit";
 
@@ -266,17 +266,29 @@ export default async function conversationRoutes(app: FastifyInstance) {
       );
       if (!membership) return reply.status(403).send({ error: "Acesso negado" });
 
-      const { error } = await db
-        .from("conversations")
-        .update({
-          is_human_takeover: takeover,
-          human_takeover_at: takeover ? new Date().toISOString() : null,
-          assigned_to: takeover ? request.user.id : null,
-        })
-        .eq("id", conversationId)
-        .eq("organization_id", conv.organization_id);
+      if (takeover) {
+        // C8: conditional update — only activates when is_human_takeover=false
+        const activated = await activateHumanTakeover(db, conversationId, conv.organization_id, {
+          assigned_to: request.user.id,
+          human_takeover_at: new Date().toISOString(),
+        });
 
-      if (error) return reply.status(500).send({ error: "Falha ao atualizar takeover" });
+        if (!activated) {
+          return reply.status(409).send({ error: "Conversa já está em atendimento humano" });
+        }
+      } else {
+        const { error } = await db
+          .from("conversations")
+          .update({
+            is_human_takeover: false,
+            human_takeover_at: null,
+            assigned_to: null,
+          })
+          .eq("id", conversationId)
+          .eq("organization_id", conv.organization_id);
+
+        if (error) return reply.status(500).send({ error: "Falha ao atualizar takeover" });
+      }
 
       fireAudit(db, {
         organization_id: conv.organization_id,

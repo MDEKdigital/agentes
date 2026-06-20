@@ -21,6 +21,7 @@ vi.mock("../../../middleware/auth", () => ({ authMiddleware: mockAuthMiddleware 
 vi.mock("@aula-agente/database", () => ({
   getAdminClient: mockGetAdminClient,
   createAuditLog: mockCreateAuditLog,
+  activateHumanTakeover: vi.fn().mockResolvedValue(true),
   getConversationById: vi.fn(),
   getMessagesByConversation: vi.fn().mockResolvedValue([]),
   getConversationNotes: vi.fn().mockResolvedValue([]),

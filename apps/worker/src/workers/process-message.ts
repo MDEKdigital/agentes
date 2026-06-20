@@ -12,6 +12,7 @@ import {
   getConversationById,
   createMessage,
   updateConversation,
+  setConversationWaiting,
   getInstanceById,
 } from "@aula-agente/database";
 import { fireAudit } from "../lib/audit";
@@ -379,11 +380,15 @@ export function startProcessMessageWorker() {
           });
         }
 
-        await updateConversation(db, conversationId, {
-          last_message_at: new Date().toISOString(),
-          status: wasResolved ? "resolved" : "waiting",
-          // is_keyword_activated already committed above when needed
-        }, organizationId);
+        if (wasResolved) {
+          await updateConversation(db, conversationId, {
+            last_message_at: new Date().toISOString(),
+            status: "resolved",
+          }, organizationId);
+        } else {
+          // C8: conditional update — won't overwrite "resolved" set by a concurrent human action
+          await setConversationWaiting(db, conversationId, organizationId, new Date().toISOString());
+        }
 
         if (wasResolved) {
           fireAudit(db, {

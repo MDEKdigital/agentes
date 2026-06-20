@@ -175,6 +175,53 @@ export async function getInboxConversations(
   return { conversations: (data as Conversation[]) ?? [], total: count ?? 0 };
 }
 
+/**
+ * C8: Conditional takeover activation — only succeeds when is_human_takeover=false.
+ * Returns true if the row was updated (no concurrent takeover), false if someone else won.
+ */
+export async function activateHumanTakeover(
+  client: SupabaseClient,
+  id: string,
+  organizationId: string,
+  fields: { assigned_to: string; human_takeover_at: string }
+): Promise<boolean> {
+  const { data, error } = await client
+    .from("conversations")
+    .update({
+      is_human_takeover: true,
+      human_takeover_at: fields.human_takeover_at,
+      assigned_to: fields.assigned_to,
+    })
+    .eq("id", id)
+    .eq("organization_id", organizationId)
+    .eq("is_human_takeover", false)
+    .select("id");
+  if (error) throw error;
+  return (data ?? []).length > 0;
+}
+
+/**
+ * C8: Conditional status update for worker — only writes "waiting" when the conversation
+ * is NOT already "resolved", preventing the worker from reopening a human-resolved chat.
+ * Returns true if the row was updated.
+ */
+export async function setConversationWaiting(
+  client: SupabaseClient,
+  id: string,
+  organizationId: string,
+  lastMessageAt: string
+): Promise<boolean> {
+  const { data, error } = await client
+    .from("conversations")
+    .update({ status: "waiting", last_message_at: lastMessageAt })
+    .eq("id", id)
+    .eq("organization_id", organizationId)
+    .neq("status", "resolved")
+    .select("id");
+  if (error) throw error;
+  return (data ?? []).length > 0;
+}
+
 export async function updateConversationTags(
   client: SupabaseClient,
   conversationId: string,

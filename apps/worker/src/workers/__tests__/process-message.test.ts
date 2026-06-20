@@ -43,6 +43,7 @@ vi.mock("@aula-agente/database", () => ({
   getConversationById: vi.fn(),
   createMessage: vi.fn(),
   updateConversation: vi.fn(),
+  setConversationWaiting: vi.fn().mockResolvedValue(true),
   getInstanceById: vi.fn(),
   createAuditLog: mockCreateAuditLog,
 }));
@@ -72,6 +73,7 @@ import {
   getRecentMessages,
   createMessage,
   updateConversation,
+  setConversationWaiting,
   getInstanceById,
 } from "@aula-agente/database";
 import { getSendMessageQueue } from "@aula-agente/queue";
@@ -189,11 +191,12 @@ describe("startProcessMessageWorker", () => {
 
     await runJob();
 
-    expect(updateConversation).toHaveBeenCalledWith(
+    // C8: now uses setConversationWaiting (conditional update) instead of updateConversation
+    expect(setConversationWaiting).toHaveBeenCalledWith(
       expect.anything(),
       "conv-1",
-      expect.objectContaining({ status: "waiting" }),
-      "org-1"
+      "org-1",
+      expect.any(String)
     );
   });
 

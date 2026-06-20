@@ -6,11 +6,13 @@ const {
   mockGetAdminClient,
   mockDbFrom,
   mockCreateAuditLog,
+  mockActivateHumanTakeover,
 } = vi.hoisted(() => ({
   mockAuthMiddleware: vi.fn(),
   mockGetAdminClient: vi.fn(),
   mockDbFrom: vi.fn(),
   mockCreateAuditLog: vi.fn(),
+  mockActivateHumanTakeover: vi.fn(),
 }));
 
 vi.mock("../../../middleware/auth", () => ({
@@ -20,6 +22,13 @@ vi.mock("../../../middleware/auth", () => ({
 vi.mock("@aula-agente/database", () => ({
   getAdminClient: mockGetAdminClient,
   createAuditLog: mockCreateAuditLog,
+  activateHumanTakeover: mockActivateHumanTakeover,
+  getConversationNotes: vi.fn(),
+  addConversationNote: vi.fn(),
+  updateConversationTags: vi.fn(),
+  getConversationById: vi.fn(),
+  getMessagesByConversation: vi.fn(),
+  getInboxConversations: vi.fn(),
 }));
 
 import conversationRoutes from "../index";
@@ -81,6 +90,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockGetAdminClient.mockReturnValue(makeDb());
   mockCreateAuditLog.mockResolvedValue({ id: "audit-uuid" });
+  mockActivateHumanTakeover.mockResolvedValue(true); // default: success
 });
 
 // ── PATCH /conversations/:id/takeover ────────────────────────────────────────
