@@ -356,6 +356,19 @@ export default async function conversationRoutes(app: FastifyInstance) {
       );
       if (!membership) return reply.status(403).send({ error: "Acesso negado" });
 
+      if (assignedTo !== null) {
+        const { data: assigneeMembership } = await db
+          .from("organization_members")
+          .select("user_id")
+          .eq("organization_id", conv.organization_id)
+          .eq("user_id", assignedTo)
+          .maybeSingle();
+
+        if (!assigneeMembership) {
+          return reply.status(422).send({ error: "Usuário atribuído não pertence a esta organização" });
+        }
+      }
+
       const { error } = await db
         .from("conversations")
         .update({ assigned_to: assignedTo })

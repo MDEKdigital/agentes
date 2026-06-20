@@ -29,12 +29,6 @@ const USER_ID = "user-uuid-1";
 const CONV_ID = "conv-uuid-1";
 
 function makeDb(convOrgId: string | null = ORG_ID, convAssignedTo: string | null = null) {
-  const updateChain = {
-    eq: vi.fn().mockReturnThis(),
-    then: vi.fn(),
-  };
-  (updateChain as any).mockResolvedValue = () => {};
-
   const selectResult = convOrgId
     ? { data: { organization_id: convOrgId, assigned_to: convAssignedTo }, error: null }
     : { data: null, error: null };
@@ -42,17 +36,30 @@ function makeDb(convOrgId: string | null = ORG_ID, convAssignedTo: string | null
   const updateResult = { error: null };
 
   const db = {
-    from: vi.fn().mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          single: vi.fn().mockResolvedValue(selectResult),
+    from: vi.fn().mockImplementation((table: string) => {
+      if (table === "organization_members") {
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                maybeSingle: vi.fn().mockResolvedValue({ data: { user_id: "other-user-uuid" }, error: null }),
+              }),
+            }),
+          }),
+        };
+      }
+      return {
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            single: vi.fn().mockResolvedValue(selectResult),
+          }),
         }),
-      }),
-      update: vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          eq: vi.fn().mockResolvedValue(updateResult),
+        update: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            eq: vi.fn().mockResolvedValue(updateResult),
+          }),
         }),
-      }),
+      };
     }),
   };
   return db;
