@@ -10,16 +10,19 @@ export function enqueueProcessMessage(data: {
   return queue.add("process-message", data);
 }
 
-export function enqueueSendMessage(data: {
-  conversationId: string;
-  messageId: string;
-  instanceId: string;
-  phone: string;
-  content: string;
-  organizationId: string;
-}) {
+export function enqueueSendMessage(
+  data: {
+    conversationId: string;
+    messageId: string;
+    instanceId: string;
+    phone: string;
+    content: string;
+    organizationId: string;
+  },
+  options?: { jobId?: string }
+) {
   const queue = getSendMessageQueue();
-  return queue.add("send-message", data);
+  return queue.add("send-message", data, options);
 }
 
 export function enqueueBillingOnboarding(data: { billingEventId: string }) {

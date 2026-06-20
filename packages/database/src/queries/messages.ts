@@ -48,6 +48,23 @@ export async function createMessage(
   return data as Message;
 }
 
+export async function getMessageByIdempotencyKey(
+  client: SupabaseClient,
+  conversationId: string,
+  organizationId: string,
+  idempotencyKey: string
+): Promise<Message | null> {
+  const { data, error } = await client
+    .from("messages")
+    .select("*")
+    .eq("conversation_id", conversationId)
+    .eq("organization_id", organizationId)
+    .eq("metadata->>idempotency_key", idempotencyKey)
+    .maybeSingle();
+  if (error) throw error;
+  return data as Message | null;
+}
+
 export async function messageExistsByEvolutionId(
   client: SupabaseClient,
   evolutionMessageId: string
