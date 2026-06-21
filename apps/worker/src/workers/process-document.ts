@@ -7,6 +7,9 @@ import { getAdminClient, getDocumentById, updateDocument, insertChunks } from "@
 import { resolveEmbeddingApiKey } from "../lib/vault";
 import { chunkText } from "../embeddings/chunker";
 import { generateEmbeddings } from "../embeddings/embedder";
+import { workerLog } from "../lib/logger";
+import { incrementMetric } from "../lib/metrics";
+import { enqueueDeadLetter } from "../lib/dead-letter";
 import pdfParse from "pdf-parse";
 import mammoth from "mammoth";
 
@@ -91,6 +94,7 @@ export function startProcessDocumentWorker() {
         });
 
         console.log(`Processed document ${documentId}: ${chunks.length} chunks`);
+        incrementMetric("process_document_success");
       } catch (error) {
         const message = error instanceof Error ? error.message : "Unknown error";
         await updateDocument(db, documentId, {
@@ -107,7 +111,16 @@ export function startProcessDocumentWorker() {
   );
 
   worker.on("failed", (job, err) => {
-    console.error(`Document job ${job?.id} failed:`, err.message);
+    workerLog("process-document", "error", { jobId: job?.id, documentId: job?.data.documentId, organizationId: job?.data.organizationId }, `failed err="${err.message}"`);
+    incrementMetric("process_document_failed");
+    if (job && job.attemptsMade >= (job.opts?.attempts ?? 1)) {
+      enqueueDeadLetter({
+        sourceQueue: QUEUE_NAMES.PROCESS_DOCUMENT,
+        jobId: job.id,
+        identifiers: { documentId: job.data.documentId, organizationId: job.data.organizationId },
+        attemptsMade: job.attemptsMade,
+      }, err).catch(() => {});
+    }
   });
 
   console.log("Process-document worker started");
