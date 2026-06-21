@@ -58,6 +58,8 @@ vi.mock("../../lib/redis", () => ({ getConnectionOptions: vi.fn(() => ({})) }));
 vi.mock("../../lib/lock", () => ({
   acquireConversationLock: mockAcquireConversationLock,
   releaseConversationLock: mockReleaseConversationLock,
+  renewConversationLock: vi.fn().mockResolvedValue(true),
+  LOCK_RENEWAL_INTERVAL_MS: 15_000,
 }));
 vi.mock("../../lib/vault", () => ({ resolveApiKey: vi.fn(async () => "sk-test") }));
 vi.mock("../../lib/evolution", () => ({

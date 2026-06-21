@@ -103,6 +103,8 @@ vi.mock("../lib/vault", () => ({ resolveApiKey: vi.fn(async () => "sk-test") }))
 vi.mock("../lib/lock", () => ({
   acquireConversationLock: vi.fn(async () => "lock-value"),
   releaseConversationLock: vi.fn(async () => {}),
+  renewConversationLock: vi.fn().mockResolvedValue(true),
+  LOCK_RENEWAL_INTERVAL_MS: 15_000,
   acquireEnrollmentLock: vi.fn(async () => "lock-value"),
   releaseEnrollmentLock: vi.fn(async () => {}),
 }));

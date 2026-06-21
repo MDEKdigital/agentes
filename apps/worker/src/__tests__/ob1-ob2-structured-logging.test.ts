@@ -157,6 +157,8 @@ vi.mock("../lib/vault", () => ({ resolveApiKey: vi.fn(async () => "sk-test") }))
 vi.mock("../lib/lock", () => ({
   acquireConversationLock: vi.fn(async () => "lock-value"),
   releaseConversationLock: vi.fn(async () => {}),
+  renewConversationLock: vi.fn().mockResolvedValue(true),
+  LOCK_RENEWAL_INTERVAL_MS: 15_000,
 }));
 vi.mock("../lib/media-validation", () => ({ validateMediaPayload: vi.fn() }));
 vi.mock("../agents/agent-runner", () => ({

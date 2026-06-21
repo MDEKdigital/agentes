@@ -16,7 +16,7 @@ import {
   getInstanceById,
 } from "@aula-agente/database";
 import { fireAudit } from "../lib/audit";
-import { acquireConversationLock, releaseConversationLock } from "../lib/lock";
+import { acquireConversationLock, releaseConversationLock, renewConversationLock, LOCK_RENEWAL_INTERVAL_MS } from "../lib/lock";
 import { resolveApiKey } from "../lib/vault";
 import { validateMediaPayload } from "../lib/media-validation";
 
@@ -219,6 +219,15 @@ export function startProcessMessageWorker() {
       if (!lockValue) {
         throw new Error(`Failed to acquire lock for conversation ${conversationId}`);
       }
+
+      // RC-3: heartbeat prevents lock expiry during long LLM calls (LLM_TIMEOUT > LOCK_TTL)
+      const lockHeartbeat = setInterval(() => {
+        renewConversationLock(conversationId, lockValue).then((renewed) => {
+          if (!renewed) {
+            workerLog("process-message", "warn", { conversationId, messageId }, "lock renewal failed — lock may have been lost");
+          }
+        }).catch(() => {});
+      }, LOCK_RENEWAL_INTERVAL_MS);
 
       try {
         const db = getAdminClient();
@@ -469,6 +478,7 @@ export function startProcessMessageWorker() {
         workerLog("process-message", "info", { jobId: job.id, conversationId, messageId, organizationId }, `completed responseId=${responseMessage.id}`);
         incrementMetric("process_message_success");
       } finally {
+        clearInterval(lockHeartbeat);
         await releaseConversationLock(conversationId, lockValue);
       }
     },
