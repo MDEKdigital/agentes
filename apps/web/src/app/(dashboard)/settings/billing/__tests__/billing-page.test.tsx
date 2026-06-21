@@ -154,6 +154,43 @@ describe("BillingPage", () => {
     });
   });
 
+  it("cenário R1: quando /billing/subscription retorna 500, exibe erro e não fica em loading infinito", async () => {
+    // Regression: before the timeout fix, a hanging or error'd API call left
+    // loading:true forever because the error wasn't reaching .catch()
+    mockUseOrganization.mockReturnValue({
+      currentOrg: mockOrg,
+      loading: false,
+    });
+    mockApiFetch.mockRejectedValue(new Error("Failed to fetch billing events"));
+
+    render(<BillingPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Failed to fetch billing events")).toBeInTheDocument();
+    });
+
+    // Skeleton must be gone
+    const pulseElements = document.querySelectorAll(".animate-pulse");
+    expect(pulseElements.length).toBe(0);
+  });
+
+  it("cenário R2: quando apiFetch lança timeout, exibe mensagem de erro (não skeleton infinito)", async () => {
+    mockUseOrganization.mockReturnValue({
+      currentOrg: mockOrg,
+      loading: false,
+    });
+    mockApiFetch.mockRejectedValue(new Error("A requisição demorou demais. Tente novamente."));
+
+    render(<BillingPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("A requisição demorou demais. Tente novamente.")).toBeInTheDocument();
+    });
+
+    const pulseElements = document.querySelectorAll(".animate-pulse");
+    expect(pulseElements.length).toBe(0);
+  });
+
   it("cenário 3: com dados completos → renderiza nome do plano, status, usages e histórico", async () => {
     mockUseOrganization.mockReturnValue({
       currentOrg: mockOrg,

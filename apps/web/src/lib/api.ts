@@ -23,6 +23,7 @@ export async function apiFetch(path: string, options: RequestInit = {}) {
   try {
     response = await fetch(`${API_URL}${path}`, {
       ...options,
+      signal: options.signal ?? AbortSignal.timeout(30_000),
       ...(body !== undefined ? { body } : {}),
       headers: {
         ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
@@ -30,7 +31,10 @@ export async function apiFetch(path: string, options: RequestInit = {}) {
         ...options.headers,
       },
     });
-  } catch {
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "TimeoutError") {
+      throw new Error("A requisição demorou demais. Tente novamente.");
+    }
     throw new Error(
       `Não foi possível conectar ao servidor em ${API_URL}.\nVerifique se a API está rodando.`
     );

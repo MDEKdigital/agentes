@@ -28,7 +28,13 @@ export default async function membersRoutes(app: FastifyInstance) {
       }
 
       const db = getAdminClient();
-      const members = await getOrgMembersWithEmail(db, organizationId);
+      let members;
+      try {
+        members = await getOrgMembersWithEmail(db, organizationId);
+      } catch (err) {
+        request.log.error({ err, organizationId }, "getOrgMembersWithEmail failed");
+        return reply.status(500).send({ error: "Failed to fetch members" });
+      }
       return reply.send({ members, current_user_id: request.user.id });
     }
   );
