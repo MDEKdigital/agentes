@@ -1,4 +1,4 @@
-import type { ToolsConfig } from "@aula-agente/shared";
+import type { ToolsConfig, Message } from "@aula-agente/shared";
 import { createSearchKnowledgeTool } from "./search-knowledge";
 import { createSearchFaqTool } from "./search-faq";
 import { buildCloseConversationTool, CLOSE_CONVERSATION_TOOL_NAME } from "./close-conversation";
@@ -9,10 +9,12 @@ interface RegistryParams {
   toolsConfig: ToolsConfig;
   apiKey: string;
   conversationId: string;
+  messages: Message[];
+  currentMessage: Message;
 }
 
 export function buildToolsForAgent(params: RegistryParams) {
-  const { organizationId, agentId, toolsConfig, apiKey, conversationId } = params;
+  const { organizationId, agentId, toolsConfig, apiKey, conversationId, messages, currentMessage } = params;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const tools: Record<string, any> = {};
 
@@ -24,7 +26,10 @@ export function buildToolsForAgent(params: RegistryParams) {
     tools.searchFaq = createSearchFaqTool(agentId, organizationId);
   }
 
-  tools[CLOSE_CONVERSATION_TOOL_NAME] = buildCloseConversationTool(conversationId);
+  tools[CLOSE_CONVERSATION_TOOL_NAME] = buildCloseConversationTool(
+    conversationId,
+    [...messages, currentMessage],
+  );
 
   return tools;
 }

@@ -7,7 +7,7 @@ export function createSearchKnowledgeTool(organizationId: string, agentId: strin
   return tool({
     description: "Search the knowledge base for relevant information about a topic. Use this to find answers from uploaded documents.",
     parameters: z.object({
-      query: z.string().describe("The search query to find relevant information"),
+      query: z.string().min(1).max(500).describe("The search query to find relevant information"),
     }),
     execute: async ({ query }) => {
       const openai = createOpenAI({ apiKey });

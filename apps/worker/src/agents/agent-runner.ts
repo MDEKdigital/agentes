@@ -137,6 +137,8 @@ export async function runAgent(params: RunAgentParams): Promise<RunAgentResult> 
     toolsConfig: agent.tools_config,
     apiKey,
     conversationId,
+    messages,
+    currentMessage,
   });
   const history = formatHistoryForLLM(messages);
 
