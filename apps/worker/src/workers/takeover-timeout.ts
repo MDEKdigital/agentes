@@ -5,6 +5,7 @@ import { getTakeoverTimeoutQueue } from "@aula-agente/queue";
 import { getConnectionOptions } from "../lib/redis";
 import { getAdminClient, getExpiredTakeovers, releaseExpiredTakeover } from "@aula-agente/database";
 import { fireAudit } from "../lib/audit";
+import { workerLog } from "../lib/logger";
 
 export async function processTakeoverTimeouts() {
   const db = getAdminClient();
@@ -26,15 +27,21 @@ export async function processTakeoverTimeouts() {
           entity_id: conversation.id,
           metadata: { actor: "system" },
         });
-        console.log(`Auto-released takeover for conversation ${conversation.id}`);
+        workerLog("takeover-timeout", "info", {
+          conversationId: conversation.id,
+          organizationId: conversation.organization_id,
+        }, "takeover released");
       }
     } catch (err) {
-      console.error(`Failed to release takeover for conversation ${conversation.id}:`, err);
+      workerLog("takeover-timeout", "error", {
+        conversationId: conversation.id,
+        organizationId: conversation.organization_id,
+      }, `release failed err="${(err as Error).message}"`);
     }
   }
 
   if (expired.length > 0) {
-    console.log(`Released ${expired.length} expired takeovers`);
+    workerLog("takeover-timeout", "info", { count: expired.length }, `released ${expired.length} expired takeovers`);
   }
 }
 
@@ -59,7 +66,7 @@ export function startTakeoverTimeoutWorker() {
   );
 
   worker.on("failed", (job, err) => {
-    console.error(`Takeover timeout job ${job?.id} failed:`, err.message);
+    workerLog("takeover-timeout", "error", { jobId: job?.id }, `failed err="${err.message}"`);
   });
 
   console.log("Takeover-timeout worker started (runs every 5 min)");

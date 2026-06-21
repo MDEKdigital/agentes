@@ -4,6 +4,7 @@ import type { SendMessageJobData } from "@aula-agente/queue";
 import { getConnectionOptions } from "../lib/redis";
 import { evolutionPost } from "../lib/evolution";
 import { getAdminClient, getInstanceById } from "@aula-agente/database";
+import { workerLog } from "../lib/logger";
 
 export function splitMessage(text: string): string[] {
   const parts = text.split(/\n\n+/).map((p) => p.trim()).filter(Boolean);
@@ -73,7 +74,13 @@ export function startSendMessageWorker() {
         await sendPresence(instance.instance_name, phone, "paused");
       }
 
-      console.log(`Sent message to ${phone} via instance ${instance.instance_name}`);
+      workerLog("send-message", "info", {
+        jobId: job.id,
+        conversationId: job.data.conversationId,
+        messageId: job.data.messageId,
+        instanceId,
+        organizationId,
+      }, "sent");
     },
     {
       connection: getConnectionOptions(),
@@ -86,7 +93,13 @@ export function startSendMessageWorker() {
   );
 
   worker.on("failed", (job, err) => {
-    console.error(`Send job ${job?.id} failed:`, err.message);
+    workerLog("send-message", "error", {
+      jobId: job?.id,
+      conversationId: job?.data.conversationId,
+      messageId: job?.data.messageId,
+      instanceId: job?.data.instanceId,
+      organizationId: job?.data.organizationId,
+    }, `failed err="${err.message}"`);
   });
 
   console.log("Send-message worker started");

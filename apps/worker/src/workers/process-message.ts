@@ -24,6 +24,7 @@ export const WHISPER_TIMEOUT_MS = 60_000;
 import { runAgent } from "../agents/agent-runner";
 import { evaluateActivation } from "./evaluate-activation";
 import { CLOSE_CONVERSATION_TOOL_NAME } from "../agents/tools/close-conversation";
+import { workerLog } from "../lib/logger";
 
 type ConversationRow = Conversation & { contacts: { phone: string } | null };
 
@@ -66,10 +67,7 @@ export async function handleTerminalFailure(
       { jobId: `fallback_${messageId}` }
     );
   } catch (err) {
-    console.error(
-      `[process-message] Failed to enqueue terminal fallback for message ${messageId}:`,
-      (err as Error).message
-    );
+    workerLog("process-message", "error", { messageId, conversationId, organizationId }, `terminal fallback failed err="${(err as Error).message}"`);
   }
 }
 
@@ -212,6 +210,7 @@ export function startProcessMessageWorker() {
     QUEUE_NAMES.PROCESS_MESSAGE,
     async (job) => {
       const { conversationId, messageId, agentId, organizationId } = job.data;
+      workerLog("process-message", "info", { jobId: job.id, conversationId, messageId, organizationId }, "started");
 
       const lockValue = await acquireConversationLock(conversationId);
       if (!lockValue) {
@@ -464,7 +463,7 @@ export function startProcessMessageWorker() {
           organizationId,
         }, { jobId: `${messageId}_agent_response` });
 
-        console.log(`Processed message ${messageId} -> response ${responseMessage.id}`);
+        workerLog("process-message", "info", { jobId: job.id, conversationId, messageId, organizationId }, `completed responseId=${responseMessage.id}`);
       } finally {
         await releaseConversationLock(conversationId, lockValue);
       }
@@ -476,10 +475,15 @@ export function startProcessMessageWorker() {
   );
 
   worker.on("failed", (job, err) => {
-    console.error(`Job ${job?.id} failed:`, err.message);
+    workerLog("process-message", "error", {
+      jobId: job?.id,
+      conversationId: job?.data.conversationId,
+      messageId: job?.data.messageId,
+      organizationId: job?.data.organizationId,
+    }, `failed err="${err.message}"`);
     if (job && isTerminalFailure(job)) {
       handleTerminalFailure(job.data).catch((e: Error) => {
-        console.error("[process-message] handleTerminalFailure threw:", e.message);
+        workerLog("process-message", "error", { jobId: job.id, messageId: job.data.messageId }, `handleTerminalFailure threw err="${e.message}"`);
       });
     }
   });

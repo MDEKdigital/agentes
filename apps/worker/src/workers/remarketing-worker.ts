@@ -25,6 +25,7 @@ import {
 } from "@aula-agente/database";
 import { fireAudit } from "../lib/audit";
 import { acquireEnrollmentLock, releaseEnrollmentLock } from "../lib/lock";
+import { workerLog } from "../lib/logger";
 
 function toMinutes(value: number, unit: string): number {
   if (unit === "hours") return value * 60;
@@ -73,7 +74,7 @@ export async function processRemarketingCycle() {
         }
       }
     } catch (err) {
-      console.error(`[remarketing] Error processing flow ${flow.id}:`, err);
+      workerLog("remarketing", "error", { flowId: flow.id }, `flow error err="${(err as Error).message}"`);
     }
   }
 
@@ -277,7 +278,11 @@ export async function processRemarketingCycle() {
       const prev = flowMinDelayMs.get(enrollment.flow_id) ?? Infinity;
       if (delayMs < prev) flowMinDelayMs.set(enrollment.flow_id, delayMs);
     } catch (err) {
-      console.error(`[remarketing] Error processing enrollment ${enrollment.id}:`, err);
+      workerLog("remarketing", "error", {
+        enrollmentId: enrollment.id,
+        conversationId: enrollment.conversation_id,
+        flowId: enrollment.flow_id,
+      }, `enrollment error err="${(err as Error).message}"`);
     } finally {
       await releaseEnrollmentLock(enrollment.id, lockValue);
     }
@@ -311,7 +316,7 @@ export function startRemarketingWorker() {
   );
 
   worker.on("failed", (job, err) => {
-    console.error(`[remarketing] Job ${job?.id} failed:`, err.message);
+    workerLog("remarketing", "error", { jobId: job?.id }, `failed err="${err.message}"`);
   });
 
   console.log("Remarketing worker started (runs every 1 min)");

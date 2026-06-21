@@ -3,6 +3,7 @@ import { QUEUE_NAMES } from "@aula-agente/shared";
 import type { BillingOnboardingJobData } from "@aula-agente/queue";
 import { getConnectionOptions } from "../lib/redis";
 import { getAdminClient, claimBillingEventForProcessing, updateBillingEventStatus } from "@aula-agente/database";
+import { workerLog } from "../lib/logger";
 import { normalizePayload } from "../normalizers/index";
 import {
   handleSubscriptionActivated,
@@ -106,7 +107,7 @@ export function createBillingOnboardingWorker() {
   );
 
   worker.on("failed", async (job, err) => {
-    console.error(`[billing-onboarding] Job ${job?.id} failed:`, err.message);
+    workerLog("billing-onboarding", "error", { jobId: job?.id, billingEventId: job?.data.billingEventId }, `failed err="${err.message}"`);
     if (!job?.data.billingEventId) return;
     try {
       const client = getAdminClient();
@@ -119,9 +120,7 @@ export function createBillingOnboardingWorker() {
         .eq("id", job.data.billingEventId)
         .single();
       if (current && ["processed", "ignored"].includes(current.status)) {
-        console.warn(
-          `[billing-onboarding] Job ${job.id} failed but event ${job.data.billingEventId} already ${current.status} — not overwriting`
-        );
+        workerLog("billing-onboarding", "warn", { jobId: job.id, billingEventId: job.data.billingEventId }, `skipped already ${current.status}`);
         return;
       }
       await updateBillingEventStatus(client, job.data.billingEventId, "failed", {
@@ -129,7 +128,7 @@ export function createBillingOnboardingWorker() {
         processed_at: new Date().toISOString(),
       });
     } catch (updateErr) {
-      console.error("[billing-onboarding] Failed to update billing_event status:", updateErr);
+      workerLog("billing-onboarding", "error", { billingEventId: job.data.billingEventId }, `status update failed err="${(updateErr as Error).message}"`);
     }
   });
 
