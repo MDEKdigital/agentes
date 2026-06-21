@@ -6,6 +6,7 @@ import { getConnectionOptions } from "../lib/redis";
 import { getAdminClient, getExpiredTakeovers, releaseExpiredTakeover } from "@aula-agente/database";
 import { fireAudit } from "../lib/audit";
 import { workerLog } from "../lib/logger";
+import { incrementMetric } from "../lib/metrics";
 
 export async function processTakeoverTimeouts() {
   const db = getAdminClient();
@@ -31,12 +32,14 @@ export async function processTakeoverTimeouts() {
           conversationId: conversation.id,
           organizationId: conversation.organization_id,
         }, "takeover released");
+        incrementMetric("takeover_timeout_released");
       }
     } catch (err) {
       workerLog("takeover-timeout", "error", {
         conversationId: conversation.id,
         organizationId: conversation.organization_id,
       }, `release failed err="${(err as Error).message}"`);
+      incrementMetric("takeover_timeout_failed");
     }
   }
 

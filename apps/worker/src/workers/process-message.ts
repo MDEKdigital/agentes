@@ -25,6 +25,7 @@ import { runAgent } from "../agents/agent-runner";
 import { evaluateActivation } from "./evaluate-activation";
 import { CLOSE_CONVERSATION_TOOL_NAME } from "../agents/tools/close-conversation";
 import { workerLog } from "../lib/logger";
+import { incrementMetric } from "../lib/metrics";
 
 type ConversationRow = Conversation & { contacts: { phone: string } | null };
 
@@ -66,6 +67,7 @@ export async function handleTerminalFailure(
       },
       { jobId: `fallback_${messageId}` }
     );
+    incrementMetric("process_message_terminal_fallback");
   } catch (err) {
     workerLog("process-message", "error", { messageId, conversationId, organizationId }, `terminal fallback failed err="${(err as Error).message}"`);
   }
@@ -464,6 +466,7 @@ export function startProcessMessageWorker() {
         }, { jobId: `${messageId}_agent_response` });
 
         workerLog("process-message", "info", { jobId: job.id, conversationId, messageId, organizationId }, `completed responseId=${responseMessage.id}`);
+        incrementMetric("process_message_success");
       } finally {
         await releaseConversationLock(conversationId, lockValue);
       }
@@ -481,6 +484,7 @@ export function startProcessMessageWorker() {
       messageId: job?.data.messageId,
       organizationId: job?.data.organizationId,
     }, `failed err="${err.message}"`);
+    incrementMetric("process_message_failed");
     if (job && isTerminalFailure(job)) {
       handleTerminalFailure(job.data).catch((e: Error) => {
         workerLog("process-message", "error", { jobId: job.id, messageId: job.data.messageId }, `handleTerminalFailure threw err="${e.message}"`);

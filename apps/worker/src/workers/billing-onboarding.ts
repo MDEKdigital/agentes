@@ -4,6 +4,7 @@ import type { BillingOnboardingJobData } from "@aula-agente/queue";
 import { getConnectionOptions } from "../lib/redis";
 import { getAdminClient, claimBillingEventForProcessing, updateBillingEventStatus } from "@aula-agente/database";
 import { workerLog } from "../lib/logger";
+import { incrementMetric } from "../lib/metrics";
 import { normalizePayload } from "../normalizers/index";
 import {
   handleSubscriptionActivated,
@@ -94,6 +95,7 @@ async function processBillingOnboarding(job: Job<BillingOnboardingJobData>): Pro
       job.log(`Event type ${normalized.event_type} marked as ignored`);
       break;
   }
+  incrementMetric("billing_onboarding_processed");
 }
 
 export function createBillingOnboardingWorker() {
@@ -108,6 +110,7 @@ export function createBillingOnboardingWorker() {
 
   worker.on("failed", async (job, err) => {
     workerLog("billing-onboarding", "error", { jobId: job?.id, billingEventId: job?.data.billingEventId }, `failed err="${err.message}"`);
+    incrementMetric("billing_onboarding_failed");
     if (!job?.data.billingEventId) return;
     try {
       const client = getAdminClient();

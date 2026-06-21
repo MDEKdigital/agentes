@@ -5,6 +5,7 @@ import { getConnectionOptions } from "../lib/redis";
 import { evolutionPost } from "../lib/evolution";
 import { getAdminClient, getInstanceById } from "@aula-agente/database";
 import { workerLog } from "../lib/logger";
+import { incrementMetric } from "../lib/metrics";
 
 export function splitMessage(text: string): string[] {
   const parts = text.split(/\n\n+/).map((p) => p.trim()).filter(Boolean);
@@ -81,6 +82,7 @@ export function startSendMessageWorker() {
         instanceId,
         organizationId,
       }, "sent");
+      incrementMetric("send_message_success");
     },
     {
       connection: getConnectionOptions(),
@@ -100,6 +102,7 @@ export function startSendMessageWorker() {
       instanceId: job?.data.instanceId,
       organizationId: job?.data.organizationId,
     }, `failed err="${err.message}"`);
+    incrementMetric("send_message_failed");
   });
 
   console.log("Send-message worker started");

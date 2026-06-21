@@ -26,6 +26,7 @@ import {
 import { fireAudit } from "../lib/audit";
 import { acquireEnrollmentLock, releaseEnrollmentLock } from "../lib/lock";
 import { workerLog } from "../lib/logger";
+import { incrementMetric } from "../lib/metrics";
 
 function toMinutes(value: number, unit: string): number {
   if (unit === "hours") return value * 60;
@@ -271,6 +272,7 @@ export async function processRemarketingCycle() {
       console.log(
         `[remarketing] Queued step ${step.step_order} → conversation ${enrollment.conversation_id} (phone ${contact.phone})`
       );
+      incrementMetric("remarketing_step_sent");
 
       // Registrar flow e menor delay observado para next_check_at
       processedFlowIds.add(enrollment.flow_id);
@@ -317,6 +319,7 @@ export function startRemarketingWorker() {
 
   worker.on("failed", (job, err) => {
     workerLog("remarketing", "error", { jobId: job?.id }, `failed err="${err.message}"`);
+    incrementMetric("remarketing_cycle_failed");
   });
 
   console.log("Remarketing worker started (runs every 1 min)");
