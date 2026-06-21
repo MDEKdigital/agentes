@@ -173,7 +173,11 @@ export async function preprocessAudioMessage(
     const safeContent = `<audio_transcription>\n${transcription}\n</audio_transcription>`;
     return { message: { ...message, content: safeContent, media_type: null }, failed: false };
   } catch (err) {
-    console.warn("[process-message] Falha ao processar áudio:", (err as Error).message);
+    workerLog("process-message", "warn", {
+      messageId: message.id,
+      conversationId: message.conversation_id,
+      organizationId: message.organization_id,
+    }, `audio preprocessing failed err="${(err as Error).message}"`);
     return {
       message: {
         ...message,
@@ -203,7 +207,11 @@ export async function preprocessImageMessage(
     validateMediaPayload(base64, mimeType);
     return { base64, mimeType };
   } catch (err) {
-    console.warn("[process-message] Falha ao buscar imagem:", (err as Error).message);
+    workerLog("process-message", "warn", {
+      messageId: message.id,
+      conversationId: message.conversation_id,
+      organizationId: message.organization_id,
+    }, `image fetch failed err="${(err as Error).message}"`);
     return null;
   }
 }
