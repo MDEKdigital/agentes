@@ -29,6 +29,7 @@ import { startProcessDocumentWorker } from "./workers/process-document";
 import { startTakeoverTimeoutWorker } from "./workers/takeover-timeout";
 import { startRemarketingWorker } from "./workers/remarketing-worker";
 import { createBillingOnboardingWorker } from "./workers/billing-onboarding";
+import { handleHealthRequest } from "./lib/health";
 
 async function main() {
   console.log("Starting workers...");
@@ -49,8 +50,10 @@ async function main() {
   const healthPort = parseInt(process.env.HEALTH_PORT || "3001", 10);
   const healthServer = createServer((req, res) => {
     if (req.url === "/health" && req.method === "GET") {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ status: "ok", timestamp: new Date().toISOString() }));
+      handleHealthRequest(res).catch(() => {
+        res.writeHead(503, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ status: "degraded", redis: "down" }));
+      });
     } else {
       res.writeHead(404);
       res.end();
