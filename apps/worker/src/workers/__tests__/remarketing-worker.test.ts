@@ -126,7 +126,7 @@ const makeStep = (id: string, flowId: string) => ({
   id,
   flow_id: flowId,
   step_order: 1,
-  delay_value: 1,
+  delay_value: 30,
   delay_unit: "minutes",
   message_type: "text",
   message_content: "Olá!",

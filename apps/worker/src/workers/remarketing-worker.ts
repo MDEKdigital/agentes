@@ -32,6 +32,10 @@ function toMinutes(value: number, unit: string): number {
   return value;
 }
 
+// Defense-in-depth: minimum delay to prevent zero/near-zero interval spam
+// even if a step was misconfigured or data is legacy.
+export const MINIMUM_DELAY_MINUTES = 5;
+
 export async function processRemarketingCycle() {
   const db = getAdminClient();
 
@@ -111,6 +115,17 @@ export async function processRemarketingCycle() {
       const step = stepMap.get(enrollment.next_step_id);
       if (!step) {
         await cancelEnrollment(db, enrollment.id, "step_not_found", enrollment.organization_id);
+        continue;
+      }
+
+      // Rate limit guard: skip steps configured below the minimum interval to
+      // prevent zero/near-zero delay abuse regardless of how the step was saved.
+      const stepDelayMinutes = toMinutes(step.delay_value, step.delay_unit);
+      if (stepDelayMinutes < MINIMUM_DELAY_MINUTES) {
+        console.warn(
+          `[remarketing] Enrollment ${enrollment.id}: step delay ${stepDelayMinutes}min ` +
+          `is below minimum ${MINIMUM_DELAY_MINUTES}min — skipping to prevent spam`
+        );
         continue;
       }
 

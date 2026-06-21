@@ -18,6 +18,7 @@ import {
 import { fireAudit } from "../lib/audit";
 import { acquireConversationLock, releaseConversationLock } from "../lib/lock";
 import { resolveApiKey } from "../lib/vault";
+import { validateMediaPayload } from "../lib/media-validation";
 import { runAgent } from "../agents/agent-runner";
 import { evaluateActivation } from "./evaluate-activation";
 import { CLOSE_CONVERSATION_TOOL_NAME } from "../agents/tools/close-conversation";
@@ -117,6 +118,7 @@ export async function preprocessAudioMessage(
       message.evolution_message_id,
       "audioMessage"
     );
+    validateMediaPayload(base64, mimeType);
     const transcription = await transcribeAudio(base64, mimeType, apiKey);
     const safeContent = `<audio_transcription>\n${transcription}\n</audio_transcription>`;
     return { message: { ...message, content: safeContent, media_type: null }, failed: false };
@@ -148,6 +150,7 @@ export async function preprocessImageMessage(
       message.evolution_message_id,
       "imageMessage"
     );
+    validateMediaPayload(base64, mimeType);
     return { base64, mimeType };
   } catch (err) {
     console.warn("[process-message] Falha ao buscar imagem:", (err as Error).message);

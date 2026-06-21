@@ -2,9 +2,14 @@ import { getAdminClient } from "@aula-agente/database";
 import type { LLMProvider } from "@aula-agente/shared";
 import { decrypt } from "./crypto";
 
-// Cache for resolved keys (TTL: 5 minutes)
+// Cache for resolved keys (TTL: 60 seconds — minimises plaintext exposure window)
 const keyCache = new Map<string, { key: string; expiresAt: number }>();
-const CACHE_TTL_MS = 5 * 60 * 1000;
+export const CACHE_TTL_MS = 60 * 1000;
+
+// Only used in tests to reset module-level cache state between test cases.
+export function __testClearCache(): void {
+  keyCache.clear();
+}
 
 const ENV_FALLBACKS: Record<LLMProvider, string> = {
   openai: "OPENAI_API_KEY",
@@ -18,10 +23,13 @@ export async function resolveApiKey(
 ): Promise<string> {
   const cacheKey = `${organizationId}:${provider}`;
 
-  // Check cache
+  // Check cache (lazy cleanup of expired entry to avoid stale plaintext retention)
   const cached = keyCache.get(cacheKey);
-  if (cached && cached.expiresAt > Date.now()) {
-    return cached.key;
+  if (cached) {
+    if (cached.expiresAt > Date.now()) {
+      return cached.key;
+    }
+    keyCache.delete(cacheKey);
   }
 
   // Try organization secrets

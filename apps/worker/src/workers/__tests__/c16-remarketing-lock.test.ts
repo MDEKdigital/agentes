@@ -117,7 +117,7 @@ const step = {
   id: STEP_ID,
   flow_id: FLOW_ID,
   step_order: 1,
-  delay_value: 1,
+  delay_value: 30,
   delay_unit: "minutes",
   message_type: "text",
   message_content: "Olá!",
