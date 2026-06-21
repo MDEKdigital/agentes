@@ -133,4 +133,39 @@ describe("TeamPage", () => {
       expect(screen.getAllByText(/2 membros/i).length).toBeGreaterThanOrEqual(1);
     });
   });
+
+  it("E: usuário com role agent (403 em /invitations) não trava a página em loading infinito", async () => {
+    // Reproduces the root cause: /invitations returns 403 for agent-role users.
+    // Before the fix, Promise.all rejected with no catch, setLoading(false) was never
+    // called, and the page stayed in the skeleton state forever.
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path.endsWith("/members")) return Promise.resolve(mockMembersResponse);
+      if (path.endsWith("/invitations")) return Promise.reject(new Error("Acesso de administrador necessário"));
+      return Promise.resolve({});
+    });
+
+    render(<TeamPage />);
+
+    // The loading skeleton must resolve — members list must render despite 403 on invitations
+    await waitFor(() => {
+      expect(screen.getByTestId("members-list")).toBeInTheDocument();
+    });
+  });
+
+  it("F: page renders with empty invitations when /invitations returns 403", async () => {
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path.endsWith("/members")) return Promise.resolve(mockMembersResponse);
+      if (path.endsWith("/invitations")) return Promise.reject(new Error("403 Forbidden"));
+      return Promise.resolve({});
+    });
+
+    render(<TeamPage />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("members-list")).toBeInTheDocument();
+    });
+
+    // No pending invitations section should be rendered (empty list)
+    expect(screen.queryByText("Convites Pendentes")).not.toBeInTheDocument();
+  });
 });

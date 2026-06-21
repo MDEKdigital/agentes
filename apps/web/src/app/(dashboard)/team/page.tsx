@@ -39,20 +39,27 @@ export default function TeamPage() {
   const fetchData = useCallback(async () => {
     if (!currentOrg) { setLoading(false); return; }
 
-    const [membersData, invitationsData] = await Promise.all([
-      apiFetch(`/organizations/${currentOrg.id}/members`),
-      apiFetch(`/organizations/${currentOrg.id}/invitations`),
-    ]);
+    try {
+      const [membersData, invitationsData] = await Promise.all([
+        apiFetch(`/organizations/${currentOrg.id}/members`),
+        // Agents don't have permission to list invitations (API returns 403).
+        // Treat any error as an empty list so the page renders correctly for all roles.
+        apiFetch(`/organizations/${currentOrg.id}/invitations`).catch(() => ({ invitations: [] })),
+      ]);
 
-    const membersList = (membersData.members || []) as Member[];
-    setMembers(membersList);
-    setCurrentUserId(membersData.current_user_id || "");
+      const membersList = (membersData.members || []) as Member[];
+      setMembers(membersList);
+      setCurrentUserId(membersData.current_user_id || "");
 
-    const myMembership = membersList.find((m) => m.user_id === membersData.current_user_id);
-    setCurrentUserRole(myMembership?.role || "agent");
+      const myMembership = membersList.find((m) => m.user_id === membersData.current_user_id);
+      setCurrentUserRole(myMembership?.role || "agent");
 
-    setInvitations((invitationsData.invitations || []) as Invitation[]);
-    setLoading(false);
+      setInvitations((invitationsData.invitations || []) as Invitation[]);
+    } catch {
+      // Members fetch failed — page renders with empty state rather than infinite skeleton
+    } finally {
+      setLoading(false);
+    }
   }, [currentOrg]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
