@@ -243,7 +243,7 @@ describe("runAgent", () => {
     expect(vi.mocked(generateText)).toHaveBeenCalledTimes(2);
   });
 
-  it("inclui feedback da violation no system prompt da retentativa", async () => {
+  it("system prompt de retry usa mensagem estática (PI-3: violation não contamina system prompt)", async () => {
     vi.mocked(generateText)
       .mockResolvedValueOnce({ text: "Ruim", usage: { totalTokens: 50, promptTokens: 30, completionTokens: 20 }, steps: [] } as never)
       .mockResolvedValueOnce({ text: '{"compliant": false, "violation": "mencionou concorrente X"}', usage: { totalTokens: 10, promptTokens: 8, completionTokens: 2 }, steps: [] } as never)
@@ -259,9 +259,11 @@ describe("runAgent", () => {
       conversationId: "conv-1",
     });
 
-    // A 3ª chamada ao generateText é a retentativa — o system deve incluir a violation
+    // A 3ª chamada é a retentativa — NÃO deve conter o texto da violation (PI-3)
     const retryCall = vi.mocked(generateText).mock.calls[2][0];
-    expect((retryCall as { system: string }).system).toContain("mencionou concorrente X");
+    const retrySystem = (retryCall as { system: string }).system;
+    expect(retrySystem).not.toContain("mencionou concorrente X");
+    expect(retrySystem).toMatch(/não.conform|violou|regras|corrija|nova.*resposta/i);
   });
 
   it("passa conversationId para buildToolsForAgent", async () => {
