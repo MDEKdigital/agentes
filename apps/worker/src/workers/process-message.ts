@@ -19,6 +19,8 @@ import { fireAudit } from "../lib/audit";
 import { acquireConversationLock, releaseConversationLock } from "../lib/lock";
 import { resolveApiKey } from "../lib/vault";
 import { validateMediaPayload } from "../lib/media-validation";
+
+export const WHISPER_TIMEOUT_MS = 60_000;
 import { runAgent } from "../agents/agent-runner";
 import { evaluateActivation } from "./evaluate-activation";
 import { CLOSE_CONVERSATION_TOOL_NAME } from "../agents/tools/close-conversation";
@@ -80,6 +82,7 @@ export async function transcribeAudio(
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}` },
     body: formData,
+    signal: AbortSignal.timeout(WHISPER_TIMEOUT_MS),
   });
   if (!response.ok) {
     const text = await response.text();

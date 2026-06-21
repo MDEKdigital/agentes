@@ -1,3 +1,5 @@
+export const EVOLUTION_TIMEOUT_MS = 30_000;
+
 async function evolutionFetch(path: string, body: unknown): Promise<Response> {
   const url = process.env.EVOLUTION_API_URL;
   if (!url) throw new Error("EVOLUTION_API_URL env var is not set");
@@ -8,6 +10,7 @@ async function evolutionFetch(path: string, body: unknown): Promise<Response> {
     method: "POST",
     headers: { "Content-Type": "application/json", apikey: key },
     body: JSON.stringify(body),
+    signal: AbortSignal.timeout(EVOLUTION_TIMEOUT_MS),
   });
 
   if (!response.ok) {

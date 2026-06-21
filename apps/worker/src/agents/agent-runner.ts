@@ -2,6 +2,7 @@ import { generateText } from "ai";
 import type { Agent, LLMProvider, Message } from "@aula-agente/shared";
 import { buildToolsForAgent } from "./tools/registry";
 import { createModel } from "../lib/create-model";
+import { withTimeout, LLM_TIMEOUT_MS, VALIDATION_TIMEOUT_MS } from "../lib/with-timeout";
 
 interface RunAgentParams {
   agent: Agent;
@@ -109,12 +110,15 @@ ou
 {"compliant": false, "violation": "descrição breve da regra violada"}`;
 
   try {
-    const result = await generateText({
-      model: validationModel,
-      prompt,
-      maxTokens: 100,
-      temperature: 0,
-    });
+    const result = await withTimeout(
+      generateText({
+        model: validationModel,
+        prompt,
+        maxTokens: 100,
+        temperature: 0,
+      }),
+      VALIDATION_TIMEOUT_MS
+    );
 
     const parsed = JSON.parse(result.text.trim()) as ValidationResult;
     return parsed;
@@ -159,18 +163,21 @@ export async function runAgent(params: RunAgentParams): Promise<RunAgentResult> 
   let systemPrompt = effectiveBasePrompt;
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-    const result = await generateText({
-      model: effectiveModel,
-      system: systemPrompt,
-      messages: [
-        ...history,
-        { role: "user", content: currentUserContent },
-      ],
-      tools,
-      maxSteps: agent.max_steps,
-      temperature: agent.temperature,
-      maxTokens: agent.max_tokens,
-    });
+    const result = await withTimeout(
+      generateText({
+        model: effectiveModel,
+        system: systemPrompt,
+        messages: [
+          ...history,
+          { role: "user", content: currentUserContent },
+        ],
+        tools,
+        maxSteps: agent.max_steps,
+        temperature: agent.temperature,
+        maxTokens: agent.max_tokens,
+      }),
+      LLM_TIMEOUT_MS
+    );
 
     totalTokens += result.usage?.totalTokens || 0;
     allToolCalls = allToolCalls.concat(
