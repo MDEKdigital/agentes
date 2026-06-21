@@ -3,6 +3,7 @@ import type { Agent, LLMProvider, Message } from "@aula-agente/shared";
 import { buildToolsForAgent } from "./tools/registry";
 import { createModel } from "../lib/create-model";
 import { withTimeout, LLM_TIMEOUT_MS, VALIDATION_TIMEOUT_MS } from "../lib/with-timeout";
+import { workerLog } from "../lib/logger";
 
 interface RunAgentParams {
   agent: Agent;
@@ -197,13 +198,23 @@ export async function runAgent(params: RunAgentParams): Promise<RunAgentResult> 
     }
 
     if (attempt === MAX_ATTEMPTS) {
-      console.warn(
-        `[agent-runner] Resposta enviada após ${MAX_ATTEMPTS} tentativas com violation: "${validation.violation}"`
-      );
+      workerLog("process-message", "warn", {
+        conversationId,
+        organizationId,
+        agentId: agent.id,
+        attempts: MAX_ATTEMPTS,
+        violation: validation.violation,
+      }, `response sent after ${MAX_ATTEMPTS} attempts — still non-compliant`);
       break;
     }
 
-    console.warn(`[agent-runner] Tentativa ${attempt} não-conforme: "${validation.violation ?? "sem detalhe"}"`);
+    workerLog("process-message", "warn", {
+      conversationId,
+      organizationId,
+      agentId: agent.id,
+      attempt,
+      violation: validation.violation,
+    }, `attempt ${attempt} non-compliant — retrying`);
     systemPrompt = `[ATENCAO: sua resposta anterior não estava em conformidade com as regras do sistema. Gere uma nova resposta seguindo estritamente todas as regras acima. Não repita o erro anterior.]\n\n${effectiveBasePrompt}`;
   }
 
