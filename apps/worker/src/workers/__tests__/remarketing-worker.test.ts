@@ -89,6 +89,13 @@ vi.mock("../../../lib/redis", () => ({
   getConnectionOptions: vi.fn().mockReturnValue({}),
 }));
 
+vi.mock("../../lib/lock", () => ({
+  acquireEnrollmentLock: vi.fn().mockResolvedValue("lock-token"),
+  releaseEnrollmentLock: vi.fn().mockResolvedValue(undefined),
+  acquireConversationLock: vi.fn().mockResolvedValue("lock-token"),
+  releaseConversationLock: vi.fn().mockResolvedValue(undefined),
+}));
+
 import { processRemarketingCycle } from "../remarketing-worker";
 
 // ── fixtures ───────────────────────────────────────────────────────────────────

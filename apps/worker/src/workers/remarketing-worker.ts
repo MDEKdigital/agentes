@@ -24,6 +24,7 @@ import {
   getConversationById,
 } from "@aula-agente/database";
 import { fireAudit } from "../lib/audit";
+import { acquireEnrollmentLock, releaseEnrollmentLock } from "../lib/lock";
 
 function toMinutes(value: number, unit: string): number {
   if (unit === "hours") return value * 60;
@@ -96,6 +97,14 @@ export async function processRemarketingCycle() {
   const flowMinDelayMs = new Map<string, number>();
 
   for (const enrollment of enrollments) {
+    // C16: Distributed lock — skip enrollment if another worker is already processing it.
+    // Prevents duplicate messages when multiple worker instances run simultaneously.
+    const lockValue = await acquireEnrollmentLock(enrollment.id);
+    if (!lockValue) {
+      console.log(`[remarketing] Enrollment ${enrollment.id} locked by another worker — skipping`);
+      continue;
+    }
+
     try {
       if (!enrollment.next_step_id) continue;
 
@@ -254,6 +263,8 @@ export async function processRemarketingCycle() {
       if (delayMs < prev) flowMinDelayMs.set(enrollment.flow_id, delayMs);
     } catch (err) {
       console.error(`[remarketing] Error processing enrollment ${enrollment.id}:`, err);
+    } finally {
+      await releaseEnrollmentLock(enrollment.id, lockValue);
     }
   }
 

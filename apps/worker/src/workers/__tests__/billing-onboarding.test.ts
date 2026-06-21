@@ -15,7 +15,28 @@ const {
   mockGetBillingEventById: vi.fn(),
   mockUpdateBillingEventStatus: vi.fn(),
   mockClaimBillingEventForProcessing: vi.fn(),
-  mockGetAdminClient: vi.fn(() => ({})),
+  // C12: provide a DB client that returns null from the stale recovery query
+  // so that existing tests remain unaffected (no stale event found → skip path unchanged)
+  mockGetAdminClient: vi.fn(() => ({
+    from: () => ({
+      update: () => ({
+        eq: () => ({
+          eq: () => ({
+            lt: () => ({
+              select: () => ({
+                single: () => Promise.resolve({ data: null, error: null }),
+              }),
+            }),
+          }),
+        }),
+      }),
+      select: () => ({
+        eq: () => ({
+          single: () => Promise.resolve({ data: { status: "processing" }, error: null }),
+        }),
+      }),
+    }),
+  })),
   mockNormalizePayload: vi.fn(),
   mockHandleActivated: vi.fn(),
   mockHandleRenewed: vi.fn(),

@@ -11,12 +11,42 @@ import {
   handleSubscriptionPastDue,
 } from "../services/onboarding-service";
 
+const STALE_PROCESSING_MS = 5 * 60 * 1000; // 5 minutes
+
+// C12: Reset a billing_event stuck in "processing" if it's older than STALE_PROCESSING_MS.
+// Returns true if the event was stale and was successfully reset to "pending".
+async function recoverStaleBillingEvent(
+  client: ReturnType<typeof getAdminClient>,
+  billingEventId: string
+): Promise<boolean> {
+  const staleAt = new Date(Date.now() - STALE_PROCESSING_MS).toISOString();
+  const { data } = await client
+    .from("billing_events")
+    .update({ status: "pending" })
+    .eq("id", billingEventId)
+    .eq("status", "processing")
+    .lt("updated_at", staleAt)
+    .select("id")
+    .single();
+  return !!data;
+}
+
 async function processBillingOnboarding(job: Job<BillingOnboardingJobData>): Promise<void> {
   const { billingEventId } = job.data;
   const client = getAdminClient();
 
   // R4: Atomic claim — UPDATE WHERE status='pending' RETURNING; returns null if already claimed
-  const billingEvent = await claimBillingEventForProcessing(client, billingEventId);
+  let billingEvent = await claimBillingEventForProcessing(client, billingEventId);
+
+  if (!billingEvent) {
+    // C12: Event may be stuck in "processing" from a previous hard crash.
+    // If it's been there for > STALE_PROCESSING_MS, reset it and re-claim.
+    const recovered = await recoverStaleBillingEvent(client, billingEventId);
+    if (recovered) {
+      billingEvent = await claimBillingEventForProcessing(client, billingEventId);
+    }
+  }
+
   if (!billingEvent) {
     job.log(`Skipping billing_event ${billingEventId}: not pending (already claimed or processed)`);
     return;
@@ -77,15 +107,29 @@ export function createBillingOnboardingWorker() {
 
   worker.on("failed", async (job, err) => {
     console.error(`[billing-onboarding] Job ${job?.id} failed:`, err.message);
-    if (job?.data.billingEventId) {
-      try {
-        await updateBillingEventStatus(getAdminClient(), job.data.billingEventId, "failed", {
-          error_message: err.message,
-          processed_at: new Date().toISOString(),
-        });
-      } catch (updateErr) {
-        console.error("[billing-onboarding] Failed to update billing_event status:", updateErr);
+    if (!job?.data.billingEventId) return;
+    try {
+      const client = getAdminClient();
+      // C12: Don't overwrite a terminal state (processed/ignored) with "failed".
+      // This prevents marking an event as failed when side effects already completed
+      // (e.g., a concurrent stale-recovery path processed it while this retry failed).
+      const { data: current } = await client
+        .from("billing_events")
+        .select("status")
+        .eq("id", job.data.billingEventId)
+        .single();
+      if (current && ["processed", "ignored"].includes(current.status)) {
+        console.warn(
+          `[billing-onboarding] Job ${job.id} failed but event ${job.data.billingEventId} already ${current.status} — not overwriting`
+        );
+        return;
       }
+      await updateBillingEventStatus(client, job.data.billingEventId, "failed", {
+        error_message: err.message,
+        processed_at: new Date().toISOString(),
+      });
+    } catch (updateErr) {
+      console.error("[billing-onboarding] Failed to update billing_event status:", updateErr);
     }
   });
 
