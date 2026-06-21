@@ -199,19 +199,34 @@ export async function processRemarketingCycle() {
       // ── Buscar conversa e telefone do contato ─────────────────────────────
       const conversation = await getConversationById(db, enrollment.conversation_id, enrollment.organization_id);
       if (!conversation) {
-        console.error(`[remarketing] Conversation ${enrollment.conversation_id} not found, skipping`);
+        workerLog("remarketing", "error", {
+          enrollmentId: enrollment.id,
+          conversationId: enrollment.conversation_id,
+          organizationId: enrollment.organization_id,
+        }, "conversation not found — skipping enrollment");
+        incrementMetric("remarketing_enrollment_skipped");
         continue;
       }
 
       const contact = conversation.contacts as { phone: string } | null;
       if (!contact?.phone) {
-        console.error(`[remarketing] No phone for conversation ${enrollment.conversation_id}, skipping`);
+        workerLog("remarketing", "error", {
+          enrollmentId: enrollment.id,
+          conversationId: enrollment.conversation_id,
+          organizationId: enrollment.organization_id,
+        }, "no phone on contact — skipping enrollment");
+        incrementMetric("remarketing_enrollment_skipped");
         continue;
       }
 
       const instanceId = flow?.instance_id;
       if (!instanceId) {
-        console.error(`[remarketing] No instance_id for flow ${enrollment.flow_id}, skipping`);
+        workerLog("remarketing", "error", {
+          enrollmentId: enrollment.id,
+          flowId: enrollment.flow_id,
+          organizationId: enrollment.organization_id,
+        }, "flow has no instance_id — skipping enrollment");
+        incrementMetric("remarketing_enrollment_skipped");
         continue;
       }
 
