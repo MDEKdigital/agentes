@@ -159,7 +159,8 @@ describe("preprocessAudioMessage", () => {
       "sk-key"
     );
 
-    expect(result.message.content).toBe("mensagem transcrita");
+    expect(result.message.content).toContain("mensagem transcrita");
+    expect(result.message.content).toContain("<audio_transcription>");
     expect(result.failed).toBe(false);
   });
 

@@ -118,7 +118,8 @@ export async function preprocessAudioMessage(
       "audioMessage"
     );
     const transcription = await transcribeAudio(base64, mimeType, apiKey);
-    return { message: { ...message, content: transcription, media_type: null }, failed: false };
+    const safeContent = `<audio_transcription>\n${transcription}\n</audio_transcription>`;
+    return { message: { ...message, content: safeContent, media_type: null }, failed: false };
   } catch (err) {
     console.warn("[process-message] Falha ao processar áudio:", (err as Error).message);
     return {

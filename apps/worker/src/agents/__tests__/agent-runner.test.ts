@@ -129,7 +129,10 @@ describe("runAgent", () => {
     const call = vi.mocked(generateText).mock.calls[0][0];
     const messages = call.messages as Array<{ role: string; content: string }>;
     expect(messages[0]).toEqual({ role: "assistant", content: "Como posso ajudar?" });
-    expect(messages[messages.length - 1]).toEqual({ role: "user", content: "Olá" });
+    const lastMsg = messages[messages.length - 1];
+    expect(lastMsg.role).toBe("user");
+    expect(lastMsg.content).toContain("Olá");
+    expect(lastMsg.content).toContain("<user_message>");
   });
 
   it("retorna resposta diretamente se validador aprova na primeira tentativa", async () => {
@@ -344,7 +347,7 @@ describe("runAgent — suporte a imagem multimodal", () => {
           expect.objectContaining({
             role: "user",
             content: expect.arrayContaining([
-              expect.objectContaining({ type: "text", text: "[imagem]" }),
+              expect.objectContaining({ type: "text", text: expect.stringContaining("[imagem]") }),
               expect.objectContaining({ type: "image" }),
             ]),
           }),
@@ -367,7 +370,7 @@ describe("runAgent — suporte a imagem multimodal", () => {
     expect(openaiCallable).toHaveBeenCalledWith("gpt-4o");
   });
 
-  it("sem imageContent, mensagem é texto simples (comportamento inalterado)", async () => {
+  it("sem imageContent, mensagem é texto simples encapsulado em <user_message>", async () => {
     await runAgent({
       agent: { ...baseAgent, model: "gpt-4o", provider: "openai" },
       messages: [],
@@ -377,15 +380,10 @@ describe("runAgent — suporte a imagem multimodal", () => {
       conversationId: "conv-1",
     });
 
-    expect(generateText).toHaveBeenCalledWith(
-      expect.objectContaining({
-        messages: expect.arrayContaining([
-          expect.objectContaining({
-            role: "user",
-            content: currentMessage.content,
-          }),
-        ]),
-      })
-    );
+    const call = vi.mocked(generateText).mock.calls[0][0] as { messages: Array<{ role: string; content: string }> };
+    const lastMsg = call.messages[call.messages.length - 1];
+    expect(lastMsg.role).toBe("user");
+    expect(lastMsg.content).toContain(currentMessage.content);
+    expect(lastMsg.content).toContain("<user_message>");
   });
 });
