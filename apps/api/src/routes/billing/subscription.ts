@@ -62,6 +62,9 @@ export default async function subscriptionRoute(app: FastifyInstance) {
     };
 
     // 4. Fetch recent billing events (not for "agent" role)
+    // Non-fatal: billing history is secondary to subscription info. If the table
+    // doesn't exist yet (pending migration) or the query fails, return empty events
+    // rather than blocking the whole page with a 500.
     let recentEvents: unknown[] = [];
     if (userRole !== "agent") {
       const { data: events, error: eventsError } = await db
@@ -72,10 +75,10 @@ export default async function subscriptionRoute(app: FastifyInstance) {
         .limit(50);
 
       if (eventsError) {
-        request.log.error({ err: eventsError }, "Failed to fetch billing events");
-        return reply.status(500).send({ error: "Failed to fetch billing events" });
+        request.log.warn({ err: eventsError }, "Could not fetch billing events — returning empty list");
+      } else {
+        recentEvents = events ?? [];
       }
-      recentEvents = events ?? [];
     }
 
     // 5. Build limits from plan
