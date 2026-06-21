@@ -94,7 +94,12 @@ export function startProcessDocumentWorker() {
           chunk_count: chunks.length,
         });
 
-        console.log(`Processed document ${documentId}: ${chunks.length} chunks`);
+        workerLog("process-document", "info", {
+          jobId: job.id,
+          documentId,
+          organizationId,
+          agentId,
+        }, `processed ${chunks.length} chunks`);
         incrementMetric("process_document_success");
       } catch (error) {
         const message = error instanceof Error ? error.message : "Unknown error";
