@@ -72,6 +72,12 @@ export function getTakeoverTimeoutQueue() {
   if (!takeoverTimeoutQueue) {
     takeoverTimeoutQueue = new Queue<TakeoverTimeoutJobData>(QUEUE_NAMES.TAKEOVER_TIMEOUT, {
       connection: getConnectionOptions(),
+      defaultJobOptions: {
+        attempts: 3,
+        backoff: { type: "fixed", delay: 10000 },
+        removeOnComplete: { count: 500 },
+        removeOnFail: { count: 1000 },
+      },
     });
   }
   return takeoverTimeoutQueue;
@@ -84,6 +90,12 @@ export function getRemarketingQueue() {
   if (!remarketingQueue) {
     remarketingQueue = new Queue<RemarketingJobData>(QUEUE_NAMES.REMARKETING, {
       connection: getConnectionOptions(),
+      defaultJobOptions: {
+        attempts: 3,
+        backoff: { type: "exponential", delay: 5000 },
+        removeOnComplete: { count: 500 },
+        removeOnFail: { count: 1000 },
+      },
     });
   }
   return remarketingQueue;
