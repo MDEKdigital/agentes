@@ -1,3 +1,5 @@
+import { EMAIL_TIMEOUT_MS } from "../lib/with-timeout";
+
 function escapeHtml(s: string): string {
   return s
     .replace(/&/g, "&amp;")
@@ -6,10 +8,6 @@ function escapeHtml(s: string): string {
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
 }
-
-const RESEND_API_KEY = process.env.RESEND_API_KEY;
-const PUBLIC_APP_URL = process.env.PUBLIC_APP_URL ?? "http://localhost:3000";
-const FROM_EMAIL = process.env.FROM_EMAIL ?? "noreply@aula-agente.com";
 
 interface WelcomeEmailOptions {
   to: string;
@@ -20,7 +18,8 @@ interface WelcomeEmailOptions {
 }
 
 export async function sendWelcomeEmail(opts: WelcomeEmailOptions): Promise<void> {
-  if (!RESEND_API_KEY) {
+  const resendApiKey = process.env.RESEND_API_KEY;
+  if (!resendApiKey) {
     console.warn(
       `[email-service] RESEND_API_KEY not configured — skipping welcome email to ${opts.to}`
     );
@@ -33,7 +32,10 @@ export async function sendWelcomeEmail(opts: WelcomeEmailOptions): Promise<void>
     throw new Error(`Invalid invitationId format: ${opts.invitationId}`);
   }
 
-  const acceptUrl = `${PUBLIC_APP_URL}/accept-invitation?id=${opts.invitationId}`;
+  const publicAppUrl = process.env.PUBLIC_APP_URL ?? "http://localhost:3000";
+  const fromEmail = process.env.FROM_EMAIL ?? "noreply@aula-agente.com";
+
+  const acceptUrl = `${publicAppUrl}/accept-invitation?id=${opts.invitationId}`;
   const firstName = escapeHtml(opts.name.split(" ")[0] || opts.name);
   const safePlanName = escapeHtml(opts.planName);
   const safeOrgName = escapeHtml(opts.orgName);
@@ -62,15 +64,16 @@ export async function sendWelcomeEmail(opts: WelcomeEmailOptions): Promise<void>
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${RESEND_API_KEY}`,
+      Authorization: `Bearer ${resendApiKey}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      from: FROM_EMAIL,
+      from: fromEmail,
       to: opts.to,
       subject: `Bem-vindo ao ${opts.planName} — acesse sua conta`,
       html,
     }),
+    signal: AbortSignal.timeout(EMAIL_TIMEOUT_MS),
   });
 
   if (!response.ok) {
