@@ -16,7 +16,7 @@ import {
   getInstanceById,
 } from "@aula-agente/database";
 import { fireAudit } from "../lib/audit";
-import { acquireConversationLock, releaseConversationLock, renewConversationLock, LOCK_RENEWAL_INTERVAL_MS } from "../lib/lock";
+import { acquireConversationLock, releaseConversationLock, renewConversationLock, LOCK_RENEWAL_INTERVAL_MS, LockContentionError } from "../lib/lock";
 import { resolveApiKey } from "../lib/vault";
 import { validateMediaPayload } from "../lib/media-validation";
 
@@ -215,10 +215,9 @@ export function startProcessMessageWorker() {
       const { conversationId, messageId, agentId, organizationId } = job.data;
       workerLog("process-message", "info", { jobId: job.id, conversationId, messageId, organizationId }, "started");
 
+      // RC-6: throws LockContentionError (not plain Error) so failed handler
+      // can skip the terminal fallback for valid lock contention.
       const lockValue = await acquireConversationLock(conversationId);
-      if (!lockValue) {
-        throw new Error(`Failed to acquire lock for conversation ${conversationId}`);
-      }
 
       // RC-3: heartbeat prevents lock expiry during long LLM calls (LLM_TIMEOUT > LOCK_TTL)
       const lockHeartbeat = setInterval(() => {
@@ -497,6 +496,25 @@ export function startProcessMessageWorker() {
     }, `failed err="${err.message}"`);
     incrementMetric("process_message_failed");
     if (job && isTerminalFailure(job)) {
+      // RC-6: lock contention is a valid operational state — do NOT send the
+      // "instabilidade técnica" fallback to the user. Still dead-letter for
+      // observability so the dropped message can be investigated.
+      if (err instanceof LockContentionError) {
+        workerLog("process-message", "warn", {
+          jobId: job.id,
+          conversationId: job.data.conversationId,
+          messageId: job.data.messageId,
+        }, "terminal lock contention — no fallback sent to user");
+        enqueueDeadLetter({
+          sourceQueue: QUEUE_NAMES.PROCESS_MESSAGE,
+          jobId: job.id,
+          identifiers: { conversationId: job.data.conversationId, messageId: job.data.messageId, organizationId: job.data.organizationId },
+          attemptsMade: job.attemptsMade,
+        }, err).catch((e: Error) => {
+          workerLog("process-message", "error", { jobId: job.id }, `dead-letter enqueue failed err="${e.message}"`);
+        });
+        return;
+      }
       handleTerminalFailure(job.data).catch((e: Error) => {
         workerLog("process-message", "error", { jobId: job.id, messageId: job.data.messageId }, `handleTerminalFailure threw err="${e.message}"`);
       });

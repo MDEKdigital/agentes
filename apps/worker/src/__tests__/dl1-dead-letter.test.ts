@@ -79,6 +79,9 @@ vi.mock("../lib/lock", () => ({
   LOCK_RENEWAL_INTERVAL_MS: 15_000,
   acquireEnrollmentLock: vi.fn(async () => "lock-value"),
   releaseEnrollmentLock: vi.fn(async () => {}),
+  LockContentionError: class LockContentionError extends Error {
+    constructor(id: string) { super(`Lock contention: ${id}`); this.name = "LockContentionError"; }
+  },
 }));
 vi.mock("../lib/media-validation", () => ({ validateMediaPayload: vi.fn() }));
 vi.mock("../lib/metrics", () => ({ incrementMetric: vi.fn() }));

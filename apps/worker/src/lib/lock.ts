@@ -1,5 +1,15 @@
 import { getRedisConnection } from "@aula-agente/queue";
 
+export class LockContentionError extends Error {
+  constructor(conversationId: string) {
+    super(
+      `Lock contention for conversation ${conversationId} — another job is currently processing it`
+    );
+    this.name = "LockContentionError";
+    Object.setPrototypeOf(this, LockContentionError.prototype);
+  }
+}
+
 const LOCK_PREFIX = "lock:conversation:";
 const ENROLLMENT_LOCK_PREFIX = "lock:remarketing:enrollment:";
 const LOCK_TTL_MS = 60_000; // 60 seconds — renewed by heartbeat while job is active
@@ -9,7 +19,7 @@ const MAX_RETRIES = 20; // 10 seconds max wait
 // Heartbeat fires well within LOCK_TTL_MS to prevent expiry during long LLM calls
 export const LOCK_RENEWAL_INTERVAL_MS = 15_000;
 
-export async function acquireConversationLock(conversationId: string): Promise<string | null> {
+export async function acquireConversationLock(conversationId: string): Promise<string> {
   const redis = getRedisConnection();
   const lockKey = `${LOCK_PREFIX}${conversationId}`;
   const lockValue = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -22,7 +32,7 @@ export async function acquireConversationLock(conversationId: string): Promise<s
     await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
   }
 
-  return null; // Failed to acquire lock
+  throw new LockContentionError(conversationId);
 }
 
 export async function releaseConversationLock(conversationId: string, lockValue: string) {
