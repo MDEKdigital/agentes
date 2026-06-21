@@ -10,11 +10,12 @@ import { generateEmbeddings } from "../embeddings/embedder";
 import { workerLog } from "../lib/logger";
 import { incrementMetric } from "../lib/metrics";
 import { enqueueDeadLetter } from "../lib/dead-letter";
+import { withTimeout, DOCUMENT_FETCH_TIMEOUT_MS, EMBEDDING_TIMEOUT_MS } from "../lib/with-timeout";
 import pdfParse from "pdf-parse";
 import mammoth from "mammoth";
 
-async function extractText(url: string, fileType: DocumentFileType): Promise<string> {
-  const response = await fetch(url);
+export async function extractText(url: string, fileType: DocumentFileType): Promise<string> {
+  const response = await fetch(url, { signal: AbortSignal.timeout(DOCUMENT_FETCH_TIMEOUT_MS) });
   if (!response.ok) {
     throw new Error(`Falha ao buscar documento: ${response.status}`);
   }
@@ -63,9 +64,9 @@ export function startProcessDocumentWorker() {
         const apiKey = await resolveEmbeddingApiKey(organizationId);
 
         // Generate embeddings
-        const embeddings = await generateEmbeddings(
-          chunks.map((c) => c.content),
-          apiKey
+        const embeddings = await withTimeout(
+          generateEmbeddings(chunks.map((c) => c.content), apiKey),
+          EMBEDDING_TIMEOUT_MS
         );
 
         if (embeddings.length !== chunks.length) {

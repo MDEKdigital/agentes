@@ -71,6 +71,7 @@ export function startTakeoverTimeoutWorker() {
 
   worker.on("failed", (job, err) => {
     workerLog("takeover-timeout", "error", { jobId: job?.id }, `failed err="${err.message}"`);
+    incrementMetric("takeover_timeout_cycle_failed");
     if (job && job.attemptsMade >= (job.opts?.attempts ?? 1)) {
       enqueueDeadLetter({
         sourceQueue: QUEUE_NAMES.TAKEOVER_TIMEOUT,
