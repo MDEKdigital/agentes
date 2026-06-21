@@ -2,6 +2,7 @@ import { generateText } from "ai";
 import type { ActivationRule, LLMProvider } from "@aula-agente/shared";
 import { matchesKeyword, matchesWordSet } from "@aula-agente/shared";
 import { createModel } from "../lib/create-model";
+import { withTimeout, LLM_TIMEOUT_MS } from "../lib/with-timeout";
 
 const PHRASE_MODELS: Record<LLMProvider, string> = {
   openai: "gpt-4.1-nano",
@@ -44,7 +45,10 @@ Responda APENAS com JSON válido, sem markdown, sem explicação:
 {"matches": true ou false, "confidence": número de 0.0 a 1.0}`;
 
   try {
-    const result = await generateText({ model, prompt, maxTokens: 60, temperature: 0 });
+    const result = await withTimeout(
+      generateText({ model, prompt, maxTokens: 60, temperature: 0 }),
+      LLM_TIMEOUT_MS
+    );
     const parsed = JSON.parse(result.text.trim()) as { matches: boolean; confidence: number };
     return { matches: parsed.matches ?? false, confidence: parsed.confidence ?? 0 };
   } catch {
