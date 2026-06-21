@@ -4,12 +4,18 @@
 -- admin/service_role client (which the API uses), auth.uid() returns NULL, causing
 -- the NOT EXISTS check to always fail and raise 'Acesso negado'.
 --
--- Authorization is already enforced at the API route level (members/index.ts checks
--- request.user.memberships before calling this function). The SQL-level auth.uid()
--- guard is redundant and breaks service_role callers.
+-- Security model:
+-- This function is SECURITY DEFINER and joins auth.users — it must not be callable
+-- directly by authenticated end-users or it becomes an IDOR vector (any user could
+-- read members of any org by calling the RPC directly). The correct approach is to
+-- restrict EXECUTE to service_role only, and enforce membership access control at the
+-- API route level (apps/api/src/routes/members/index.ts already does this via
+-- request.user.memberships before the DB call).
 --
--- Fix: drop the auth.uid() guard, simplify to pure SQL, and grant EXECUTE to
--- service_role in addition to authenticated.
+-- Changes:
+-- 1. Remove the auth.uid() guard (was broken for service_role; redundant given API-level check)
+-- 2. REVOKE EXECUTE from authenticated (closes the IDOR: unauthenticated RPC calls blocked)
+-- 3. GRANT EXECUTE to service_role only
 
 CREATE OR REPLACE FUNCTION get_org_members_with_email(p_org_id uuid)
 RETURNS TABLE (
@@ -35,5 +41,8 @@ AS $$
   ORDER BY om.created_at;
 $$;
 
-GRANT EXECUTE ON FUNCTION get_org_members_with_email(uuid) TO authenticated;
+-- Close the IDOR: authenticated users cannot call this function directly.
+-- Access is exclusively through the API backend (service_role), which enforces
+-- membership checks before invoking this function.
+REVOKE EXECUTE ON FUNCTION get_org_members_with_email(uuid) FROM authenticated;
 GRANT EXECUTE ON FUNCTION get_org_members_with_email(uuid) TO service_role;
