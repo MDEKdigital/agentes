@@ -27,6 +27,52 @@ import { CLOSE_CONVERSATION_TOOL_NAME } from "../agents/tools/close-conversation
 
 type ConversationRow = Conversation & { contacts: { phone: string } | null };
 
+export const FALLBACK_MESSAGE =
+  "Tivemos uma instabilidade técnica ao processar sua mensagem. Por favor, tente novamente em instantes.";
+
+export function isTerminalFailure(job: {
+  attemptsMade: number;
+  opts?: { attempts?: number };
+}): boolean {
+  return job.attemptsMade >= (job.opts?.attempts ?? 1);
+}
+
+export async function handleTerminalFailure(
+  jobData: ProcessMessageJobData
+): Promise<void> {
+  const { conversationId, messageId, organizationId } = jobData;
+  try {
+    const db = getAdminClient();
+    const conversation = await getConversationById(db, conversationId, organizationId) as ConversationRow | null;
+    if (!conversation) return;
+
+    const instanceId = conversation.evolution_instance_id;
+    if (!instanceId) return;
+
+    const contact = conversation.contacts;
+    if (!contact?.phone) return;
+
+    const sendQueue = getSendMessageQueue();
+    await sendQueue.add(
+      "send-message",
+      {
+        conversationId,
+        messageId,
+        instanceId,
+        phone: contact.phone,
+        content: FALLBACK_MESSAGE,
+        organizationId,
+      },
+      { jobId: `fallback_${messageId}` }
+    );
+  } catch (err) {
+    console.error(
+      `[process-message] Failed to enqueue terminal fallback for message ${messageId}:`,
+      (err as Error).message
+    );
+  }
+}
+
 const AUDIO_EXTENSION_MAP: Record<string, string> = {
   "audio/ogg": "ogg",
   "audio/mp4": "mp4",
@@ -431,6 +477,11 @@ export function startProcessMessageWorker() {
 
   worker.on("failed", (job, err) => {
     console.error(`Job ${job?.id} failed:`, err.message);
+    if (job && isTerminalFailure(job)) {
+      handleTerminalFailure(job.data).catch((e: Error) => {
+        console.error("[process-message] handleTerminalFailure threw:", e.message);
+      });
+    }
   });
 
   console.log("Process-message worker started");
