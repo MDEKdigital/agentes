@@ -94,12 +94,25 @@ export async function handleSubscriptionActivated(
     const orgName = normalized.customer.name || normalized.customer.email;
     const slug = await generateUniqueSlug(client, orgName);
 
-    const org = await createOrganizationForBilling(client, {
-      name: orgName,
-      slug,
-      plan_id: planId,
-      settings: { max_documents: 50, max_agents: 5, max_instances: 3 },
-    });
+    let org;
+    try {
+      org = await createOrganizationForBilling(client, {
+        name: orgName,
+        slug,
+        plan_id: planId,
+        settings: { max_documents: 50, max_agents: 5, max_instances: 3 },
+      });
+    } catch (err: any) {
+      // C13: concurrent request took the same slug — generate a collision-free fallback
+      if (err?.code !== "23505") throw err;
+      const retrySlug = `${slugify(orgName)}-${Date.now().toString(36)}`;
+      org = await createOrganizationForBilling(client, {
+        name: orgName,
+        slug: retrySlug,
+        plan_id: planId,
+        settings: { max_documents: 50, max_agents: 5, max_instances: 3 },
+      });
+    }
     orgId = org.id;
 
     // 4. Create owner invitation (invited_by: null = system)
@@ -121,14 +134,19 @@ export async function handleSubscriptionActivated(
     });
   }
 
-  // 5. Create subscription
-  const subscription = await createSubscription(client, {
+  // 5. Create subscription — C11: reuse existing to prevent duplicates on retry/redelivery
+  const gatewaySubId = normalized.subscription?.gateway_subscription_id ?? null;
+  const existingSub = gatewaySubId
+    ? await findSubscriptionByGatewayId(client, normalized.gateway, gatewaySubId)
+    : null;
+
+  const subscription = existingSub ?? await createSubscription(client, {
     organization_id: orgId,
     plan_id: planId,
     status: "active",
     billing_interval: (normalized.subscription?.interval ?? "monthly") as BillingInterval,
     gateway: normalized.gateway as BillingGateway,
-    gateway_subscription_id: normalized.subscription?.gateway_subscription_id ?? null,
+    gateway_subscription_id: gatewaySubId,
     gateway_customer_id: normalized.subscription?.gateway_customer_id ?? null,
     current_period_start: normalized.subscription?.current_period_start ?? null,
     current_period_end: normalized.subscription?.current_period_end ?? null,

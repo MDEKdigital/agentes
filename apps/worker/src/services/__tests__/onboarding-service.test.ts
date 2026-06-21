@@ -90,6 +90,8 @@ beforeEach(() => {
   // Defaults for happy path
   mockGetPlanByGatewayProduct.mockResolvedValue({ plans: { id: "plan-uuid", name: "Plano Pro" } });
   mockFindPendingInvitationByEmail.mockResolvedValue(null);
+  // C11: default → no existing subscription (normal path calls createSubscription)
+  mockFindSubscriptionByGatewayId.mockResolvedValue(null);
   mockIsSlugAvailable.mockResolvedValue(true);
   mockCreateOrganizationForBilling.mockResolvedValue({ id: "org-uuid" });
   mockCreateInvitation.mockResolvedValue({ id: "inv-uuid" });
