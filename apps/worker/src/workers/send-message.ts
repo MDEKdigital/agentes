@@ -6,6 +6,7 @@ import { evolutionPost } from "../lib/evolution";
 import { getAdminClient, getInstanceById } from "@aula-agente/database";
 import { workerLog } from "../lib/logger";
 import { incrementMetric } from "../lib/metrics";
+import { enqueueDeadLetter } from "../lib/dead-letter";
 
 export function splitMessage(text: string): string[] {
   const parts = text.split(/\n\n+/).map((p) => p.trim()).filter(Boolean);
@@ -103,6 +104,14 @@ export function startSendMessageWorker() {
       organizationId: job?.data.organizationId,
     }, `failed err="${err.message}"`);
     incrementMetric("send_message_failed");
+    if (job && job.attemptsMade >= (job.opts?.attempts ?? 1)) {
+      enqueueDeadLetter({
+        sourceQueue: QUEUE_NAMES.SEND_MESSAGE,
+        jobId: job.id,
+        identifiers: { conversationId: job.data.conversationId, messageId: job.data.messageId, instanceId: job.data.instanceId, organizationId: job.data.organizationId },
+        attemptsMade: job.attemptsMade,
+      }, err).catch(() => {});
+    }
   });
 
   console.log("Send-message worker started");

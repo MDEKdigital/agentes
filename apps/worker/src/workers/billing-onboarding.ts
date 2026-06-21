@@ -5,6 +5,7 @@ import { getConnectionOptions } from "../lib/redis";
 import { getAdminClient, claimBillingEventForProcessing, updateBillingEventStatus } from "@aula-agente/database";
 import { workerLog } from "../lib/logger";
 import { incrementMetric } from "../lib/metrics";
+import { enqueueDeadLetter } from "../lib/dead-letter";
 import { normalizePayload } from "../normalizers/index";
 import {
   handleSubscriptionActivated,
@@ -111,6 +112,14 @@ export function createBillingOnboardingWorker() {
   worker.on("failed", async (job, err) => {
     workerLog("billing-onboarding", "error", { jobId: job?.id, billingEventId: job?.data.billingEventId }, `failed err="${err.message}"`);
     incrementMetric("billing_onboarding_failed");
+    if (job && job.attemptsMade >= (job.opts?.attempts ?? 1)) {
+      enqueueDeadLetter({
+        sourceQueue: QUEUE_NAMES.BILLING_ONBOARDING,
+        jobId: job.id,
+        identifiers: { billingEventId: job.data.billingEventId },
+        attemptsMade: job.attemptsMade,
+      }, err).catch(() => {});
+    }
     if (!job?.data.billingEventId) return;
     try {
       const client = getAdminClient();

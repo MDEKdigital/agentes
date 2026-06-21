@@ -27,6 +27,7 @@ import { fireAudit } from "../lib/audit";
 import { acquireEnrollmentLock, releaseEnrollmentLock } from "../lib/lock";
 import { workerLog } from "../lib/logger";
 import { incrementMetric } from "../lib/metrics";
+import { enqueueDeadLetter } from "../lib/dead-letter";
 
 function toMinutes(value: number, unit: string): number {
   if (unit === "hours") return value * 60;
@@ -320,6 +321,14 @@ export function startRemarketingWorker() {
   worker.on("failed", (job, err) => {
     workerLog("remarketing", "error", { jobId: job?.id }, `failed err="${err.message}"`);
     incrementMetric("remarketing_cycle_failed");
+    if (job && job.attemptsMade >= (job.opts?.attempts ?? 1)) {
+      enqueueDeadLetter({
+        sourceQueue: QUEUE_NAMES.REMARKETING,
+        jobId: job.id,
+        identifiers: {},
+        attemptsMade: job.attemptsMade,
+      }, err).catch(() => {});
+    }
   });
 
   console.log("Remarketing worker started (runs every 1 min)");

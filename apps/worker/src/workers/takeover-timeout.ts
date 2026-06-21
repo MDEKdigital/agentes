@@ -7,6 +7,7 @@ import { getAdminClient, getExpiredTakeovers, releaseExpiredTakeover } from "@au
 import { fireAudit } from "../lib/audit";
 import { workerLog } from "../lib/logger";
 import { incrementMetric } from "../lib/metrics";
+import { enqueueDeadLetter } from "../lib/dead-letter";
 
 export async function processTakeoverTimeouts() {
   const db = getAdminClient();
@@ -70,6 +71,14 @@ export function startTakeoverTimeoutWorker() {
 
   worker.on("failed", (job, err) => {
     workerLog("takeover-timeout", "error", { jobId: job?.id }, `failed err="${err.message}"`);
+    if (job && job.attemptsMade >= (job.opts?.attempts ?? 1)) {
+      enqueueDeadLetter({
+        sourceQueue: QUEUE_NAMES.TAKEOVER_TIMEOUT,
+        jobId: job.id,
+        identifiers: {},
+        attemptsMade: job.attemptsMade,
+      }, err).catch(() => {});
+    }
   });
 
   console.log("Takeover-timeout worker started (runs every 5 min)");

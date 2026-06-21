@@ -26,6 +26,7 @@ import { evaluateActivation } from "./evaluate-activation";
 import { CLOSE_CONVERSATION_TOOL_NAME } from "../agents/tools/close-conversation";
 import { workerLog } from "../lib/logger";
 import { incrementMetric } from "../lib/metrics";
+import { enqueueDeadLetter } from "../lib/dead-letter";
 
 type ConversationRow = Conversation & { contacts: { phone: string } | null };
 
@@ -488,6 +489,14 @@ export function startProcessMessageWorker() {
     if (job && isTerminalFailure(job)) {
       handleTerminalFailure(job.data).catch((e: Error) => {
         workerLog("process-message", "error", { jobId: job.id, messageId: job.data.messageId }, `handleTerminalFailure threw err="${e.message}"`);
+      });
+      enqueueDeadLetter({
+        sourceQueue: QUEUE_NAMES.PROCESS_MESSAGE,
+        jobId: job.id,
+        identifiers: { conversationId: job.data.conversationId, messageId: job.data.messageId, organizationId: job.data.organizationId },
+        attemptsMade: job.attemptsMade,
+      }, err).catch((e: Error) => {
+        workerLog("process-message", "error", { jobId: job.id }, `dead-letter enqueue failed err="${e.message}"`);
       });
     }
   });

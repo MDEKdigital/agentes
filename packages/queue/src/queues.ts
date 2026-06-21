@@ -102,6 +102,22 @@ export function getRemarketingQueue() {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
+let deadLetterQueue: Queue<any, any, string> | null = null;
+
+export function getDeadLetterQueue() {
+  if (!deadLetterQueue) {
+    deadLetterQueue = new Queue("dead-letter", {
+      connection: getConnectionOptions(),
+      defaultJobOptions: {
+        removeOnComplete: { count: 10_000 },
+        removeOnFail: { count: 1_000 },
+      },
+    });
+  }
+  return deadLetterQueue;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 let billingOnboardingQueue: Queue<BillingOnboardingJobData, any, string> | null = null;
 
 export function getBillingOnboardingQueue() {

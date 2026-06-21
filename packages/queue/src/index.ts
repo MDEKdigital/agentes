@@ -6,6 +6,7 @@ export {
   getTakeoverTimeoutQueue,
   getRemarketingQueue,
   getBillingOnboardingQueue,
+  getDeadLetterQueue,
 } from "./queues";
 export type {
   ProcessMessageJobData,
