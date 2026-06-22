@@ -39,6 +39,7 @@ export const createAgentSchema = z.object({
   max_steps: z.number().int().min(1).max(20).default(5),
   tools_config: toolsConfigSchema.default({ search_knowledge: true, search_faq: true }),
   activation_rules: z.array(activationRuleSchema).default([]),
+  is_active: z.boolean().default(true),
 });
 
 export const updateAgentSchema = createAgentSchema.partial();

@@ -37,7 +37,6 @@ export default async function agentRoutes(app: FastifyInstance) {
       const agent = await createAgent(db, {
         ...parseResult.data,
         organization_id: organizationId,
-        is_active: true,
       });
 
       fireAudit(db, {
