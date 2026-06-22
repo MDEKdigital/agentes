@@ -5,13 +5,13 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 export async function apiFetch(path: string, options: RequestInit = {}) {
   const supabase = createClient();
 
-  // getUser() verifies the JWT server-side; getSession() alone only reads local cache
-  const [{ data: { user } }, { data: { session } }] = await Promise.all([
-    supabase.auth.getUser(),
-    supabase.auth.getSession(),
-  ]);
+  // getSession() reads from local storage — no network call, always fast.
+  // JWT validation is the server's job (authMiddleware calls getUser server-side).
+  // Calling getUser() here made a Supabase Auth network round-trip before every
+  // single API request, causing slow/rate-limited requests to chain-timeout.
+  const { data: { session } } = await supabase.auth.getSession();
 
-  if (!user || !session) {
+  if (!session) {
     throw new Error("Sessão expirada. Faça login novamente.");
   }
 
