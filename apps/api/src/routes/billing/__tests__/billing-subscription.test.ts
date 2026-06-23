@@ -17,10 +17,6 @@ vi.mock("../../../middleware/auth", () => ({
   requireOrg: mockRequireOrg,
 }));
 
-vi.mock("../../../lib/db-timeout", () => ({
-  withTimeout: vi.fn(<T>(p: PromiseLike<T>) => Promise.resolve(p)),
-}));
-
 import billingRoutes from "../index";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -29,21 +25,23 @@ import billingRoutes from "../index";
 function makeDataChain(data: unknown) {
   const result = { data, error: null };
   const chain: Record<string, unknown> = {};
-  chain["select"] = vi.fn().mockReturnValue(chain);
-  chain["eq"]     = vi.fn().mockReturnValue(chain);
-  chain["order"]  = vi.fn().mockReturnValue(chain);
-  chain["limit"]  = vi.fn().mockResolvedValue(result);
+  chain["select"]      = vi.fn().mockReturnValue(chain);
+  chain["eq"]          = vi.fn().mockReturnValue(chain);
+  chain["order"]       = vi.fn().mockReturnValue(chain);
+  chain["limit"]       = vi.fn().mockResolvedValue(result);
+  chain["abortSignal"] = vi.fn().mockReturnValue(chain);
   chain["maybeSingle"] = vi.fn().mockResolvedValue(result);
   chain["single"]      = vi.fn().mockResolvedValue(result);
   return chain;
 }
 
-/** Chain for count-style queries (.select('*', {count:'exact',head:true}).eq(...)) */
+/** Chain for count-style queries (.select('*', {count:'exact',head:true}).eq(...).abortSignal(...)) */
 function makeCountChain(count: number) {
   const result = { count, data: null, error: null };
   const chain: Record<string, unknown> = {};
-  chain["select"] = vi.fn().mockReturnValue(chain);
-  chain["eq"]     = vi.fn().mockResolvedValue(result);
+  chain["select"]      = vi.fn().mockReturnValue(chain);
+  chain["eq"]          = vi.fn().mockReturnValue(chain);
+  chain["abortSignal"] = vi.fn().mockResolvedValue(result);
   return chain;
 }
 
@@ -51,10 +49,11 @@ function makeCountChain(count: number) {
 function makeEventsChain(events: unknown[]) {
   const result = { data: events, error: null };
   const chain: Record<string, unknown> = {};
-  chain["select"] = vi.fn().mockReturnValue(chain);
-  chain["eq"]     = vi.fn().mockReturnValue(chain);
-  chain["order"]  = vi.fn().mockReturnValue(chain);
-  chain["limit"]  = vi.fn().mockResolvedValue(result);
+  chain["select"]      = vi.fn().mockReturnValue(chain);
+  chain["eq"]          = vi.fn().mockReturnValue(chain);
+  chain["order"]       = vi.fn().mockReturnValue(chain);
+  chain["limit"]       = vi.fn().mockReturnValue(chain);
+  chain["abortSignal"] = vi.fn().mockResolvedValue(result);
   return chain;
 }
 
@@ -230,14 +229,22 @@ describe("GET /billing/subscription", () => {
     expect(mockFrom).not.toHaveBeenCalledWith("billing_events");
   });
 
-  it("cenário 5: subscription query timeout — retorna 503", async () => {
-    vi.mocked(
-      (await import("../../../lib/db-timeout")).withTimeout
-    ).mockRejectedValueOnce(new Error("DB timeout: subscription+plan"));
+  it("cenário 5: subscription query falha — retorna 503", async () => {
+    // Simulate the subscriptions chain rejecting (e.g. AbortError on timeout)
+    function makeFailChain(err: Error) {
+      const chain: Record<string, unknown> = {};
+      const reject = vi.fn().mockRejectedValue(err);
+      chain["select"]      = vi.fn().mockReturnValue(chain);
+      chain["eq"]          = vi.fn().mockReturnValue(chain);
+      chain["abortSignal"] = vi.fn().mockReturnValue(chain);
+      chain["maybeSingle"] = reject;
+      chain["single"]      = reject;
+      return chain;
+    }
 
     mockGetAdminClient.mockReturnValue({
       from: vi.fn((table: string) => {
-        if (table === "subscriptions")        return makeDataChain(null);
+        if (table === "subscriptions")        return makeFailChain(new Error("AbortError"));
         if (table === "agents")               return makeCountChain(0);
         if (table === "organization_members") return makeCountChain(0);
         if (table === "evolution_instances")  return makeCountChain(0);

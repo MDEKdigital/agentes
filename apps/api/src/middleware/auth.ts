@@ -1,6 +1,18 @@
 import type { FastifyRequest, FastifyReply } from "fastify";
 import { getAdminClient } from "@aula-agente/database";
-import { withTimeout } from "../lib/db-timeout";
+
+const AUTH_MS  = 8_000;
+const QUERY_MS = 8_000;
+
+function raceTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const id = setTimeout(() => reject(new Error(`Timeout: ${label}`)), ms);
+    p.then(
+      (v) => { clearTimeout(id); resolve(v); },
+      (e) => { clearTimeout(id); reject(e); }
+    );
+  });
+}
 
 export async function authMiddleware(request: FastifyRequest, reply: FastifyReply) {
   const authHeader = request.headers.authorization;
@@ -12,11 +24,12 @@ export async function authMiddleware(request: FastifyRequest, reply: FastifyRepl
   const token = authHeader.slice(7);
   const adminClient = getAdminClient();
 
+  // auth.getUser() doesn't expose .abortSignal(), so use Promise.race with timeout
   let user: { id: string; email?: string } | null = null;
   try {
-    const { data, error } = await withTimeout(
+    const { data, error } = await raceTimeout(
       adminClient.auth.getUser(token),
-      8_000,
+      AUTH_MS,
       "getUser"
     );
     if (error || !data.user) {
@@ -28,16 +41,17 @@ export async function authMiddleware(request: FastifyRequest, reply: FastifyRepl
     return reply.status(503).send({ error: "Auth service unavailable" });
   }
 
+  // Use AbortSignal on the DB query so the HTTP fetch is actually cancelled on timeout
   let memberships: Array<{ organization_id: string; role: string }> = [];
   try {
-    const { data, error: memberError } = await withTimeout(
-      adminClient
-        .from("organization_members")
-        .select("organization_id, role")
-        .eq("user_id", user.id),
-      8_000,
-      "memberships"
-    );
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), QUERY_MS);
+    const { data, error: memberError } = await adminClient
+      .from("organization_members")
+      .select("organization_id, role")
+      .eq("user_id", user.id)
+      .abortSignal(ctrl.signal);
+    clearTimeout(timer);
     if (memberError) {
       request.log.error({ err: memberError }, "Failed to fetch memberships");
       return reply.status(500).send({ error: "Failed to fetch user memberships" });

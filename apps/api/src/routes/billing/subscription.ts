@@ -1,7 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { getAdminClient } from "@aula-agente/database";
 import { authMiddleware, requireOrg } from "../../middleware/auth";
-import { withTimeout } from "../../lib/db-timeout";
 import type { Plan, Subscription, BillingEvent } from "@aula-agente/shared";
 
 const QUERY_MS = 8_000;
@@ -16,52 +15,47 @@ export default async function subscriptionRoute(app: FastifyInstance) {
     const userRole = request.userRole;
     const db = getAdminClient();
 
-    // Fire all queries in parallel — worst case is one 8s window, not 29s
+    // AbortController cancels the actual HTTP fetch inside Supabase client.
+    // setTimeout-based races don't work when the underlying socket hangs —
+    // the fetch promise never settles and the Promise.allSettled waits forever.
+    const ctrl = new AbortController();
+    const evCtrl = new AbortController();
+    const ctrlTimer = setTimeout(() => ctrl.abort(), QUERY_MS);
+    const evTimer  = setTimeout(() => evCtrl.abort(), EVENTS_MS);
+
     const [subResult, agentsResult, membersResult, instancesResult, eventsResult] =
       await Promise.allSettled([
-        withTimeout(
-          db.from("subscriptions")
-            .select("*, plans(*)")
-            .eq("organization_id", orgId)
-            .maybeSingle(),
-          QUERY_MS,
-          "subscription+plan"
-        ),
-        withTimeout(
-          db.from("agents")
-            .select("*", { count: "exact", head: true })
-            .eq("organization_id", orgId),
-          QUERY_MS,
-          "agents-count"
-        ),
-        withTimeout(
-          db.from("organization_members")
-            .select("*", { count: "exact", head: true })
-            .eq("organization_id", orgId),
-          QUERY_MS,
-          "members-count"
-        ),
-        withTimeout(
-          db.from("evolution_instances")
-            .select("*", { count: "exact", head: true })
-            .eq("organization_id", orgId),
-          QUERY_MS,
-          "instances-count"
-        ),
+        db.from("subscriptions")
+          .select("*, plans(*)")
+          .eq("organization_id", orgId)
+          .abortSignal(ctrl.signal)
+          .maybeSingle(),
+        db.from("agents")
+          .select("*", { count: "exact", head: true })
+          .eq("organization_id", orgId)
+          .abortSignal(ctrl.signal),
+        db.from("organization_members")
+          .select("*", { count: "exact", head: true })
+          .eq("organization_id", orgId)
+          .abortSignal(ctrl.signal),
+        db.from("evolution_instances")
+          .select("*", { count: "exact", head: true })
+          .eq("organization_id", orgId)
+          .abortSignal(ctrl.signal),
         userRole !== "agent"
-          ? withTimeout(
-              db.from("billing_events")
-                .select("id, gateway, event_type, status, created_at")
-                .eq("organization_id", orgId)
-                .order("created_at", { ascending: false })
-                .limit(50),
-              EVENTS_MS,
-              "billing-events"
-            )
+          ? db.from("billing_events")
+              .select("id, gateway, event_type, status, created_at")
+              .eq("organization_id", orgId)
+              .order("created_at", { ascending: false })
+              .limit(50)
+              .abortSignal(evCtrl.signal)
           : Promise.resolve({ data: [] as BillingEvent[], error: null }),
       ]);
 
-    // Subscription is the only critical query — fail fast if it died
+    clearTimeout(ctrlTimer);
+    clearTimeout(evTimer);
+
+    // Subscription is the only critical query — fail fast if it timed out or errored
     if (subResult.status === "rejected") {
       request.log.error({ err: subResult.reason }, "subscription query failed");
       return reply.status(503).send({ error: "Serviço temporariamente indisponível. Tente novamente em instantes." });
