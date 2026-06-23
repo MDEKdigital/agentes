@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { getAdminClient } from "@aula-agente/database";
 import { authMiddleware, requireOrg } from "../../middleware/auth";
-import { QUERY_MS } from "../../lib/db-timeout";
+import { withTimeout, QUERY_MS } from "../../lib/db-timeout";
 import type { Plan, Subscription, BillingEvent } from "@aula-agente/shared";
 
 const EVENTS_MS = 5_000;
@@ -16,55 +16,38 @@ export default async function subscriptionRoute(app: FastifyInstance) {
     const userRole = request.userRole;
     const db = getAdminClient();
 
-    // Hard deadline: se qualquer query travar (AbortSignal ignorado pelo cliente),
-    // este timer garante que a rota responde em no máximo ROUTE_TIMEOUT_MS.
-    const ROUTE_TIMEOUT_MS = 10_000;
-    const routeTimer = setTimeout(() => {
-      if (!reply.sent) {
-        request.log.error({ orgId }, "billing/subscription: hard timeout atingido — enviando 503");
-        reply.status(503).send({ error: "Serviço temporariamente indisponível. Tente novamente em instantes." });
-      }
-    }, ROUTE_TIMEOUT_MS);
-
-    const ctrl = new AbortController();
-    const evCtrl = new AbortController();
-    const ctrlTimer = setTimeout(() => ctrl.abort(), QUERY_MS);
-    const evTimer = setTimeout(() => evCtrl.abort(), EVENTS_MS);
-
+    // withTimeout usa Promise.race internamente: mesmo que o fetch do Supabase
+    // não honre AbortSignal, o timer rejeita a promise externa e o allSettled
+    // avança — a rota sempre responde dentro de QUERY_MS / EVENTS_MS.
     const [subResult, agentsResult, membersResult, instancesResult, eventsResult] =
       await Promise.allSettled([
-        db.from("subscriptions")
-          .select("*, plans(*)")
-          .eq("organization_id", orgId)
-          .abortSignal(ctrl.signal)
-          .maybeSingle(),
-        db.from("agents")
-          .select("*", { count: "exact", head: true })
-          .eq("organization_id", orgId)
-          .abortSignal(ctrl.signal),
-        db.from("organization_members")
-          .select("*", { count: "exact", head: true })
-          .eq("organization_id", orgId)
-          .abortSignal(ctrl.signal),
-        db.from("evolution_instances")
-          .select("*", { count: "exact", head: true })
-          .eq("organization_id", orgId)
-          .abortSignal(ctrl.signal),
+        withTimeout(
+          db.from("subscriptions").select("*, plans(*)").eq("organization_id", orgId).maybeSingle(),
+          QUERY_MS, "subscriptions"
+        ),
+        withTimeout(
+          db.from("agents").select("*", { count: "exact", head: true }).eq("organization_id", orgId),
+          QUERY_MS, "agents-count"
+        ),
+        withTimeout(
+          db.from("organization_members").select("*", { count: "exact", head: true }).eq("organization_id", orgId),
+          QUERY_MS, "members-count"
+        ),
+        withTimeout(
+          db.from("evolution_instances").select("*", { count: "exact", head: true }).eq("organization_id", orgId),
+          QUERY_MS, "instances-count"
+        ),
         userRole !== "agent"
-          ? db.from("billing_events")
-              .select("id, gateway, event_type, status, created_at")
-              .eq("organization_id", orgId)
-              .order("created_at", { ascending: false })
-              .limit(50)
-              .abortSignal(evCtrl.signal)
+          ? withTimeout(
+              db.from("billing_events")
+                .select("id, gateway, event_type, status, created_at")
+                .eq("organization_id", orgId)
+                .order("created_at", { ascending: false })
+                .limit(50),
+              EVENTS_MS, "billing-events"
+            )
           : Promise.resolve({ data: [] as BillingEvent[], error: null }),
-      ]).finally(() => {
-        clearTimeout(ctrlTimer);
-        clearTimeout(evTimer);
-        clearTimeout(routeTimer);
-      });
-
-    if (reply.sent) return;
+      ]);
 
     // Subscription is the only critical query — fail fast if it timed out or errored
     if (subResult.status === "rejected") {
