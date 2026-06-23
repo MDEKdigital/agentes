@@ -16,9 +16,16 @@ export default async function subscriptionRoute(app: FastifyInstance) {
     const userRole = request.userRole;
     const db = getAdminClient();
 
-    // AbortController cancels the actual HTTP fetch inside Supabase client.
-    // setTimeout-based races don't work when the underlying socket hangs —
-    // the fetch promise never settles and the Promise.allSettled waits forever.
+    // Hard deadline: se qualquer query travar (AbortSignal ignorado pelo cliente),
+    // este timer garante que a rota responde em no máximo ROUTE_TIMEOUT_MS.
+    const ROUTE_TIMEOUT_MS = 10_000;
+    const routeTimer = setTimeout(() => {
+      if (!reply.sent) {
+        request.log.error({ orgId }, "billing/subscription: hard timeout atingido — enviando 503");
+        reply.status(503).send({ error: "Serviço temporariamente indisponível. Tente novamente em instantes." });
+      }
+    }, ROUTE_TIMEOUT_MS);
+
     const ctrl = new AbortController();
     const evCtrl = new AbortController();
     const ctrlTimer = setTimeout(() => ctrl.abort(), QUERY_MS);
@@ -54,7 +61,10 @@ export default async function subscriptionRoute(app: FastifyInstance) {
       ]).finally(() => {
         clearTimeout(ctrlTimer);
         clearTimeout(evTimer);
+        clearTimeout(routeTimer);
       });
+
+    if (reply.sent) return;
 
     // Subscription is the only critical query — fail fast if it timed out or errored
     if (subResult.status === "rejected") {
