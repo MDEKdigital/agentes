@@ -113,6 +113,9 @@ export function startProcessDocumentWorker() {
     {
       connection: getConnectionOptions(),
       concurrency: 3,
+      // DOCUMENT_FETCH_TIMEOUT_MS (60 s) + EMBEDDING_TIMEOUT_MS (60 s) can exceed BullMQ's
+      // default 30 s stall window — set explicit headroom to prevent stall→retry→duplicate insertChunks.
+      lockDuration: 150_000,
     }
   );
 
