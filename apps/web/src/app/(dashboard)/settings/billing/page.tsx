@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useOrganization } from "@/providers/organization-provider";
 import { apiFetch } from "@/lib/api";
@@ -81,10 +82,19 @@ function SkeletonCard({ rows = 5 }: { rows?: number }) {
 }
 
 export default function BillingPage() {
-  const { currentOrg, loading: orgLoading } = useOrganization();
+  const { currentOrg, currentRole, loading: orgLoading } = useOrganization();
+  const router = useRouter();
   const [data, setData] = useState<BillingData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const isAdmin = currentRole === "owner" || currentRole === "admin";
+
+  useEffect(() => {
+    if (!orgLoading && currentRole !== null && !isAdmin) {
+      router.replace("/inbox");
+    }
+  }, [orgLoading, currentRole, isAdmin, router]);
 
   const fetchBilling = useCallback(() => {
     if (!currentOrg) return;

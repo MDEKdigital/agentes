@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useOrganization } from "@/providers/organization-provider";
 import { apiFetch } from "@/lib/api";
 import { CheckCircle, AlertTriangle, RefreshCw } from "lucide-react";
@@ -21,11 +22,20 @@ function formatCurrency(value: number) {
 }
 
 export default function PlansPage() {
-  const { currentOrg, loading: orgLoading } = useOrganization();
+  const { currentOrg, currentRole, loading: orgLoading } = useOrganization();
+  const router = useRouter();
   const [plans, setPlans] = useState<Plan[]>([]);
   const [billingData, setBillingData] = useState<BillingData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const isAdmin = currentRole === "owner" || currentRole === "admin";
+
+  useEffect(() => {
+    if (!orgLoading && currentRole !== null && !isAdmin) {
+      router.replace("/inbox");
+    }
+  }, [orgLoading, currentRole, isAdmin, router]);
 
   const fetchData = useCallback(() => {
     if (!currentOrg) return;

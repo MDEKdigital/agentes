@@ -21,7 +21,11 @@ export default async function organizationRoutes(app: FastifyInstance) {
     const db = getAdminClient();
     const memberships = await getUserOrganizations(db, request.user.id);
     const orgs = (memberships ?? [])
-      .map((m: Record<string, unknown>) => m.organizations as Record<string, unknown>)
+      .map((m: Record<string, unknown>) => {
+        const org = m.organizations as Record<string, unknown>;
+        if (!org) return null;
+        return { ...org, role: m.role };
+      })
       .filter(Boolean);
     return reply.send(orgs);
   });

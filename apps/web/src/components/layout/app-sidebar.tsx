@@ -6,6 +6,7 @@ import { Inbox, Bot, RefreshCw, Radio, Users, Settings, Zap, LogOut, CreditCard 
 import { OrgSwitcher } from "./org-switcher";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
+import { useOrganization } from "@/providers/organization-provider";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,7 +21,7 @@ const navigation = [
   { name: "Remarketing", href: "/remarketing", icon: RefreshCw },
   { name: "Instâncias", href: "/instances", icon: Radio },
   { name: "Equipe", href: "/team", icon: Users },
-  { name: "Assinatura", href: "/settings/billing", icon: CreditCard },
+  { name: "Assinatura", href: "/settings/billing", icon: CreditCard, adminOnly: true },
   { name: "Configurações", href: "/settings", icon: Settings, exact: true },
 ] as const;
 
@@ -31,7 +32,9 @@ interface AppSidebarProps {
 export function AppSidebar({ email }: AppSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const { currentRole } = useOrganization();
   const initials = email.slice(0, 2).toUpperCase();
+  const isAdmin = currentRole === "owner" || currentRole === "admin";
 
   const handleLogout = async () => {
     const supabase = createClient();
@@ -62,6 +65,7 @@ export function AppSidebar({ email }: AppSidebarProps) {
       {/* Nav */}
       <nav className="flex flex-1 flex-col gap-1 p-2">
         {navigation.map((item) => {
+          if ("adminOnly" in item && item.adminOnly && !isAdmin) return null;
           const isActive = "exact" in item && item.exact
             ? pathname === item.href
             : pathname.startsWith(item.href);

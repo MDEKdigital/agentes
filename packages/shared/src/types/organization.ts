@@ -14,6 +14,7 @@ export interface Organization {
   settings: OrganizationSettings;
   created_at: string;
   updated_at: string;
+  role?: MemberRole;
 }
 
 export interface OrganizationSettings {

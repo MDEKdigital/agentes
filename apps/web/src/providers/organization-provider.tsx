@@ -3,11 +3,12 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { apiFetch } from "@/lib/api";
-import type { Organization } from "@aula-agente/shared";
+import type { Organization, MemberRole } from "@aula-agente/shared";
 
 interface OrganizationContextType {
   organizations: Organization[];
   currentOrg: Organization | null;
+  currentRole: MemberRole | null;
   setCurrentOrg: (org: Organization) => void;
   loading: boolean;
   refetch: () => Promise<void>;
@@ -16,6 +17,7 @@ interface OrganizationContextType {
 const OrganizationContext = createContext<OrganizationContextType>({
   organizations: [],
   currentOrg: null,
+  currentRole: null,
   setCurrentOrg: () => {},
   loading: true,
   refetch: async () => {},
@@ -84,11 +86,14 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
     }
   };
 
+  const currentRole = currentOrg?.role ?? null;
+
   return (
     <OrganizationContext.Provider
       value={{
         organizations,
         currentOrg,
+        currentRole,
         setCurrentOrg: handleSetCurrentOrg,
         loading,
         refetch: fetchOrgs,
