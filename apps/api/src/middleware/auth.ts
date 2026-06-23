@@ -1,18 +1,8 @@
 import type { FastifyRequest, FastifyReply } from "fastify";
 import { getAdminClient } from "@aula-agente/database";
+import { withTimeout, QUERY_MS } from "../lib/db-timeout";
 
-const AUTH_MS  = 8_000;
-const QUERY_MS = 8_000;
-
-function raceTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const id = setTimeout(() => reject(new Error(`Timeout: ${label}`)), ms);
-    p.then(
-      (v) => { clearTimeout(id); resolve(v); },
-      (e) => { clearTimeout(id); reject(e); }
-    );
-  });
-}
+const AUTH_MS = 8_000;
 
 export async function authMiddleware(request: FastifyRequest, reply: FastifyReply) {
   const authHeader = request.headers.authorization;
@@ -24,10 +14,12 @@ export async function authMiddleware(request: FastifyRequest, reply: FastifyRepl
   const token = authHeader.slice(7);
   const adminClient = getAdminClient();
 
-  // auth.getUser() doesn't expose .abortSignal(), so use Promise.race with timeout
+  // auth.getUser() doesn't expose .abortSignal(), so use promise-race timeout.
+  // The underlying HTTP fetch is NOT cancelled on timeout — the connection stays open
+  // until Supabase or the OS closes it. Accepted: there is no cancellation API here.
   let user: { id: string; email?: string } | null = null;
   try {
-    const { data, error } = await raceTimeout(
+    const { data, error } = await withTimeout(
       adminClient.auth.getUser(token),
       AUTH_MS,
       "getUser"
@@ -43,15 +35,14 @@ export async function authMiddleware(request: FastifyRequest, reply: FastifyRepl
 
   // Use AbortSignal on the DB query so the HTTP fetch is actually cancelled on timeout
   let memberships: Array<{ organization_id: string; role: string }> = [];
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), QUERY_MS);
   try {
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), QUERY_MS);
     const { data, error: memberError } = await adminClient
       .from("organization_members")
       .select("organization_id, role")
       .eq("user_id", user.id)
       .abortSignal(ctrl.signal);
-    clearTimeout(timer);
     if (memberError) {
       request.log.error({ err: memberError }, "Failed to fetch memberships");
       return reply.status(500).send({ error: "Failed to fetch user memberships" });
@@ -60,6 +51,8 @@ export async function authMiddleware(request: FastifyRequest, reply: FastifyRepl
   } catch (err) {
     request.log.error({ err }, "authMiddleware: memberships query timed out or failed");
     return reply.status(503).send({ error: "Database unavailable" });
+  } finally {
+    clearTimeout(timer);
   }
 
   request.user = {

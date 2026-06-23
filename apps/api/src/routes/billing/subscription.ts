@@ -1,10 +1,11 @@
 import type { FastifyInstance } from "fastify";
 import { getAdminClient } from "@aula-agente/database";
 import { authMiddleware, requireOrg } from "../../middleware/auth";
+import { QUERY_MS } from "../../lib/db-timeout";
 import type { Plan, Subscription, BillingEvent } from "@aula-agente/shared";
 
-const QUERY_MS = 8_000;
 const EVENTS_MS = 5_000;
+type PlanLimits = Pick<Plan, "max_agents" | "max_members" | "max_instances">;
 
 export default async function subscriptionRoute(app: FastifyInstance) {
   app.addHook("preHandler", authMiddleware);
@@ -15,20 +16,13 @@ export default async function subscriptionRoute(app: FastifyInstance) {
     const userRole = request.userRole;
     const db = getAdminClient();
 
-    request.log.info({ orgId, userRole }, "billing/subscription: handler reached");
-
     // AbortController cancels the actual HTTP fetch inside Supabase client.
     // setTimeout-based races don't work when the underlying socket hangs —
     // the fetch promise never settles and the Promise.allSettled waits forever.
     const ctrl = new AbortController();
     const evCtrl = new AbortController();
-    const ctrlTimer = setTimeout(() => {
-      request.log.warn("billing/subscription: ABORT TIMER FIRED — aborting DB queries");
-      ctrl.abort();
-    }, QUERY_MS);
+    const ctrlTimer = setTimeout(() => ctrl.abort(), QUERY_MS);
     const evTimer = setTimeout(() => evCtrl.abort(), EVENTS_MS);
-
-    request.log.info("billing/subscription: starting allSettled");
 
     const [subResult, agentsResult, membersResult, instancesResult, eventsResult] =
       await Promise.allSettled([
@@ -57,18 +51,10 @@ export default async function subscriptionRoute(app: FastifyInstance) {
               .limit(50)
               .abortSignal(evCtrl.signal)
           : Promise.resolve({ data: [] as BillingEvent[], error: null }),
-      ]);
-
-    clearTimeout(ctrlTimer);
-    clearTimeout(evTimer);
-
-    request.log.info({
-      sub: subResult.status,
-      agents: agentsResult.status,
-      members: membersResult.status,
-      instances: instancesResult.status,
-      events: eventsResult.status,
-    }, "billing/subscription: allSettled resolved");
+      ]).finally(() => {
+        clearTimeout(ctrlTimer);
+        clearTimeout(evTimer);
+      });
 
     // Subscription is the only critical query — fail fast if it timed out or errored
     if (subResult.status === "rejected") {
@@ -82,27 +68,40 @@ export default async function subscriptionRoute(app: FastifyInstance) {
       return reply.status(500).send({ error: "Failed to fetch subscription" });
     }
 
-    // Unpack the joined plan from the subscription row
+    // Unpack the joined plan from the subscription row.
+    // Supabase may return plans as Plan[] when the FK relation is not recognised as unique.
     let subscription: Subscription | null = null;
     let plan: Plan | null = null;
     if (subData) {
-      const { plans: embeddedPlan, ...subFields } = subData as { plans: Plan | null } & Record<string, unknown>;
-      subscription = subFields as unknown as Subscription;
-      plan = embeddedPlan ?? null;
+      const { plans: rawPlan, ...subFields } = subData as { plans: Plan | Plan[] | null } & Subscription;
+      subscription = subFields as Subscription;
+      plan = Array.isArray(rawPlan) ? ((rawPlan[0] as Plan) ?? null) : (rawPlan as Plan | null) ?? null;
+      if (subscription && !plan) {
+        request.log.warn({ plan_id: (subscription as Subscription & { plan_id?: string }).plan_id },
+          "subscription references a plan that was not found in the join — data integrity issue");
+      }
     }
 
-    // Usage counts — non-critical, default to 0 on failure
+    // Usage counts — non-critical, default to 0 on failure or DB error
     if (agentsResult.status === "rejected")
       request.log.warn({ err: agentsResult.reason }, "agents count failed");
+    else if (agentsResult.value.error)
+      request.log.warn({ err: agentsResult.value.error }, "agents count returned error");
+
     if (membersResult.status === "rejected")
       request.log.warn({ err: membersResult.reason }, "members count failed");
+    else if (membersResult.value.error)
+      request.log.warn({ err: membersResult.value.error }, "members count returned error");
+
     if (instancesResult.status === "rejected")
       request.log.warn({ err: instancesResult.reason }, "instances count failed");
+    else if (instancesResult.value.error)
+      request.log.warn({ err: instancesResult.value.error }, "instances count returned error");
 
     const usage = {
-      agents_used:    agentsResult.status    === "fulfilled" ? (agentsResult.value.count    ?? 0) : 0,
-      members_used:   membersResult.status   === "fulfilled" ? (membersResult.value.count   ?? 0) : 0,
-      instances_used: instancesResult.status === "fulfilled" ? (instancesResult.value.count ?? 0) : 0,
+      agents_used:    agentsResult.status    === "fulfilled" && !agentsResult.value.error    ? (agentsResult.value.count    ?? 0) : 0,
+      members_used:   membersResult.status   === "fulfilled" && !membersResult.value.error   ? (membersResult.value.count   ?? 0) : 0,
+      instances_used: instancesResult.status === "fulfilled" && !instancesResult.value.error ? (instancesResult.value.count ?? 0) : 0,
     };
 
     // Billing events — non-critical, silent fallback to []
@@ -118,7 +117,7 @@ export default async function subscriptionRoute(app: FastifyInstance) {
       request.log.warn({ err: eventsResult.reason }, "billing_events timed out — returning []");
     }
 
-    const limits = plan
+    const limits: PlanLimits | null = plan
       ? { max_agents: plan.max_agents, max_members: plan.max_members, max_instances: plan.max_instances }
       : null;
 

@@ -36,8 +36,8 @@ function makeDataChain(data: unknown) {
 }
 
 /** Chain for count-style queries (.select('*', {count:'exact',head:true}).eq(...).abortSignal(...)) */
-function makeCountChain(count: number) {
-  const result = { count, data: null, error: null };
+function makeCountChain(count: number | null, error: object | null = null) {
+  const result = { count, data: null, error };
   const chain: Record<string, unknown> = {};
   chain["select"]      = vi.fn().mockReturnValue(chain);
   chain["eq"]          = vi.fn().mockReturnValue(chain);
@@ -262,5 +262,67 @@ describe("GET /billing/subscription", () => {
 
     expect(res.statusCode).toBe(503);
     expect(JSON.parse(res.body).error).toMatch(/temporariamente indisponível/);
+  });
+
+  it("cenário 6: count query fulfills com error — usage retorna 0 e não mascara o erro silenciosamente", async () => {
+    const permissionError = { message: "permission denied", code: "42501" };
+
+    mockGetAdminClient.mockReturnValue({
+      from: vi.fn((table: string) => {
+        if (table === "subscriptions")        return makeDataChain(null);
+        if (table === "agents")               return makeCountChain(null, permissionError);
+        if (table === "organization_members") return makeCountChain(null, permissionError);
+        if (table === "evolution_instances")  return makeCountChain(null, permissionError);
+        if (table === "billing_events")       return makeEventsChain([]);
+        return makeDataChain(null);
+      }),
+    });
+
+    const app = await buildApp();
+    const res = await app.inject({
+      method: "GET",
+      url: "/billing/subscription",
+      headers: { authorization: "Bearer token-x", "x-organization-id": "org-1" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.usage.agents_used).toBe(0);
+    expect(body.usage.members_used).toBe(0);
+    expect(body.usage.instances_used).toBe(0);
+  });
+
+  it("cenário 7: plans retornado como array pelo Supabase — extrai primeiro elemento", async () => {
+    const mockPlan = { id: "plan-pro", name: "Pro", max_agents: 5, max_members: 10, max_instances: 3 };
+    const mockSubRow = {
+      id: "sub-1",
+      organization_id: "org-1",
+      plan_id: "plan-pro",
+      status: "active",
+      plans: [mockPlan],
+    };
+
+    mockGetAdminClient.mockReturnValue({
+      from: vi.fn((table: string) => {
+        if (table === "subscriptions")        return makeDataChain(mockSubRow);
+        if (table === "agents")               return makeCountChain(0);
+        if (table === "organization_members") return makeCountChain(0);
+        if (table === "evolution_instances")  return makeCountChain(0);
+        if (table === "billing_events")       return makeEventsChain([]);
+        return makeDataChain(null);
+      }),
+    });
+
+    const app = await buildApp();
+    const res = await app.inject({
+      method: "GET",
+      url: "/billing/subscription",
+      headers: { authorization: "Bearer token-x", "x-organization-id": "org-1" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.plan).toMatchObject({ id: "plan-pro", name: "Pro" });
+    expect(body.limits).toMatchObject({ max_agents: 5, max_members: 10, max_instances: 3 });
   });
 });
