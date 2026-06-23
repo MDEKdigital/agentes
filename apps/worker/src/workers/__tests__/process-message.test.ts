@@ -175,6 +175,34 @@ describe("startProcessMessageWorker", () => {
     expect(mockReleaseConversationLock).toHaveBeenCalled();
   });
 
+  it("resposta multi-parte: part_0 com delay=0, part_1 com delay=7000 (garante INTER_PART_DELAY_MS > backoff)", async () => {
+    mockRunAgent.mockResolvedValue({
+      text: "Primeira parte.\n\nSegunda parte.",
+      model: "gpt-4o-mini",
+      tokensUsed: 50,
+      latencyMs: 100,
+      toolCalls: [],
+    });
+    const sendQueue = { add: vi.fn() };
+    vi.mocked(getSendMessageQueue).mockReturnValue(sendQueue as never);
+
+    await runJob();
+
+    expect(sendQueue.add).toHaveBeenCalledTimes(2);
+    expect(sendQueue.add).toHaveBeenNthCalledWith(
+      1,
+      "send-message",
+      expect.objectContaining({ content: "Primeira parte." }),
+      expect.objectContaining({ jobId: "msg-1_agent_response_part_0", delay: 0 })
+    );
+    expect(sendQueue.add).toHaveBeenNthCalledWith(
+      2,
+      "send-message",
+      expect.objectContaining({ content: "Segunda parte." }),
+      expect.objectContaining({ jobId: "msg-1_agent_response_part_1", delay: 7000 })
+    );
+  });
+
   it("agente retorna string vazia — não salva no DB e não enfileira sendQueue", async () => {
     mockRunAgent.mockResolvedValue({
       text: "",

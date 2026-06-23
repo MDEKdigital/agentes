@@ -113,9 +113,10 @@ export function startProcessDocumentWorker() {
     {
       connection: getConnectionOptions(),
       concurrency: 3,
-      // DOCUMENT_FETCH_TIMEOUT_MS (60 s) + EMBEDDING_TIMEOUT_MS (60 s) can exceed BullMQ's
-      // default 30 s stall window — set explicit headroom to prevent stall→retry→duplicate insertChunks.
-      lockDuration: 150_000,
+      // DOCUMENT_FETCH_TIMEOUT_MS (60 s) + EMBEDDING_TIMEOUT_MS (60 s) are both bounded, but
+      // pdfParse(buffer) and mammoth.extractRawText() run with no timeout (synchronous CPU).
+      // A 50 MB PDF can take 60–120 s to parse. 300 s covers worst-case end-to-end.
+      lockDuration: 300_000,
     }
   );
 
