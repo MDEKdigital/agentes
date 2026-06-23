@@ -85,6 +85,13 @@ function AuthFormInner({ mode }: AuthFormProps) {
             />
           </div>
           {error && <p className="text-sm text-destructive">{error}</p>}
+          {mode === "login" && (
+            <div className="flex justify-end">
+              <a href="/forgot-password" className="text-xs text-muted-foreground underline">
+                Esqueci minha senha
+              </a>
+            </div>
+          )}
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? "Carregando..." : mode === "login" ? "Entrar" : "Criar conta"}
           </Button>
