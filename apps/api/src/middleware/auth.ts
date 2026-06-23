@@ -1,6 +1,16 @@
 import type { FastifyRequest, FastifyReply } from "fastify";
 import { getAdminClient } from "@aula-agente/database";
 
+function withTimeout<T>(p: PromiseLike<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const id = setTimeout(() => reject(new Error(`Auth timeout: ${label}`)), ms);
+    void Promise.resolve(p).then(
+      (v) => { clearTimeout(id); resolve(v); },
+      (e) => { clearTimeout(id); reject(e); }
+    );
+  });
+}
+
 export async function authMiddleware(request: FastifyRequest, reply: FastifyReply) {
   const authHeader = request.headers.authorization;
 
@@ -11,26 +21,46 @@ export async function authMiddleware(request: FastifyRequest, reply: FastifyRepl
   const token = authHeader.slice(7);
   const adminClient = getAdminClient();
 
-  const { data: { user }, error } = await adminClient.auth.getUser(token);
-
-  if (error || !user) {
-    return reply.status(401).send({ error: "Invalid or expired token" });
+  let user: { id: string; email?: string } | null = null;
+  try {
+    const { data, error } = await withTimeout(
+      adminClient.auth.getUser(token),
+      8_000,
+      "getUser"
+    );
+    if (error || !data.user) {
+      return reply.status(401).send({ error: "Invalid or expired token" });
+    }
+    user = data.user;
+  } catch (err) {
+    request.log.error({ err }, "authMiddleware: getUser timed out or failed");
+    return reply.status(503).send({ error: "Auth service unavailable" });
   }
 
-  const { data: memberships, error: memberError } = await adminClient
-    .from("organization_members")
-    .select("organization_id, role")
-    .eq("user_id", user.id);
-
-  if (memberError) {
-    request.log.error({ err: memberError }, "Failed to fetch memberships");
-    return reply.status(500).send({ error: "Failed to fetch user memberships" });
+  let memberships: Array<{ organization_id: string; role: string }> = [];
+  try {
+    const { data, error: memberError } = await withTimeout(
+      adminClient
+        .from("organization_members")
+        .select("organization_id, role")
+        .eq("user_id", user.id),
+      8_000,
+      "memberships"
+    );
+    if (memberError) {
+      request.log.error({ err: memberError }, "Failed to fetch memberships");
+      return reply.status(500).send({ error: "Failed to fetch user memberships" });
+    }
+    memberships = data || [];
+  } catch (err) {
+    request.log.error({ err }, "authMiddleware: memberships query timed out or failed");
+    return reply.status(503).send({ error: "Database unavailable" });
   }
 
   request.user = {
     id: user.id,
     email: user.email ?? "",
-    memberships: memberships || [],
+    memberships,
   };
 }
 
