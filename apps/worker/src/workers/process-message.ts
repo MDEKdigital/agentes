@@ -19,14 +19,18 @@ import { fireAudit } from "../lib/audit";
 import { acquireConversationLock, releaseConversationLock, renewConversationLock, LOCK_RENEWAL_INTERVAL_MS, LockContentionError } from "../lib/lock";
 import { resolveApiKey } from "../lib/vault";
 import { validateMediaPayload } from "../lib/media-validation";
-
-export const WHISPER_TIMEOUT_MS = 60_000;
 import { runAgent } from "../agents/agent-runner";
 import { evaluateActivation } from "./evaluate-activation";
 import { CLOSE_CONVERSATION_TOOL_NAME } from "../agents/tools/close-conversation";
+import { splitMessage } from "../lib/split-message";
 import { workerLog } from "../lib/logger";
 import { incrementMetric } from "../lib/metrics";
 import { enqueueDeadLetter } from "../lib/dead-letter";
+
+export const WHISPER_TIMEOUT_MS = 60_000;
+// Each part job has delay: i * INTER_PART_DELAY_MS. Must exceed max retry backoff (fixed 1 000 ms)
+// so a retrying part_0 always resolves before part_1 becomes eligible.
+const INTER_PART_DELAY_MS = 7_000;
 
 type ConversationRow = Conversation & { contacts: { phone: string } | null };
 
@@ -432,6 +436,11 @@ export function startProcessMessageWorker() {
             conversationId,
           });
           responseContent = result.text;
+          if (!responseContent?.trim()) {
+            workerLog("process-message", "warn", { jobId: job.id, conversationId, messageId, organizationId }, "agent returned empty response — skipping DB write and delivery");
+            incrementMetric("process_message_empty_response");
+            return;
+          }
           wasResolved = result.toolCalls.includes(CLOSE_CONVERSATION_TOOL_NAME);
           responseMessage = await createMessage(db, {
             conversation_id: conversationId,
@@ -472,15 +481,29 @@ export function startProcessMessageWorker() {
         }
 
         const sendQueue = getSendMessageQueue();
-        // Stable jobId prevents duplicate WhatsApp delivery when retry hits the queue add twice
-        await sendQueue.add("send-message", {
-          conversationId,
-          messageId: responseMessage.id,
-          instanceId: instance.id,
-          phone: contact.phone,
-          content: responseContent,
-          organizationId,
-        }, { jobId: `${messageId}_agent_response` });
+        const parts = splitMessage(responseContent);
+        if (parts.length === 0) {
+          workerLog("process-message", "warn", { jobId: job.id, conversationId, messageId, organizationId }, "splitMessage returned 0 parts — agent response not delivered");
+          return;
+        }
+        // One job per part — stable jobId per part gives BullMQ per-part idempotency on retry.
+        // Delay staggers delivery so parts arrive in order even with concurrent workers.
+        await Promise.all(
+          parts.map((part, i) =>
+            sendQueue.add(
+              "send-message",
+              {
+                conversationId,
+                messageId: responseMessage.id,
+                instanceId: instance.id,
+                phone: contact.phone,
+                content: part,
+                organizationId,
+              },
+              { jobId: `${messageId}_agent_response_part_${i}`, delay: i * INTER_PART_DELAY_MS }
+            )
+          )
+        );
 
         workerLog("process-message", "info", { jobId: job.id, conversationId, messageId, organizationId }, `completed responseId=${responseMessage.id}`);
         incrementMetric("process_message_success");

@@ -20,7 +20,8 @@ vi.mock("@aula-agente/shared", () => ({
 vi.mock("../../lib/redis", () => ({ getConnectionOptions: vi.fn(() => ({})) }));
 
 import { getInstanceById } from "@aula-agente/database";
-import { startSendMessageWorker, splitMessage, typingDelay } from "../send-message";
+import { startSendMessageWorker, typingDelay } from "../send-message";
+import { splitMessage } from "../../lib/split-message";
 
 const jobData = {
   conversationId: "conv-1",
@@ -74,16 +75,16 @@ describe("splitMessage", () => {
     expect(splitMessage("A\n\nB\n\nC\n\nD")).toEqual(["A", "B", "C\n\nD"]);
   });
 
-  it("retorna array com 1 elemento para texto vazio", () => {
-    expect(splitMessage("")).toEqual([""]);
+  it("retorna array vazio para texto vazio", () => {
+    expect(splitMessage("")).toEqual([]);
   });
 
   it("retorna array com 1 elemento para texto com apenas \\n simples", () => {
     expect(splitMessage("linha 1\nlinha 2")).toEqual(["linha 1\nlinha 2"]);
   });
 
-  it("retorna array com string vazia para texto apenas com espaços", () => {
-    expect(splitMessage("   ")).toEqual([""]);
+  it("retorna array vazio para texto apenas com espaços", () => {
+    expect(splitMessage("   ")).toEqual([]);
   });
 
   it("mantém quebras \\n\\n no 3º elemento ao concatenar overflow", () => {
@@ -206,7 +207,7 @@ describe("startSendMessageWorker", () => {
     expect(lastPresenceBody.options.presence).toBe("paused");
   });
 
-  it("C2: mensagem com 2 parágrafos é enviada como 2 mensagens separadas na ordem correta", async () => {
+  it("C2: worker é atômico — conteúdo com \\n\\n é entregue como uma única mensagem", async () => {
     const multiPartJob = {
       ...jobData,
       content: "Primeiro parágrafo.\n\nSegundo parágrafo.",
@@ -230,13 +231,12 @@ describe("startSendMessageWorker", () => {
     const sendTextCalls = mockFetch.mock.calls.filter((c) =>
       (c[0] as string).includes("/message/sendText/")
     );
-    expect(sendTextCalls.length).toBe(2);
-    expect(JSON.parse(sendTextCalls[0][1].body as string).text).toBe("Primeiro parágrafo.");
-    expect(JSON.parse(sendTextCalls[1][1].body as string).text).toBe("Segundo parágrafo.");
+    expect(sendTextCalls.length).toBe(1);
+    expect(JSON.parse(sendTextCalls[0][1].body as string).text).toBe("Primeiro parágrafo.\n\nSegundo parágrafo.");
   });
 
-  it("C2: entre partes multipart há composing adicional (um por parte após a primeira)", async () => {
-    const multiPartJob = { ...jobData, content: "Parte A\n\nParte B\n\nParte C" };
+  it("C2: conteúdo vazio é descartado silenciosamente sem chamar sendText", async () => {
+    const emptyJob = { ...jobData, content: "" };
 
     const { Worker } = await import("bullmq");
     vi.clearAllMocks();
@@ -248,17 +248,15 @@ describe("startSendMessageWorker", () => {
 
     startSendMessageWorker();
     const workerInstance = vi.mocked(Worker).mock.results.at(-1)!.value;
-    const jobPromise = workerInstance._processor({ data: multiPartJob });
+    const jobPromise = workerInstance._processor({ data: emptyJob });
     jobPromise.catch(() => {});
     await vi.runAllTimersAsync();
     await jobPromise;
 
-    const composingCalls = mockFetch.mock.calls.filter((c) => {
-      if (!(c[0] as string).includes("/chat/sendPresence/")) return false;
-      try { return JSON.parse(c[1].body as string).options?.presence === "composing"; } catch { return false; }
-    });
-    // 1 composing inicial + 1 por parte adicional (2 parts extras = 2 composing adicionais) = 3 total
-    expect(composingCalls.length).toBe(3);
+    const sendTextCalls = mockFetch.mock.calls.filter((c) =>
+      (c[0] as string).includes("/message/sendText/")
+    );
+    expect(sendTextCalls.length).toBe(0);
   });
 
   it("mensagem sem parágrafo gera 1 composing + 1 paused + 1 sendText", async () => {

@@ -164,7 +164,7 @@ describe("startProcessMessageWorker", () => {
     expect(sendQueue.add).toHaveBeenCalledWith(
       "send-message",
       expect.objectContaining({ phone: "5511999999999" }),
-      expect.objectContaining({ jobId: "msg-1_agent_response" })
+      expect.objectContaining({ jobId: "msg-1_agent_response_part_0", delay: 0 })
     );
   });
 
@@ -173,6 +173,23 @@ describe("startProcessMessageWorker", () => {
 
     await expect(runJob()).rejects.toThrow("DB error");
     expect(mockReleaseConversationLock).toHaveBeenCalled();
+  });
+
+  it("agente retorna string vazia — não salva no DB e não enfileira sendQueue", async () => {
+    mockRunAgent.mockResolvedValue({
+      text: "",
+      model: "gpt-4o-mini",
+      tokensUsed: 0,
+      latencyMs: 50,
+      toolCalls: [],
+    });
+    const sendQueue = { add: vi.fn() };
+    vi.mocked(getSendMessageQueue).mockReturnValue(sendQueue as never);
+
+    await runJob();
+
+    expect(createMessage).not.toHaveBeenCalled();
+    expect(sendQueue.add).not.toHaveBeenCalled();
   });
 
   it("passa conversationId para runAgent", async () => {
@@ -514,7 +531,7 @@ describe("C1 — resposta do agente não deve ser duplicada em retry", () => {
     expect(sendQueue.add).toHaveBeenCalledWith(
       "send-message",
       expect.any(Object),
-      expect.objectContaining({ jobId: "msg-1_agent_response" })
+      expect.objectContaining({ jobId: "msg-1_agent_response_part_0", delay: 0 })
     );
   });
 

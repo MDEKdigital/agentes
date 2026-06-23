@@ -8,13 +8,6 @@ import { workerLog } from "../lib/logger";
 import { incrementMetric } from "../lib/metrics";
 import { enqueueDeadLetter } from "../lib/dead-letter";
 
-export function splitMessage(text: string): string[] {
-  const parts = text.split(/\n\n+/).map((p) => p.trim()).filter(Boolean);
-  if (parts.length === 0) return [text.trim()];
-  if (parts.length <= 3) return parts;
-  return [...parts.slice(0, 2), parts.slice(2).join("\n\n")];
-}
-
 async function sendEvolutionText(instanceName: string, phone: string, text: string): Promise<void> {
   await evolutionPost(`/message/sendText/${encodeURIComponent(instanceName)}`, {
     number: phone,
@@ -51,16 +44,16 @@ export function typingDelay(text: string): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function shortPause(): Promise<void> {
-  const ms = Math.floor(Math.random() * 501) + 500;
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 export function startSendMessageWorker() {
   const worker = new Worker<SendMessageJobData>(
     QUEUE_NAMES.SEND_MESSAGE,
     async (job) => {
       const { instanceId, phone, content, organizationId } = job.data;
+
+      if (!content?.trim()) {
+        workerLog("send-message", "warn", { jobId: job.id, messageId: job.data.messageId }, "empty content — skipping send");
+        return;
+      }
 
       const db = getAdminClient();
       const instance = await getInstanceById(db, instanceId, organizationId);
@@ -68,18 +61,10 @@ export function startSendMessageWorker() {
         throw new Error(`Instance ${instanceId} not found — cannot send message`);
       }
 
-      const parts = splitMessage(content);
-
       await sendPresence(instance.instance_name, phone, "composing");
       try {
-        for (let i = 0; i < parts.length; i++) {
-          if (i > 0) {
-            await shortPause();
-            await sendPresence(instance.instance_name, phone, "composing");
-          }
-          await typingDelay(parts[i]);
-          await sendEvolutionText(instance.instance_name, phone, parts[i]);
-        }
+        await typingDelay(content);
+        await sendEvolutionText(instance.instance_name, phone, content);
       } finally {
         await sendPresence(instance.instance_name, phone, "paused");
       }
@@ -96,6 +81,9 @@ export function startSendMessageWorker() {
     {
       connection: getConnectionOptions(),
       concurrency: 20,
+      // Worst case: sendPresence(30s) + typingDelay(5s) + sendEvolutionText(30s) + sendPresence paused(30s) = 95s.
+      // 120s gives ~25s headroom so BullMQ stall-checker never fires on a healthy job.
+      lockDuration: 120_000,
       limiter: {
         max: 30,
         duration: 1000,

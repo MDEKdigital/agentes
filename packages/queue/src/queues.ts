@@ -44,8 +44,12 @@ export function getSendMessageQueue() {
       connection: getConnectionOptions(),
       defaultJobOptions: {
         attempts: 3,
-        backoff: { type: "exponential", delay: 1000 },
-        removeOnComplete: { count: 1000 },
+        // Fixed backoff (2 s) gives ~4 s of retry coverage while staying well under
+        // INTER_PART_DELAY_MS (7 s), preserving multi-part delivery order on retry.
+        backoff: { type: "fixed", delay: 2000 },
+        // Large window so completed-part jobIds stay in Redis long enough for
+        // process-message retries to deduplicate safely (prevents duplicate WhatsApp delivery).
+        removeOnComplete: { count: 50_000 },
         removeOnFail: { count: 5000 },
       },
     });
