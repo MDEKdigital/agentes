@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { MailCheck } from "lucide-react";
 
 interface AuthFormProps {
   mode: "login" | "register";
@@ -18,7 +17,6 @@ function AuthFormInner({ mode }: AuthFormProps) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [confirming, setConfirming] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
   const rawNext = searchParams.get("next") ?? "/inbox";
@@ -36,13 +34,8 @@ function AuthFormInner({ mode }: AuthFormProps) {
 
     try {
       if (mode === "register") {
-        const { data, error } = await supabase.auth.signUp({ email, password });
+        const { error } = await supabase.auth.signUp({ email, password });
         if (error) throw error;
-        // session is null when Supabase requires email confirmation
-        if (!data.session) {
-          setConfirming(true);
-          return;
-        }
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
@@ -57,38 +50,6 @@ function AuthFormInner({ mode }: AuthFormProps) {
   };
 
   const nextParam = next !== "/inbox" ? `?next=${encodeURIComponent(next)}` : "";
-
-  if (confirming) {
-    return (
-      <Card>
-        <CardContent className="pt-8 pb-8">
-          <div className="flex flex-col items-center gap-4 text-center">
-            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-electric-500/10">
-              <MailCheck className="h-7 w-7 text-blue-electric-400" />
-            </div>
-            <div className="space-y-1">
-              <h2 className="text-lg font-semibold text-foreground">Verifique seu email</h2>
-              <p className="text-sm text-muted-foreground">
-                Enviamos um link de confirmação para <span className="font-medium text-foreground">{email}</span>.
-              </p>
-              <p className="text-sm text-muted-foreground">
-                Acesse sua caixa de entrada e clique no link para ativar sua conta.
-              </p>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Não recebeu?{" "}
-              <button
-                className="underline"
-                onClick={() => setConfirming(false)}
-              >
-                Tentar novamente
-              </button>
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
 
   return (
     <Card>
