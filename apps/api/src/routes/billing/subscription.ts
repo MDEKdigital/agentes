@@ -15,13 +15,20 @@ export default async function subscriptionRoute(app: FastifyInstance) {
     const userRole = request.userRole;
     const db = getAdminClient();
 
+    request.log.info({ orgId, userRole }, "billing/subscription: handler reached");
+
     // AbortController cancels the actual HTTP fetch inside Supabase client.
     // setTimeout-based races don't work when the underlying socket hangs —
     // the fetch promise never settles and the Promise.allSettled waits forever.
     const ctrl = new AbortController();
     const evCtrl = new AbortController();
-    const ctrlTimer = setTimeout(() => ctrl.abort(), QUERY_MS);
-    const evTimer  = setTimeout(() => evCtrl.abort(), EVENTS_MS);
+    const ctrlTimer = setTimeout(() => {
+      request.log.warn("billing/subscription: ABORT TIMER FIRED — aborting DB queries");
+      ctrl.abort();
+    }, QUERY_MS);
+    const evTimer = setTimeout(() => evCtrl.abort(), EVENTS_MS);
+
+    request.log.info("billing/subscription: starting allSettled");
 
     const [subResult, agentsResult, membersResult, instancesResult, eventsResult] =
       await Promise.allSettled([
@@ -54,6 +61,14 @@ export default async function subscriptionRoute(app: FastifyInstance) {
 
     clearTimeout(ctrlTimer);
     clearTimeout(evTimer);
+
+    request.log.info({
+      sub: subResult.status,
+      agents: agentsResult.status,
+      members: membersResult.status,
+      instances: instancesResult.status,
+      events: eventsResult.status,
+    }, "billing/subscription: allSettled resolved");
 
     // Subscription is the only critical query — fail fast if it timed out or errored
     if (subResult.status === "rejected") {
