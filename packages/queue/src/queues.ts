@@ -47,9 +47,9 @@ export function getSendMessageQueue() {
         // Fixed backoff (2 s) gives ~4 s of retry coverage while staying well under
         // INTER_PART_DELAY_MS (7 s), preserving multi-part delivery order on retry.
         backoff: { type: "fixed", delay: 2000 },
-        // Large window so completed-part jobIds stay in Redis long enough for
-        // process-message retries to deduplicate safely (prevents duplicate WhatsApp delivery).
-        removeOnComplete: { count: 50_000 },
+        // Dedup window: process-message retries complete within ~4 s (fixed 2 s × 2 gaps).
+        // At 30 jobs/s that's ~120 completed jobs in the window — 1 000 is 8× headroom.
+        removeOnComplete: { count: 1000 },
         removeOnFail: { count: 5000 },
       },
     });

@@ -28,7 +28,7 @@ import { incrementMetric } from "../lib/metrics";
 import { enqueueDeadLetter } from "../lib/dead-letter";
 
 export const WHISPER_TIMEOUT_MS = 60_000;
-// Each part job has delay: i * INTER_PART_DELAY_MS. Must exceed max retry backoff (fixed 1 000 ms)
+// Each part job has delay: i * INTER_PART_DELAY_MS. Must exceed max retry backoff (fixed 2 000 ms × 2 gaps = 4 s)
 // so a retrying part_0 always resolves before part_1 becomes eligible.
 const INTER_PART_DELAY_MS = 7_000;
 
@@ -482,10 +482,6 @@ export function startProcessMessageWorker() {
 
         const sendQueue = getSendMessageQueue();
         const parts = splitMessage(responseContent);
-        if (parts.length === 0) {
-          workerLog("process-message", "warn", { jobId: job.id, conversationId, messageId, organizationId }, "splitMessage returned 0 parts — agent response not delivered");
-          return;
-        }
         // One job per part — stable jobId per part gives BullMQ per-part idempotency on retry.
         // Delay staggers delivery so parts arrive in order even with concurrent workers.
         await Promise.all(
@@ -515,6 +511,9 @@ export function startProcessMessageWorker() {
     {
       connection: getConnectionOptions(),
       concurrency: 10,
+      // WHISPER_TIMEOUT_MS is 60 s; runAgent can chain multiple calls. 120 s gives headroom
+      // so BullMQ stall-checker never fires on a legitimately-running job.
+      lockDuration: 120_000,
     }
   );
 
