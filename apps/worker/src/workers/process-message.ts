@@ -422,6 +422,10 @@ export function startProcessMessageWorker() {
 
         if (existingResponse) {
           console.log(`[process-message] Retry: reusing existing response ${existingResponse.id} for message ${messageId}`);
+          if (!existingResponse.content?.trim()) {
+            workerLog("process-message", "warn", { jobId: job.id, conversationId, messageId, organizationId }, "existingResponse has empty content — skipping delivery");
+            return;
+          }
           responseMessage = existingResponse;
           responseContent = existingResponse.content;
           wasResolved = (existingResponse.metadata?.tool_calls ?? []).includes(CLOSE_CONVERSATION_TOOL_NAME);
