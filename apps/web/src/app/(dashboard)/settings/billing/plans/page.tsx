@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useOrganization } from "@/providers/organization-provider";
 import { apiFetch } from "@/lib/api";
-import { CheckCircle, AlertTriangle } from "lucide-react";
+import { CheckCircle, AlertTriangle, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Subscription, Plan, BillingEvent } from "@aula-agente/shared";
 
@@ -17,9 +17,7 @@ interface BillingData {
 
 function formatCurrency(value: number) {
   if (value === 0) return "Gratuito";
-  return (
-    new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value / 100) + "/mês"
-  );
+  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value) + "/mês";
 }
 
 export default function PlansPage() {
@@ -29,30 +27,27 @@ export default function PlansPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (orgLoading) return;
-    if (!currentOrg) {
-      setLoading(false);
-      return;
-    }
-
+  const fetchData = useCallback(() => {
+    if (!currentOrg) return;
     setLoading(true);
+    setError(null);
     Promise.all([
       apiFetch("/billing/plans"),
-      apiFetch("/billing/subscription", {
-        headers: { "x-organization-id": currentOrg.id },
-      }),
+      apiFetch("/billing/subscription", { headers: { "x-organization-id": currentOrg.id } }),
     ])
       .then(([plansRes, subRes]) => {
         setPlans(plansRes as Plan[]);
         setBillingData(subRes as BillingData);
         setLoading(false);
       })
-      .catch((err: Error) => {
-        setError(err.message);
-        setLoading(false);
-      });
-  }, [currentOrg, orgLoading]);
+      .catch((err: Error) => { setError(err.message); setLoading(false); });
+  }, [currentOrg]);
+
+  useEffect(() => {
+    if (orgLoading) return;
+    if (!currentOrg) { setLoading(false); return; }
+    fetchData();
+  }, [currentOrg, orgLoading, fetchData]);
 
   if (loading || orgLoading) {
     return (
@@ -81,9 +76,19 @@ export default function PlansPage() {
   if (error) {
     return (
       <div className="mx-auto max-w-4xl">
-        <div className="rounded-xl border border-border bg-card p-6 flex items-center gap-2 text-destructive">
-          <AlertTriangle className="h-4 w-4 shrink-0" />
-          <p className="text-sm">{error}</p>
+        <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-5 flex items-start gap-3">
+          <AlertTriangle className="h-4 w-4 shrink-0 text-destructive mt-0.5" />
+          <div className="flex-1 space-y-1">
+            <p className="text-sm font-medium text-destructive">Não foi possível carregar os planos</p>
+            <p className="text-xs text-muted-foreground">{error}</p>
+          </div>
+          <button
+            onClick={fetchData}
+            className="shrink-0 flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-accent"
+          >
+            <RefreshCw className="h-3 w-3" />
+            Tentar novamente
+          </button>
         </div>
       </div>
     );

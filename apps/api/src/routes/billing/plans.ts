@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { getAdminClient, getActivePlans } from "@aula-agente/database";
 import { authMiddleware } from "../../middleware/auth";
+import { withTimeout } from "../../lib/db-timeout";
 
 export default async function plansRoute(app: FastifyInstance) {
   app.addHook("preHandler", authMiddleware);
@@ -8,11 +9,14 @@ export default async function plansRoute(app: FastifyInstance) {
   app.get("/billing/plans", async (request, reply) => {
     const db = getAdminClient();
     try {
-      const plans = await getActivePlans(db);
+      const plans = await withTimeout(getActivePlans(db), 8_000, "plans");
       return reply.send(plans);
     } catch (err) {
       request.log.error({ err }, "Failed to fetch plans");
-      return reply.status(500).send({ error: "Failed to fetch plans" });
+      const isTimeout = err instanceof Error && err.message.startsWith("DB timeout:");
+      return reply
+        .status(isTimeout ? 503 : 500)
+        .send({ error: isTimeout ? "Serviço temporariamente indisponível." : "Failed to fetch plans" });
     }
   });
 }

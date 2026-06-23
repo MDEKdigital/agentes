@@ -1,15 +1,6 @@
 import type { FastifyRequest, FastifyReply } from "fastify";
 import { getAdminClient } from "@aula-agente/database";
-
-function withTimeout<T>(p: PromiseLike<T>, ms: number, label: string): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const id = setTimeout(() => reject(new Error(`Auth timeout: ${label}`)), ms);
-    void Promise.resolve(p).then(
-      (v) => { clearTimeout(id); resolve(v); },
-      (e) => { clearTimeout(id); reject(e); }
-    );
-  });
-}
+import { withTimeout } from "../lib/db-timeout";
 
 export async function authMiddleware(request: FastifyRequest, reply: FastifyReply) {
   const authHeader = request.headers.authorization;

@@ -60,9 +60,9 @@ export async function getSubscriptionByOrg(client: SupabaseClient, organizationI
     .from("subscriptions")
     .select("*")
     .eq("organization_id", organizationId)
-    .single();
+    .maybeSingle();
   if (error) throw error;
-  return data as Subscription;
+  return data as Subscription | null;
 }
 
 export async function createSubscription(

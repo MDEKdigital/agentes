@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useOrganization } from "@/providers/organization-provider";
 import { apiFetch } from "@/lib/api";
-import { CreditCard, CheckCircle, AlertTriangle, Clock, Activity, Receipt, LayoutGrid } from "lucide-react";
+import { CreditCard, CheckCircle, AlertTriangle, Clock, Activity, Receipt, LayoutGrid, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Subscription, Plan, BillingEvent } from "@aula-agente/shared";
 
@@ -25,11 +25,11 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
 };
 
 const EVENT_STATUS_CONFIG: Record<string, { label: string; color: string }> = {
-  processed:  { label: "Processado", color: "text-green-400 bg-green-400/10 border-green-400/30" },
-  pending:    { label: "Pendente",   color: "text-amber-400 bg-amber-400/10 border-amber-400/30" },
+  processed:  { label: "Processado",  color: "text-green-400 bg-green-400/10 border-green-400/30" },
+  pending:    { label: "Pendente",    color: "text-amber-400 bg-amber-400/10 border-amber-400/30" },
   processing: { label: "Processando", color: "text-amber-400 bg-amber-400/10 border-amber-400/30" },
-  failed:     { label: "Falhou",     color: "text-destructive bg-destructive/10 border-destructive/30" },
-  ignored:    { label: "Ignorado",   color: "text-muted-foreground bg-muted border-border" },
+  failed:     { label: "Falhou",      color: "text-destructive bg-destructive/10 border-destructive/30" },
+  ignored:    { label: "Ignorado",    color: "text-muted-foreground bg-muted border-border" },
 };
 
 function formatDate(iso: string | null) {
@@ -39,11 +39,8 @@ function formatDate(iso: string | null) {
 
 function formatDateTime(iso: string) {
   return new Date(iso).toLocaleString("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
+    day: "2-digit", month: "2-digit", year: "numeric",
+    hour: "2-digit", minute: "2-digit",
   });
 }
 
@@ -53,13 +50,7 @@ function formatCurrency(value: number) {
 
 function UsageBar({ used, max, label }: { used: number; max: number; label: string }) {
   const pct = max > 0 ? Math.min(100, Math.round((used / max) * 100)) : 0;
-  const barColor =
-    pct >= 100
-      ? "bg-destructive"
-      : pct >= 80
-        ? "bg-amber-fire-400"
-        : "bg-blue-electric-400";
-
+  const barColor = pct >= 100 ? "bg-destructive" : pct >= 80 ? "bg-amber-fire-400" : "bg-blue-electric-400";
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between">
@@ -67,14 +58,24 @@ function UsageBar({ used, max, label }: { used: number; max: number; label: stri
         <span className="text-xs text-muted-foreground">{pct}%</span>
       </div>
       <div className="h-2 rounded-full bg-muted overflow-hidden">
-        <div
-          className={cn("h-full rounded-full transition-all", barColor)}
-          style={{ width: `${pct}%` }}
-        />
+        <div className={cn("h-full rounded-full transition-all", barColor)} style={{ width: `${pct}%` }} />
       </div>
-      <p className="text-xs text-muted-foreground">
-        {used} / {max} {label.toLowerCase()}
-      </p>
+      <p className="text-xs text-muted-foreground">{used} / {max} {label.toLowerCase()}</p>
+    </div>
+  );
+}
+
+function SkeletonCard({ rows = 5 }: { rows?: number }) {
+  return (
+    <div className="rounded-xl border border-border bg-card overflow-hidden">
+      <div className="border-b border-border px-6 py-4">
+        <div className="h-4 w-24 animate-pulse rounded bg-muted" />
+      </div>
+      <div className="p-6 space-y-4">
+        {Array.from({ length: rows }).map((_, i) => (
+          <div key={i} className="h-5 animate-pulse rounded bg-muted" />
+        ))}
+      </div>
     </div>
   );
 }
@@ -85,61 +86,49 @@ export default function BillingPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (orgLoading) return;
-    if (!currentOrg) {
-      setLoading(false);
-      return;
-    }
-
+  const fetchBilling = useCallback(() => {
+    if (!currentOrg) return;
     setLoading(true);
+    setError(null);
     apiFetch("/billing/subscription", {
       headers: { "x-organization-id": currentOrg.id },
     })
-      .then((res) => {
-        setData(res as BillingData);
-        setLoading(false);
-      })
-      .catch((err: Error) => {
-        setError(err.message);
-        setLoading(false);
-      });
-  }, [currentOrg, orgLoading]);
+      .then((res) => { setData(res as BillingData); setLoading(false); })
+      .catch((err: Error) => { setError(err.message); setLoading(false); });
+  }, [currentOrg]);
+
+  useEffect(() => {
+    if (orgLoading) return;
+    if (!currentOrg) { setLoading(false); return; }
+    fetchBilling();
+  }, [currentOrg, orgLoading, fetchBilling]);
 
   if (loading || orgLoading) {
     return (
       <div className="mx-auto max-w-2xl space-y-6">
         <div className="h-7 w-36 animate-pulse rounded-lg bg-muted" />
-        <div className="rounded-xl border border-border bg-card overflow-hidden">
-          <div className="border-b border-border px-6 py-4">
-            <div className="h-4 w-24 animate-pulse rounded bg-muted" />
-          </div>
-          <div className="p-6 space-y-4">
-            {[...Array(5)].map((_, i) => (
-              <div key={i} className="h-5 animate-pulse rounded bg-muted" />
-            ))}
-          </div>
-        </div>
-        <div className="rounded-xl border border-border bg-card overflow-hidden">
-          <div className="border-b border-border px-6 py-4">
-            <div className="h-4 w-28 animate-pulse rounded bg-muted" />
-          </div>
-          <div className="p-6 space-y-4">
-            {[...Array(3)].map((_, i) => (
-              <div key={i} className="h-8 animate-pulse rounded bg-muted" />
-            ))}
-          </div>
-        </div>
+        <SkeletonCard rows={5} />
+        <SkeletonCard rows={3} />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="mx-auto max-w-2xl">
-        <div className="rounded-xl border border-border bg-card p-6 flex items-center gap-2 text-destructive">
-          <AlertTriangle className="h-4 w-4 shrink-0" />
-          <p className="text-sm">{error}</p>
+      <div className="mx-auto max-w-2xl space-y-3">
+        <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-5 flex items-start gap-3">
+          <AlertTriangle className="h-4 w-4 shrink-0 text-destructive mt-0.5" />
+          <div className="flex-1 space-y-1">
+            <p className="text-sm font-medium text-destructive">Não foi possível carregar os dados</p>
+            <p className="text-xs text-muted-foreground">{error}</p>
+          </div>
+          <button
+            onClick={fetchBilling}
+            className="shrink-0 flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-accent"
+          >
+            <RefreshCw className="h-3 w-3" />
+            Tentar novamente
+          </button>
         </div>
       </div>
     );
@@ -187,15 +176,14 @@ export default function BillingPage() {
           </div>
         ) : (
           <div className="p-6 space-y-5">
-            {/* Plan name + status */}
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-lg font-semibold text-foreground">{plan?.name ?? "—"}</p>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  {sub.billing_interval === "monthly" && "Cobrança mensal"}
-                  {sub.billing_interval === "yearly" && "Cobrança anual"}
+                  {sub.billing_interval === "monthly"  && "Cobrança mensal"}
+                  {sub.billing_interval === "yearly"   && "Cobrança anual"}
                   {sub.billing_interval === "lifetime" && "Acesso vitalício"}
-                  {sub.billing_interval === "manual" && "Plano manual"}
+                  {sub.billing_interval === "manual"   && "Plano manual"}
                 </p>
               </div>
               {statusConfig && (
@@ -205,7 +193,6 @@ export default function BillingPage() {
               )}
             </div>
 
-            {/* Price */}
             {plan && (
               <div className="rounded-lg bg-muted p-4 flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Valor</span>
@@ -219,7 +206,6 @@ export default function BillingPage() {
               </div>
             )}
 
-            {/* Limits */}
             {plan && (
               <div className="space-y-2">
                 <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Limites do plano</p>
@@ -238,19 +224,17 @@ export default function BillingPage() {
               </div>
             )}
 
-            {/* Current usage */}
             {limits && (
               <div className="space-y-3">
                 <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Utilização atual</p>
                 <div className="space-y-4">
-                  <UsageBar used={usage.agents_used} max={limits.max_agents} label="Agentes" />
-                  <UsageBar used={usage.members_used} max={limits.max_members} label="Membros" />
+                  <UsageBar used={usage.agents_used}    max={limits.max_agents}    label="Agentes" />
+                  <UsageBar used={usage.members_used}   max={limits.max_members}   label="Membros" />
                   <UsageBar used={usage.instances_used} max={limits.max_instances} label="Instâncias WhatsApp" />
                 </div>
               </div>
             )}
 
-            {/* Billing period */}
             {(sub.current_period_start || sub.current_period_end) && (
               <div className="space-y-2">
                 <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Período atual</p>
@@ -263,7 +247,6 @@ export default function BillingPage() {
               </div>
             )}
 
-            {/* Features */}
             {plan && plan.features.length > 0 && (
               <div className="space-y-2">
                 <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Recursos incluídos</p>
@@ -278,7 +261,6 @@ export default function BillingPage() {
               </div>
             )}
 
-            {/* Gateway info */}
             {sub.gateway && (
               <p className="text-xs text-muted-foreground">
                 Gateway: <span className="capitalize font-medium">{sub.gateway}</span>
@@ -288,11 +270,9 @@ export default function BillingPage() {
               </p>
             )}
 
-            {/* Organization ID */}
             {currentOrg && (
               <p className="text-xs text-muted-foreground border-t border-border pt-4">
-                ID da Organização:{" "}
-                <span className="font-mono">{currentOrg.id}</span>
+                ID da Organização: <span className="font-mono">{currentOrg.id}</span>
               </p>
             )}
           </div>
@@ -307,8 +287,8 @@ export default function BillingPage() {
             <h2 className="text-sm font-semibold text-foreground">Utilização atual</h2>
           </div>
           <div className="p-6 space-y-4">
-            <UsageBar used={usage.agents_used} max={limits.max_agents} label="Agentes" />
-            <UsageBar used={usage.members_used} max={limits.max_members} label="Membros" />
+            <UsageBar used={usage.agents_used}    max={limits.max_agents}    label="Agentes" />
+            <UsageBar used={usage.members_used}   max={limits.max_members}   label="Membros" />
             <UsageBar used={usage.instances_used} max={limits.max_instances} label="Instâncias WhatsApp" />
           </div>
         </div>
@@ -330,18 +310,10 @@ export default function BillingPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border bg-muted/30">
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    Data
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    Gateway
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    Tipo
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    Status
-                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Data</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Gateway</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Tipo</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -349,15 +321,9 @@ export default function BillingPage() {
                   const evtStatus = EVENT_STATUS_CONFIG[evt.status] ?? { label: evt.status, color: "text-muted-foreground bg-muted border-border" };
                   return (
                     <tr key={evt.id} className="hover:bg-muted/20 transition-colors">
-                      <td className="px-4 py-3 text-foreground whitespace-nowrap">
-                        {formatDateTime(evt.created_at)}
-                      </td>
-                      <td className="px-4 py-3 text-foreground capitalize">
-                        {evt.gateway}
-                      </td>
-                      <td className="px-4 py-3 text-foreground">
-                        {evt.event_type.replace(/_/g, " ")}
-                      </td>
+                      <td className="px-4 py-3 text-foreground whitespace-nowrap">{formatDateTime(evt.created_at)}</td>
+                      <td className="px-4 py-3 text-foreground capitalize">{evt.gateway}</td>
+                      <td className="px-4 py-3 text-foreground">{evt.event_type.replace(/_/g, " ")}</td>
                       <td className="px-4 py-3">
                         <span className={cn("rounded-md border px-2 py-0.5 text-xs font-semibold", evtStatus.color)}>
                           {evtStatus.label}
