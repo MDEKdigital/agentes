@@ -156,4 +156,10 @@ describe("Regressão: filas existentes preservam retry policy original", () => {
     const opts = capturedArgs.get("billing-onboarding");
     expect(opts?.defaultJobOptions?.backoff?.type).toBe("exponential");
   });
+
+  it("send-message usa backoff fixed (garante cobertura de retry < INTER_PART_DELAY_MS)", () => {
+    const opts = capturedArgs.get("send-message");
+    expect(opts?.defaultJobOptions?.backoff?.type).toBe("fixed");
+    expect(opts?.defaultJobOptions?.backoff?.delay).toBe(2000);
+  });
 });

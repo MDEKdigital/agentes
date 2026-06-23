@@ -421,10 +421,10 @@ export function startProcessMessageWorker() {
         let responseContent: string;
 
         if (existingResponse) {
-          console.log(`[process-message] Retry: reusing existing response ${existingResponse.id} for message ${messageId}`);
+          workerLog("process-message", "info", { jobId: job.id, conversationId, messageId, organizationId }, `retry: reusing existing response ${existingResponse.id}`);
           if (!existingResponse.content?.trim()) {
-            workerLog("process-message", "warn", { jobId: job.id, conversationId, messageId, organizationId }, "existingResponse has empty content — skipping delivery");
-            return;
+            workerLog("process-message", "error", { jobId: job.id, conversationId, messageId, organizationId }, "existingResponse has empty content — conversation stuck, manual intervention required");
+            throw new Error(`existingResponse ${existingResponse.id} has empty content — cannot deliver`);
           }
           responseMessage = existingResponse;
           responseContent = existingResponse.content;
