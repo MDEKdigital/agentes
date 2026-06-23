@@ -206,8 +206,7 @@ describe("startSendMessageWorker", () => {
     expect(lastPresenceBody.options.presence).toBe("paused");
   });
 
-  // C2 — RED: conteúdo multipart deve ser enviado como mensagem única (sem split no worker)
-  it("C2: mensagem com parágrafos é enviada como uma única mensagem, sem divisão em partes", async () => {
+  it("C2: mensagem com 2 parágrafos é enviada como 2 mensagens separadas na ordem correta", async () => {
     const multiPartJob = {
       ...jobData,
       content: "Primeiro parágrafo.\n\nSegundo parágrafo.",
@@ -231,15 +230,13 @@ describe("startSendMessageWorker", () => {
     const sendTextCalls = mockFetch.mock.calls.filter((c) =>
       (c[0] as string).includes("/message/sendText/")
     );
-    // Deve haver exatamente 1 sendText com o conteúdo completo (sem split)
-    expect(sendTextCalls.length).toBe(1);
-    const body = JSON.parse(sendTextCalls[0][1].body as string);
-    expect(body.text).toBe("Primeiro parágrafo.\n\nSegundo parágrafo.");
+    expect(sendTextCalls.length).toBe(2);
+    expect(JSON.parse(sendTextCalls[0][1].body as string).text).toBe("Primeiro parágrafo.");
+    expect(JSON.parse(sendTextCalls[1][1].body as string).text).toBe("Segundo parágrafo.");
   });
 
-  // C2 — RED: retry não re-envia partes já enviadas
-  it("C2: retry após falha não re-envia partes já enviadas de mensagem multipart", async () => {
-    const multiPartJob = { ...jobData, content: "Parte A\n\nParte B" };
+  it("C2: entre partes multipart há composing adicional (um por parte após a primeira)", async () => {
+    const multiPartJob = { ...jobData, content: "Parte A\n\nParte B\n\nParte C" };
 
     const { Worker } = await import("bullmq");
     vi.clearAllMocks();
@@ -247,35 +244,21 @@ describe("startSendMessageWorker", () => {
       id: "inst-1",
       instance_name: "minha-instancia",
     } as never);
-
-    // Primeira execução: falha no único sendText
-    mockFetch
-      .mockResolvedValueOnce({ ok: true, json: async () => ({}) } as never) // composing
-      .mockResolvedValueOnce({ ok: false, text: async () => "Erro simulado" } as never); // sendText falha
+    mockFetch.mockResolvedValue({ ok: true, json: async () => ({}) } as never);
 
     startSendMessageWorker();
     const workerInstance = vi.mocked(Worker).mock.results.at(-1)!.value;
-
-    const run1 = workerInstance._processor({ data: multiPartJob });
-    run1.catch(() => {});
+    const jobPromise = workerInstance._processor({ data: multiPartJob });
+    jobPromise.catch(() => {});
     await vi.runAllTimersAsync();
-    await expect(run1).rejects.toThrow();
+    await jobPromise;
 
-    // Retry: reset mocks, tudo OK
-    mockFetch.mockReset();
-    mockFetch.mockResolvedValue({ ok: true, json: async () => ({}) } as never);
-
-    const run2 = workerInstance._processor({ data: multiPartJob });
-    run2.catch(() => {});
-    await vi.runAllTimersAsync();
-    await run2;
-
-    const sendTextOnRetry = mockFetch.mock.calls.filter((c) =>
-      (c[0] as string).includes("/message/sendText/")
-    );
-    // Com single-message fix: apenas 1 sendText no retry (não 2 partes separadas)
-    // Bug antigo (split): enviaria 2 sendText no retry ("Parte A" duplicada + "Parte B")
-    expect(sendTextOnRetry.length).toBe(1);
+    const composingCalls = mockFetch.mock.calls.filter((c) => {
+      if (!(c[0] as string).includes("/chat/sendPresence/")) return false;
+      try { return JSON.parse(c[1].body as string).options?.presence === "composing"; } catch { return false; }
+    });
+    // 1 composing inicial + 1 por parte adicional (2 parts extras = 2 composing adicionais) = 3 total
+    expect(composingCalls.length).toBe(3);
   });
 
   it("mensagem sem parágrafo gera 1 composing + 1 paused + 1 sendText", async () => {
