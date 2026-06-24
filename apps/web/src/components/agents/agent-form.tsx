@@ -42,7 +42,7 @@ export function AgentForm({ defaultValues, onSubmit, submitLabel }: AgentFormPro
       temperature: 0.7,
       max_tokens: 1024,
       max_steps: 5,
-      tools_config: { search_knowledge: true, search_faq: true },
+      tools_config: { search_knowledge: true, search_faq: true, search_web: false },
       activation_rules: [],
       is_active: true,
       ...defaultValues,
@@ -249,6 +249,19 @@ export function AgentForm({ defaultValues, onSubmit, submitLabel }: AgentFormPro
             <Switch
               checked={form.watch("tools_config.search_faq")}
               onCheckedChange={(v) => form.setValue("tools_config.search_faq", v)}
+            />
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-medium">Busca na Internet</p>
+              <p className="text-sm text-muted-foreground">
+                Permite ao agente pesquisar produtos e informações na web (Brave Search)
+              </p>
+            </div>
+            <Switch
+              checked={form.watch("tools_config.search_web")}
+              onCheckedChange={(v) => form.setValue("tools_config.search_web", v)}
             />
           </div>
         </CardContent>

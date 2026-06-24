@@ -4,6 +4,7 @@ import { isValidRegex } from "../utils/keyword";
 export const toolsConfigSchema = z.object({
   search_knowledge: z.boolean().default(true),
   search_faq: z.boolean().default(true),
+  search_web: z.boolean().default(false),
 });
 
 export const singleWordRuleSchema = z.object({
@@ -37,7 +38,7 @@ export const createAgentSchema = z.object({
   temperature: z.number().min(0).max(2).default(0.7),
   max_tokens: z.number().int().min(1).max(16384).default(1024),
   max_steps: z.number().int().min(1).max(20).default(5),
-  tools_config: toolsConfigSchema.default({ search_knowledge: true, search_faq: true }),
+  tools_config: toolsConfigSchema.default({ search_knowledge: true, search_faq: true, search_web: false }),
   activation_rules: z.array(activationRuleSchema).default([]),
   is_active: z.boolean().default(true),
 });

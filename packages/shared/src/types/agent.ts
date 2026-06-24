@@ -39,4 +39,5 @@ export interface Agent {
 export interface ToolsConfig {
   search_knowledge: boolean;
   search_faq: boolean;
+  search_web: boolean;
 }
