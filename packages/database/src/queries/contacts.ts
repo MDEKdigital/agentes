@@ -28,3 +28,21 @@ export async function getContactById(client: SupabaseClient, id: string) {
   if (error) throw error;
   return data as Contact;
 }
+
+export async function getContactsByOrganization(
+  client: SupabaseClient,
+  organizationId: string,
+  limit = 200
+) {
+  const { data, error } = await client
+    .from("contacts")
+    .select(`
+      *,
+      conversations(id, status, created_at, updated_at)
+    `)
+    .eq("organization_id", organizationId)
+    .order("updated_at", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return data as (Contact & { conversations: { id: string; status: string; created_at: string; updated_at: string }[] })[];
+}

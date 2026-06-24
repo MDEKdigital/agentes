@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Inbox, Bot, RefreshCw, Radio, Users, Settings, Zap, LogOut, CreditCard } from "lucide-react";
+import { Inbox, Bot, RefreshCw, Radio, Users, Settings, Zap, LogOut, CreditCard, UserCheck } from "lucide-react";
 import { OrgSwitcher } from "./org-switcher";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
@@ -17,6 +17,7 @@ import {
 
 const navigation = [
   { name: "Inbox", href: "/inbox", icon: Inbox },
+  { name: "Leads", href: "/leads", icon: UserCheck },
   { name: "Agentes", href: "/agents", icon: Bot },
   { name: "Remarketing", href: "/remarketing", icon: RefreshCw },
   { name: "Instâncias", href: "/instances", icon: Radio },
