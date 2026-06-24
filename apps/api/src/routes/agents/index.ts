@@ -13,10 +13,10 @@ export default async function agentRoutes(app: FastifyInstance) {
       const { organizationId } = request.params;
 
       const membership = request.user.memberships.find(
-        (m) => m.organization_id === organizationId && m.role !== "agent"
+        (m) => m.organization_id === organizationId
       );
       if (!membership) {
-        return reply.status(403).send({ error: "Acesso de administrador necessário" });
+        return reply.status(403).send({ error: "Acesso negado" });
       }
 
       const parseResult = createAgentSchema.safeParse(request.body);
