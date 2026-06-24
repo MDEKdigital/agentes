@@ -106,13 +106,13 @@ export default function BillingPage() {
   const isAdmin = currentRole === "owner" || currentRole === "admin";
 
   useEffect(() => {
-    if (!orgLoading && currentRole !== null && !isAdmin) {
+    if (!orgLoading && currentOrg !== null && !isAdmin) {
       router.replace("/inbox");
     }
-  }, [orgLoading, currentRole, isAdmin, router]);
+  }, [orgLoading, currentOrg, isAdmin, router]);
 
   const load = useCallback(() => {
-    if (!currentOrg) return;
+    if (!currentOrg) { setLoading(false); return; }
     setLoading(true);
     setError(null);
     apiFetch("/billing/subscription", { headers: { "x-organization-id": currentOrg.id } })

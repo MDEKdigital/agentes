@@ -23,13 +23,13 @@ export default function PlansPage() {
   const isAdmin = currentRole === "owner" || currentRole === "admin";
 
   useEffect(() => {
-    if (!orgLoading && currentRole !== null && !isAdmin) {
+    if (!orgLoading && currentOrg !== null && !isAdmin) {
       router.replace("/inbox");
     }
-  }, [orgLoading, currentRole, isAdmin, router]);
+  }, [orgLoading, currentOrg, isAdmin, router]);
 
   const load = useCallback(() => {
-    if (!currentOrg) return;
+    if (!currentOrg) { setLoading(false); return; }
     setLoading(true);
     setError(null);
 
@@ -46,7 +46,12 @@ export default function PlansPage() {
         return;
       }
       const raw = plansResult.value;
-      setPlans(Array.isArray(raw) ? (raw as Plan[]) : []);
+      if (!Array.isArray(raw)) {
+        setError("Não foi possível carregar os planos. Tente novamente.");
+        setLoading(false);
+        return;
+      }
+      setPlans(raw as Plan[]);
       if (subResult.status === "fulfilled") {
         const planId = (subResult.value as { plan?: { id: string } | null })?.plan?.id ?? null;
         setActivePlanId(planId);

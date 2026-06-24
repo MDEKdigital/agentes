@@ -14,6 +14,11 @@ export default async function subscriptionRoute(app: FastifyInstance) {
   app.get("/billing/subscription", async (request, reply) => {
     const orgId = request.organizationId;
     const userRole = request.userRole;
+
+    if (userRole === "agent") {
+      return reply.status(403).send({ error: "Acesso restrito a administradores." });
+    }
+
     const db = getAdminClient();
 
     // withTimeout usa Promise.race internamente: mesmo que o fetch do Supabase
