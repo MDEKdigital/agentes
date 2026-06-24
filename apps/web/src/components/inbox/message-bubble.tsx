@@ -61,7 +61,9 @@ export function MessageBubble({ message }: MessageBubbleProps) {
           />
         ) : null}
 
-        {(!message.media_type || message.media_type === "text" || message.content) && (
+        {(message.media_type !== "audio" || !message.media_url) &&
+          (message.media_type !== "image" || !message.media_url) &&
+          message.content && (
           <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
             {message.content}
           </p>

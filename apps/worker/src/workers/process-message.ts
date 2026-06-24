@@ -16,6 +16,7 @@ import {
   getInstanceById,
   workerActivateHumanTakeover,
   cancelEnrollmentsByConversation,
+  updateMessageMediaUrl,
 } from "@aula-agente/database";
 import { fireAudit } from "../lib/audit";
 import { acquireConversationLock, releaseConversationLock, renewConversationLock, LOCK_RENEWAL_INTERVAL_MS, LockContentionError } from "../lib/lock";
@@ -146,6 +147,35 @@ export async function transcribeAudio(
   return json.text;
 }
 
+async function uploadAudioToStorage(
+  base64: string,
+  mimeType: string,
+  messageId: string,
+  organizationId: string
+): Promise<string | null> {
+  try {
+    const db = getAdminClient();
+    const ext = mimeTypeToAudioExtension(mimeType);
+    const path = `audio/${organizationId}/${messageId}.${ext}`;
+    const buffer = Buffer.from(base64, "base64");
+
+    const { error } = await db.storage
+      .from("media")
+      .upload(path, buffer, { contentType: mimeType.split(";")[0].trim(), upsert: true });
+
+    if (error) {
+      workerLog("process-message", "warn", { messageId, organizationId }, `audio storage upload failed: ${error.message}`);
+      return null;
+    }
+
+    const { data } = db.storage.from("media").getPublicUrl(path);
+    return data.publicUrl;
+  } catch (err) {
+    workerLog("process-message", "warn", { messageId, organizationId }, `audio storage upload error: ${(err as Error).message}`);
+    return null;
+  }
+}
+
 export async function preprocessAudioMessage(
   message: Message,
   instanceName: string,
@@ -176,6 +206,14 @@ export async function preprocessAudioMessage(
       "audioMessage"
     );
     validateMediaPayload(base64, mimeType);
+
+    // Upload audio to Storage so the attendant can play it in the inbox
+    const publicUrl = await uploadAudioToStorage(base64, mimeType, message.id, message.organization_id);
+    if (publicUrl) {
+      const db = getAdminClient();
+      await updateMessageMediaUrl(db, message.id, message.organization_id, publicUrl);
+    }
+
     const transcription = await transcribeAudio(base64, mimeType, apiKey);
     const safeContent = `<audio_transcription>\n${transcription}\n</audio_transcription>`;
     return { message: { ...message, content: safeContent, media_type: null }, failed: false };

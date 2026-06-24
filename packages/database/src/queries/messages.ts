@@ -65,6 +65,20 @@ export async function getMessageByIdempotencyKey(
   return data as Message | null;
 }
 
+export async function updateMessageMediaUrl(
+  client: SupabaseClient,
+  messageId: string,
+  organizationId: string,
+  mediaUrl: string
+) {
+  const { error } = await client
+    .from("messages")
+    .update({ media_url: mediaUrl })
+    .eq("id", messageId)
+    .eq("organization_id", organizationId);
+  if (error) throw error;
+}
+
 export async function messageExistsByEvolutionId(
   client: SupabaseClient,
   evolutionMessageId: string
