@@ -453,6 +453,23 @@ export function startProcessMessageWorker() {
           }
           wasResolved = result.toolCalls.includes(CLOSE_CONVERSATION_TOOL_NAME);
           wasHandoff = result.toolCalls.includes(HUMAN_HANDOFF_TOOL_NAME);
+
+          // Re-check takeover: human may have activated it while LLM was running.
+          // If so, skip delivery — the agent's response would arrive after the human
+          // already took over, confusing the contact.
+          if (!wasHandoff) {
+            const { data: freshConv } = await db
+              .from("conversations")
+              .select("is_human_takeover")
+              .eq("id", conversationId)
+              .eq("organization_id", organizationId)
+              .single();
+            if (freshConv?.is_human_takeover) {
+              workerLog("process-message", "info", { jobId: job.id, conversationId, messageId }, "human takeover detected post-LLM — skipping response delivery");
+              return;
+            }
+          }
+
           responseMessage = await createMessage(db, {
             conversation_id: conversationId,
             organization_id: organizationId,
