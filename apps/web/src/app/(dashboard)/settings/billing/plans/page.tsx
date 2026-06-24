@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle, AlertTriangle, Loader2, ArrowLeft } from "lucide-react";
+import { CheckCircle, AlertTriangle, Loader2, ArrowLeft, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/api";
 import { useOrganization } from "@/providers/organization-provider";
@@ -28,26 +28,37 @@ export default function PlansPage() {
     }
   }, [orgLoading, currentRole, isAdmin, router]);
 
-  useEffect(() => {
-    if (orgLoading || !currentOrg) return;
+  const load = useCallback(() => {
+    if (!currentOrg) return;
+    setLoading(true);
+    setError(null);
 
     const headers = { "x-organization-id": currentOrg.id };
 
-    Promise.all([
+    // Promise.allSettled: planos são exibidos mesmo se /billing/subscription der timeout
+    Promise.allSettled([
       apiFetch("/billing/plans", { headers }),
       apiFetch("/billing/subscription", { headers }),
-    ])
-      .then(([plansRes, subRes]) => {
-        setPlans((plansRes as Plan[]) ?? []);
-        const planId = (subRes as { plan?: { id: string } | null })?.plan?.id ?? null;
+    ]).then(([plansResult, subResult]) => {
+      if (plansResult.status === "rejected") {
+        setError(plansResult.reason instanceof Error ? plansResult.reason.message : "Erro ao carregar planos.");
+        setLoading(false);
+        return;
+      }
+      const raw = plansResult.value;
+      setPlans(Array.isArray(raw) ? (raw as Plan[]) : []);
+      if (subResult.status === "fulfilled") {
+        const planId = (subResult.value as { plan?: { id: string } | null })?.plan?.id ?? null;
         setActivePlanId(planId);
-        setLoading(false);
-      })
-      .catch((err: Error) => {
-        setError(err.message);
-        setLoading(false);
-      });
-  }, [currentOrg, orgLoading]);
+      }
+      setLoading(false);
+    });
+  }, [currentOrg]);
+
+  useEffect(() => {
+    if (orgLoading || !currentOrg) return;
+    load();
+  }, [currentOrg, orgLoading, load]);
 
   if (loading || orgLoading) {
     return (
@@ -62,10 +73,16 @@ export default function PlansPage() {
       <div className="mx-auto max-w-xl pt-6">
         <div className="flex items-start gap-3 rounded-xl border border-destructive/30 bg-destructive/5 p-5">
           <AlertTriangle className="h-4 w-4 shrink-0 text-destructive mt-0.5" />
-          <div>
+          <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-destructive">Não foi possível carregar os planos</p>
             <p className="text-xs text-muted-foreground mt-0.5">{error}</p>
           </div>
+          <button
+            onClick={load}
+            className="shrink-0 flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground hover:bg-accent transition-colors"
+          >
+            <RefreshCw className="h-3 w-3" /> Tentar novamente
+          </button>
         </div>
       </div>
     );
