@@ -64,10 +64,9 @@ const mockPlans = [
 
 function makePlansChain(result: { data: unknown; error: unknown }) {
   const chain: Record<string, unknown> = {};
-  chain["select"]      = vi.fn().mockReturnValue(chain);
-  chain["eq"]          = vi.fn().mockReturnValue(chain);
-  chain["order"]       = vi.fn().mockReturnValue(chain);
-  chain["abortSignal"] = vi.fn().mockResolvedValue(result);
+  chain["select"] = vi.fn().mockReturnValue(chain);
+  chain["eq"]     = vi.fn().mockReturnValue(chain);
+  chain["order"]  = vi.fn().mockResolvedValue(result);
   return chain;
 }
 
@@ -182,16 +181,12 @@ describe("GET /billing/plans", () => {
     expect(mockFrom).not.toHaveBeenCalled();
   });
 
-  it("cenário 5: AbortError → retorna 503", async () => {
-    const abortErr = new Error("This operation was aborted");
-    abortErr.name = "AbortError";
+  it("cenário 5: query throws erro inesperado → retorna 500", async () => {
     mockGetAdminClient.mockReturnValue({
       from: vi.fn().mockReturnValue({
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
-            order: vi.fn().mockReturnValue({
-              abortSignal: vi.fn().mockRejectedValue(abortErr),
-            }),
+            order: vi.fn().mockRejectedValue(new Error("unexpected network error")),
           }),
         }),
       }),
@@ -204,7 +199,7 @@ describe("GET /billing/plans", () => {
       headers: { authorization: "Bearer token-x" },
     });
 
-    expect(res.statusCode).toBe(503);
-    expect(JSON.parse(res.body).error).toMatch(/temporariamente indisponível/);
+    expect(res.statusCode).toBe(500);
+    expect(JSON.parse(res.body).error).toMatch(/Failed to fetch plans/);
   });
 });

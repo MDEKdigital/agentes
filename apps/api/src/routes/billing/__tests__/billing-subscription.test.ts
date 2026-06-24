@@ -35,27 +35,25 @@ function makeDataChain(data: unknown) {
   return chain;
 }
 
-/** Chain for count-style queries (.select('*', {count:'exact',head:true}).eq(...).abortSignal(...))
- *  abortSignal() is the terminal method — it must be a thenable. */
+/** Chain for count-style queries (.select('*', {count:'exact',head:true}).eq(...))
+ *  eq() is the terminal method — it must be a thenable. */
 function makeCountChain(count: number | null, error: object | null = null) {
   const result = { count, data: null, error };
   const chain: Record<string, unknown> = {};
-  chain["select"]      = vi.fn().mockReturnValue(chain);
-  chain["eq"]          = vi.fn().mockReturnValue(chain);
-  chain["abortSignal"] = vi.fn().mockResolvedValue(result);
+  chain["select"] = vi.fn().mockReturnValue(chain);
+  chain["eq"]     = vi.fn().mockResolvedValue(result);
   return chain;
 }
 
-/** Chain for billing_events: ends with .limit().abortSignal()
- *  abortSignal() is the terminal method — it must be a thenable. */
+/** Chain for billing_events: ends with .limit()
+ *  limit() is the terminal method — it must be a thenable. */
 function makeEventsChain(events: unknown[]) {
   const result = { data: events, error: null };
   const chain: Record<string, unknown> = {};
-  chain["select"]      = vi.fn().mockReturnValue(chain);
-  chain["eq"]          = vi.fn().mockReturnValue(chain);
-  chain["order"]       = vi.fn().mockReturnValue(chain);
-  chain["limit"]       = vi.fn().mockReturnValue(chain);
-  chain["abortSignal"] = vi.fn().mockResolvedValue(result);
+  chain["select"] = vi.fn().mockReturnValue(chain);
+  chain["eq"]     = vi.fn().mockReturnValue(chain);
+  chain["order"]  = vi.fn().mockReturnValue(chain);
+  chain["limit"]  = vi.fn().mockResolvedValue(result);
   return chain;
 }
 
@@ -229,7 +227,6 @@ describe("GET /billing/subscription", () => {
       const reject = vi.fn().mockRejectedValue(err);
       chain["select"]      = vi.fn().mockReturnValue(chain);
       chain["eq"]          = vi.fn().mockReturnValue(chain);
-      chain["abortSignal"] = vi.fn().mockReturnValue(chain);
       chain["maybeSingle"] = reject;
       chain["single"]      = reject;
       return chain;
