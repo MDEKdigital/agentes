@@ -197,10 +197,12 @@ export default function BillingPage() {
               <div>
                 <p className="text-base font-semibold text-foreground">{plan?.name ?? "—"}</p>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  {sub.billing_interval === "monthly"  && "Cobrança mensal"}
-                  {sub.billing_interval === "yearly"   && "Cobrança anual"}
-                  {sub.billing_interval === "lifetime" && "Acesso vitalício"}
-                  {sub.billing_interval === "manual"   && "Plano manual"}
+                  {({
+                    monthly:  "Cobrança mensal",
+                    yearly:   "Cobrança anual",
+                    lifetime: "Acesso vitalício",
+                    manual:   "Plano manual",
+                  } as Record<string, string>)[sub.billing_interval] ?? sub.billing_interval}
                 </p>
               </div>
               {statusCfg && (
@@ -237,9 +239,7 @@ export default function BillingPage() {
               {sub.gateway && (
                 <Row label="Gateway" value={<span className="capitalize">{sub.gateway}</span>} />
               )}
-              {currentOrg && (
-                <Row label="ID da organização" value={<span className="font-mono text-[11px]">{currentOrg.id}</span>} />
-              )}
+              <Row label="ID da organização" value={<span className="font-mono text-[11px]">{currentOrg.id}</span>} />
             </div>
 
             {plan && plan.features.length > 0 && (

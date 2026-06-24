@@ -42,16 +42,14 @@ export default async function subscriptionRoute(app: FastifyInstance) {
           db.from("evolution_instances").select("*", { count: "exact", head: true }).eq("organization_id", orgId),
           QUERY_MS, "instances-count"
         ),
-        userRole !== "agent"
-          ? withTimeout(
-              db.from("billing_events")
-                .select("id, gateway, event_type, status, created_at")
-                .eq("organization_id", orgId)
-                .order("created_at", { ascending: false })
-                .limit(50),
-              EVENTS_MS, "billing-events"
-            )
-          : Promise.resolve({ data: [] as BillingEvent[], error: null }),
+        withTimeout(
+          db.from("billing_events")
+            .select("id, gateway, event_type, status, created_at")
+            .eq("organization_id", orgId)
+            .order("created_at", { ascending: false })
+            .limit(50),
+          EVENTS_MS, "billing-events"
+        ),
       ]);
 
     // Subscription is the only critical query — fail fast if it timed out or errored
