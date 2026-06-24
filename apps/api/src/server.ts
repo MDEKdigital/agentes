@@ -1,4 +1,16 @@
 import "dotenv/config";
+// Set socket-level timeouts on ALL outbound HTTP/HTTPS requests (including those made
+// by @supabase/supabase-js). AbortSignal-based timeouts only cancel Promises; they
+// don't reliably close hung TCP sockets in some container environments. undici's Agent
+// operates at the libuv socket layer and guarantees connections are torn down.
+import { setGlobalDispatcher, Agent } from "undici";
+setGlobalDispatcher(
+  new Agent({
+    connectTimeout: 8_000,   // abort TCP connection if not established within 8 s
+    headersTimeout: 12_000,  // abort if HTTP headers not received within 12 s
+    bodyTimeout: 12_000,     // abort if body read takes longer than 12 s
+  })
+);
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const WsImpl = require("ws");
 if (!globalThis.WebSocket) {
