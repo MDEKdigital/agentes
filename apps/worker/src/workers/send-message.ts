@@ -23,7 +23,8 @@ async function sendPresence(
   try {
     await evolutionPost(`/chat/sendPresence/${encodeURIComponent(instanceName)}`, {
       number: phone,
-      options: { presence },
+      presence,
+      delay: 1000,
     });
   } catch (err) {
     console.warn(`sendPresence(${presence}) failed (non-fatal):`, (err as Error).message);

@@ -137,7 +137,8 @@ describe("startSendMessageWorker", () => {
     );
     expect(presenceCall).toBeDefined();
     const presenceBody = JSON.parse(presenceCall![1].body as string);
-    expect(presenceBody.options.presence).toBe("composing");
+    expect(presenceBody.presence).toBe("composing");
+    expect(presenceBody.delay).toBe(1000);
   });
 
   it("envia sendPresence paused depois de enviar mensagem", async () => {
@@ -149,7 +150,8 @@ describe("startSendMessageWorker", () => {
     );
     expect(presenceCalls.length).toBe(2);
     const lastPresenceBody = JSON.parse(presenceCalls[1][1].body as string);
-    expect(lastPresenceBody.options.presence).toBe("paused");
+    expect(lastPresenceBody.presence).toBe("paused");
+    expect(lastPresenceBody.delay).toBe(1000);
   });
 
   it("sendPresence composing ocorre antes de sendText", async () => {
@@ -204,7 +206,8 @@ describe("startSendMessageWorker", () => {
     );
     expect(presenceCalls.length).toBe(2);
     const lastPresenceBody = JSON.parse(presenceCalls[1][1].body as string);
-    expect(lastPresenceBody.options.presence).toBe("paused");
+    expect(lastPresenceBody.presence).toBe("paused");
+    expect(lastPresenceBody.delay).toBe(1000);
   });
 
   it("C2: worker é atômico — conteúdo com \\n\\n é entregue como uma única mensagem", async () => {
