@@ -42,7 +42,7 @@ function formatPhone(phone: string) {
 }
 
 export default function LeadsPage() {
-  const { currentOrg, isLoading: orgLoading } = useOrganization();
+  const { currentOrg, loading: orgLoading } = useOrganization();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");

@@ -239,7 +239,7 @@ export default function BillingPage() {
               {sub.gateway && (
                 <Row label="Gateway" value={<span className="capitalize">{sub.gateway}</span>} />
               )}
-              <Row label="ID da organização" value={<span className="font-mono text-[11px]">{currentOrg.id}</span>} />
+              <Row label="ID da organização" value={<span className="font-mono text-[11px]">{currentOrg?.id}</span>} />
             </div>
 
             {plan && plan.features.length > 0 && (
