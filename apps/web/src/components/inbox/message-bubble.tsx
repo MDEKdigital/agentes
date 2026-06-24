@@ -44,9 +44,28 @@ export function MessageBubble({ message }: MessageBubbleProps) {
           </p>
         )}
 
-        <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
-          {message.content}
-        </p>
+        {message.media_type === "audio" && message.media_url ? (
+          <audio
+            controls
+            src={message.media_url}
+            className="w-full max-w-[260px] h-8"
+            preload="metadata"
+          />
+        ) : null}
+
+        {message.media_type === "image" && message.media_url ? (
+          <img
+            src={message.media_url}
+            alt="imagem"
+            className="max-w-[260px] rounded-md object-cover"
+          />
+        ) : null}
+
+        {(!message.media_type || message.media_type === "text" || message.content) && (
+          <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
+            {message.content}
+          </p>
+        )}
 
         <p className={cn(
           "mt-1.5 text-right text-[10px]",
