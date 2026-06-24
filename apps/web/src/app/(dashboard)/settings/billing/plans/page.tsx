@@ -1,33 +1,24 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useOrganization } from "@/providers/organization-provider";
-import { apiFetch } from "@/lib/api";
-import { CheckCircle, AlertTriangle, RefreshCw } from "lucide-react";
+import { CheckCircle, AlertTriangle, Loader2, ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { Subscription, Plan, BillingEvent } from "@aula-agente/shared";
+import { apiFetch } from "@/lib/api";
+import { useOrganization } from "@/providers/organization-provider";
+import type { Plan } from "@aula-agente/shared";
 
-interface BillingData {
-  subscription: Subscription | null;
-  plan: Plan | null;
-  usage: { agents_used: number; members_used: number; instances_used: number };
-  limits: { max_agents: number; max_members: number; max_instances: number } | null;
-  recentEvents: BillingEvent[];
-}
-
-function formatCurrency(value: number) {
-  if (value === 0) return "Gratuito";
-  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value) + "/mês";
+function fmtBRL(value: number) {
+  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
 }
 
 export default function PlansPage() {
   const { currentOrg, currentRole, loading: orgLoading } = useOrganization();
   const router = useRouter();
   const [plans, setPlans] = useState<Plan[]>([]);
-  const [billingData, setBillingData] = useState<BillingData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activePlanId, setActivePlanId] = useState<string | null>(null);
 
   const isAdmin = currentRole === "owner" || currentRole === "admin";
 
@@ -37,152 +28,140 @@ export default function PlansPage() {
     }
   }, [orgLoading, currentRole, isAdmin, router]);
 
-  const fetchData = useCallback(() => {
-    if (!currentOrg) return;
-    setLoading(true);
-    setError(null);
+  useEffect(() => {
+    if (orgLoading || !currentOrg) return;
+
+    const headers = { "x-organization-id": currentOrg.id };
+
     Promise.all([
-      apiFetch("/billing/plans"),
-      apiFetch("/billing/subscription", { headers: { "x-organization-id": currentOrg.id } }),
+      apiFetch("/billing/plans", { headers }),
+      apiFetch("/billing/subscription", { headers }),
     ])
       .then(([plansRes, subRes]) => {
-        setPlans(plansRes as Plan[]);
-        setBillingData(subRes as BillingData);
+        setPlans((plansRes as Plan[]) ?? []);
+        const planId = (subRes as { plan?: { id: string } | null })?.plan?.id ?? null;
+        setActivePlanId(planId);
         setLoading(false);
       })
-      .catch((err: Error) => { setError(err.message); setLoading(false); });
-  }, [currentOrg]);
-
-  useEffect(() => {
-    if (orgLoading) return;
-    if (!currentOrg) { setLoading(false); return; }
-    fetchData();
-  }, [currentOrg, orgLoading, fetchData]);
+      .catch((err: Error) => {
+        setError(err.message);
+        setLoading(false);
+      });
+  }, [currentOrg, orgLoading]);
 
   if (loading || orgLoading) {
     return (
-      <div className="mx-auto max-w-4xl space-y-6">
-        <div className="h-7 w-48 animate-pulse rounded-lg bg-muted" />
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          {[...Array(3)].map((_, i) => (
-            <div key={i} className="rounded-xl border border-border bg-card overflow-hidden">
-              <div className="p-6 space-y-4">
-                <div className="h-5 w-24 animate-pulse rounded bg-muted" />
-                <div className="h-8 w-32 animate-pulse rounded bg-muted" />
-                <div className="space-y-2">
-                  {[...Array(4)].map((_, j) => (
-                    <div key={j} className="h-4 animate-pulse rounded bg-muted" />
-                  ))}
-                </div>
-                <div className="h-9 animate-pulse rounded bg-muted" />
-              </div>
-            </div>
-          ))}
-        </div>
+      <div className="flex items-center justify-center py-24">
+        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="mx-auto max-w-4xl">
-        <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-5 flex items-start gap-3">
+      <div className="mx-auto max-w-xl pt-6">
+        <div className="flex items-start gap-3 rounded-xl border border-destructive/30 bg-destructive/5 p-5">
           <AlertTriangle className="h-4 w-4 shrink-0 text-destructive mt-0.5" />
-          <div className="flex-1 space-y-1">
+          <div>
             <p className="text-sm font-medium text-destructive">Não foi possível carregar os planos</p>
-            <p className="text-xs text-muted-foreground">{error}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{error}</p>
           </div>
-          <button
-            onClick={fetchData}
-            className="shrink-0 flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-accent"
-          >
-            <RefreshCw className="h-3 w-3" />
-            Tentar novamente
-          </button>
         </div>
       </div>
     );
   }
 
-  const currentPlanSlug = billingData?.plan?.slug ?? null;
-
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold text-foreground">Planos disponíveis</h1>
-        <p className="text-xs text-muted-foreground mt-0.5">Escolha o plano ideal para sua organização</p>
+    <div className="mx-auto max-w-3xl space-y-6">
+      <div className="flex items-center gap-3">
+        <button
+          onClick={() => router.back()}
+          className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-xs font-medium text-foreground hover:bg-accent transition-colors"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" />
+          Voltar
+        </button>
+        <div>
+          <h1 className="text-lg font-semibold text-foreground">Planos disponíveis</h1>
+          <p className="text-xs text-muted-foreground mt-0.5">Compare e escolha o plano ideal para o seu negócio</p>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        {plans.map((plan) => {
-          const isCurrent = currentPlanSlug !== null && plan.slug === currentPlanSlug;
-
-          return (
-            <div
-              key={plan.id}
-              className={cn(
-                "rounded-xl border bg-card overflow-hidden flex flex-col",
-                isCurrent
-                  ? "border-blue-electric-400 ring-1 ring-blue-electric-400"
-                  : "border-border"
-              )}
-            >
-              <div className="p-6 flex flex-col flex-1 space-y-4">
-                {/* Plan header */}
-                <div className="flex items-start justify-between gap-2">
-                  <h2 className="text-base font-semibold text-foreground">{plan.name}</h2>
-                  {isCurrent && (
-                    <span className="shrink-0 rounded-md border border-blue-electric-400/40 bg-blue-electric-400/10 px-2 py-0.5 text-xs font-semibold text-blue-electric-400">
-                      Plano atual
-                    </span>
-                  )}
-                </div>
-
-                {/* Price */}
-                <p className="text-2xl font-bold text-foreground">
-                  {formatCurrency(plan.price_monthly)}
-                </p>
-
-                {/* Limits */}
-                <div className="space-y-1">
-                  <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-2">
-                    Limites
-                  </p>
-                  <p className="text-sm text-foreground">{plan.max_agents} agentes</p>
-                  <p className="text-sm text-foreground">{plan.max_instances} instâncias</p>
-                  <p className="text-sm text-foreground">{plan.max_members} membros</p>
-                </div>
-
-                {/* Features */}
-                {plan.features.length > 0 && (
-                  <ul className="space-y-1 flex-1">
-                    {plan.features.map((feature) => (
-                      <li key={feature} className="flex items-center gap-2 text-sm text-foreground">
-                        <CheckCircle className="h-3.5 w-3.5 text-green-400 shrink-0" />
-                        <span className="capitalize">{feature.replace(/_/g, " ")}</span>
-                      </li>
-                    ))}
-                  </ul>
+      {plans.length === 0 ? (
+        <div className="rounded-xl border border-border bg-card p-8 text-center">
+          <p className="text-sm text-muted-foreground">Nenhum plano disponível no momento.</p>
+        </div>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {plans.map((plan) => {
+            const isActive = plan.id === activePlanId;
+            return (
+              <div
+                key={plan.id}
+                className={cn(
+                  "relative flex flex-col rounded-xl border bg-card overflow-hidden transition-all",
+                  isActive
+                    ? "border-blue-electric-400 ring-1 ring-blue-electric-400/30"
+                    : "border-border hover:border-border/80"
+                )}
+              >
+                {isActive && (
+                  <div className="bg-blue-electric-500/10 px-4 py-1.5 text-center">
+                    <span className="text-[11px] font-semibold text-blue-electric-300">Plano atual</span>
+                  </div>
                 )}
 
-                {/* CTA */}
-                <button
-                  disabled={isCurrent}
-                  onClick={() => {}}
-                  className={cn(
-                    "mt-auto w-full rounded-lg px-4 py-2 text-sm font-medium transition-colors",
-                    isCurrent
-                      ? "cursor-not-allowed bg-muted text-muted-foreground"
-                      : "bg-blue-electric-400 text-white hover:bg-blue-electric-400/90"
+                <div className="flex flex-col flex-1 p-5 space-y-4">
+                  <div>
+                    <h3 className="text-base font-semibold text-foreground">{plan.name}</h3>
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-2xl font-bold text-foreground">{fmtBRL(plan.price_monthly)}</span>
+                      <span className="text-xs text-muted-foreground">/mês</span>
+                    </div>
+                    {plan.price_yearly > 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        ou {fmtBRL(plan.price_yearly)}/ano
+                        {plan.price_monthly > 0 && (
+                          <span className="ml-1 text-green-400 font-medium">
+                            ({Math.round(100 - (plan.price_yearly / (plan.price_monthly * 12)) * 100)}% off)
+                          </span>
+                        )}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { label: "Agentes",    n: plan.max_agents },
+                      { label: "Instâncias", n: plan.max_instances },
+                      { label: "Membros",    n: plan.max_members },
+                    ].map((item) => (
+                      <div key={item.label} className="rounded-lg border border-border bg-muted/30 p-2 text-center">
+                        <p className="text-lg font-bold text-foreground">{item.n}</p>
+                        <p className="text-[10px] text-muted-foreground leading-tight">{item.label}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {plan.features.length > 0 && (
+                    <ul className="space-y-1.5 flex-1">
+                      {plan.features.map((f) => (
+                        <li key={f} className="flex items-center gap-2 text-xs text-foreground">
+                          <CheckCircle className="h-3 w-3 text-green-400 shrink-0" />
+                          <span className="capitalize">{f.replace(/_/g, " ")}</span>
+                        </li>
+                      ))}
+                    </ul>
                   )}
-                >
-                  {isCurrent ? "Plano atual" : `Upgrade para ${plan.name}`}
-                </button>
+                </div>
               </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
