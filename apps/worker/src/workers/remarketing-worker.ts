@@ -143,18 +143,20 @@ export async function processRemarketingCycle() {
 
       // ── Verificar regras de cancelamento ──────────────────────────────────
 
-      const resolved = await isConversationResolved(db, enrollment.conversation_id);
-      if (resolved) {
-        await cancelEnrollment(db, enrollment.id, "resolved", enrollment.organization_id);
-        fireAudit(db, {
-          organization_id: enrollment.organization_id,
-          action: "remarketing.enrollment_cancelled",
-          entity_type: "remarketing_enrollment",
-          entity_id: enrollment.id,
-          metadata: { reason: "resolved", conversation_id: enrollment.conversation_id, actor: "system" },
-        });
-        console.log(`[remarketing] Cancelled enrollment ${enrollment.id}: conversation resolved`);
-        continue;
+      if (flow?.cancel_on_resolved !== false) {
+        const resolved = await isConversationResolved(db, enrollment.conversation_id);
+        if (resolved) {
+          await cancelEnrollment(db, enrollment.id, "resolved", enrollment.organization_id);
+          fireAudit(db, {
+            organization_id: enrollment.organization_id,
+            action: "remarketing.enrollment_cancelled",
+            entity_type: "remarketing_enrollment",
+            entity_id: enrollment.id,
+            metadata: { reason: "resolved", conversation_id: enrollment.conversation_id, actor: "system" },
+          });
+          console.log(`[remarketing] Cancelled enrollment ${enrollment.id}: conversation resolved`);
+          continue;
+        }
       }
 
       if (flow?.cancel_on_reply) {

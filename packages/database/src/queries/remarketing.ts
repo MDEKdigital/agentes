@@ -84,7 +84,7 @@ export async function getConversationsEligibleForEnrollment(
       "conversation_id",
       conversations.map((c) => c.id)
     )
-    .eq("status", "active");
+    .eq("flow_id", flow.id);
 
   const enrolledIds = new Set((enrolled ?? []).map((e) => e.conversation_id));
   const candidates = conversations.filter((c) => !enrolledIds.has(c.id));
