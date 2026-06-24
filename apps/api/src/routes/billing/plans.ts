@@ -6,7 +6,7 @@ import { authMiddleware, requireOrg } from "../../middleware/auth";
 // Hard limit: if the route handler hasn't sent a response in this many ms,
 // forcibly send 503. This works even when fetch hangs at the TCP level because
 // setTimeout fires on the event loop regardless of pending awaits.
-const HARD_TIMEOUT_MS = 9_000;
+const HARD_TIMEOUT_MS = 3_000;
 
 export default async function plansRoute(app: FastifyInstance) {
   app.addHook("preHandler", authMiddleware);

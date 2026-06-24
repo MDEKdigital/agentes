@@ -134,7 +134,7 @@ server.register(cors, {
 
 // Health check
 server.get("/health", { logLevel: "silent" }, async () => {
-  return { status: "ok", timestamp: new Date().toISOString(), node: process.version, build: "conn-close" };
+  return { status: "ok", timestamp: new Date().toISOString(), node: process.version, build: "timer-3s" };
 });
 
 // Routes
