@@ -2,6 +2,9 @@ import type { ToolsConfig, Message } from "@aula-agente/shared";
 import { createSearchKnowledgeTool } from "./search-knowledge";
 import { createSearchFaqTool } from "./search-faq";
 import { buildCloseConversationTool, CLOSE_CONVERSATION_TOOL_NAME } from "./close-conversation";
+import { buildRequestHumanHandoffTool, HUMAN_HANDOFF_TOOL_NAME } from "./request-human-handoff";
+
+export { HUMAN_HANDOFF_TOOL_NAME };
 
 interface RegistryParams {
   organizationId: string;
@@ -30,6 +33,8 @@ export function buildToolsForAgent(params: RegistryParams) {
     conversationId,
     [...messages, currentMessage],
   );
+
+  tools[HUMAN_HANDOFF_TOOL_NAME] = buildRequestHumanHandoffTool();
 
   return tools;
 }

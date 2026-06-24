@@ -14,6 +14,8 @@ import {
   updateConversation,
   setConversationWaiting,
   getInstanceById,
+  workerActivateHumanTakeover,
+  cancelEnrollmentsByConversation,
 } from "@aula-agente/database";
 import { fireAudit } from "../lib/audit";
 import { acquireConversationLock, releaseConversationLock, renewConversationLock, LOCK_RENEWAL_INTERVAL_MS, LockContentionError } from "../lib/lock";
@@ -22,6 +24,7 @@ import { validateMediaPayload } from "../lib/media-validation";
 import { runAgent } from "../agents/agent-runner";
 import { evaluateActivation } from "./evaluate-activation";
 import { CLOSE_CONVERSATION_TOOL_NAME } from "../agents/tools/close-conversation";
+import { HUMAN_HANDOFF_TOOL_NAME } from "../agents/tools/registry";
 import { splitMessage } from "../lib/split-message";
 import { workerLog } from "../lib/logger";
 import { incrementMetric } from "../lib/metrics";
@@ -418,6 +421,7 @@ export function startProcessMessageWorker() {
 
         let responseMessage: { id: string };
         let wasResolved: boolean;
+        let wasHandoff: boolean;
         let responseContent: string;
 
         if (existingResponse) {
@@ -428,7 +432,9 @@ export function startProcessMessageWorker() {
           }
           responseMessage = existingResponse;
           responseContent = existingResponse.content;
-          wasResolved = (existingResponse.metadata?.tool_calls ?? []).includes(CLOSE_CONVERSATION_TOOL_NAME);
+          const savedToolCalls: string[] = existingResponse.metadata?.tool_calls ?? [];
+          wasResolved = savedToolCalls.includes(CLOSE_CONVERSATION_TOOL_NAME);
+          wasHandoff = savedToolCalls.includes(HUMAN_HANDOFF_TOOL_NAME);
         } else {
           const result = await runAgent({
             agent,
@@ -446,6 +452,7 @@ export function startProcessMessageWorker() {
             return;
           }
           wasResolved = result.toolCalls.includes(CLOSE_CONVERSATION_TOOL_NAME);
+          wasHandoff = result.toolCalls.includes(HUMAN_HANDOFF_TOOL_NAME);
           responseMessage = await createMessage(db, {
             conversation_id: conversationId,
             organization_id: organizationId,
@@ -464,17 +471,23 @@ export function startProcessMessageWorker() {
           });
         }
 
-        if (wasResolved) {
+        if (wasHandoff) {
+          await Promise.all([
+            workerActivateHumanTakeover(db, conversationId, organizationId),
+            cancelEnrollmentsByConversation(db, conversationId, organizationId),
+          ]);
+          fireAudit(db, {
+            organization_id: organizationId,
+            action: "conversation.human_handoff",
+            entity_type: "conversation",
+            entity_id: conversationId,
+            metadata: { agent_id: agentId, actor: "agent" },
+          });
+        } else if (wasResolved) {
           await updateConversation(db, conversationId, {
             last_message_at: new Date().toISOString(),
             status: "resolved",
           }, organizationId);
-        } else {
-          // C8: conditional update — won't overwrite "resolved" set by a concurrent human action
-          await setConversationWaiting(db, conversationId, organizationId, new Date().toISOString());
-        }
-
-        if (wasResolved) {
           fireAudit(db, {
             organization_id: organizationId,
             action: "conversation.resolved",
@@ -482,6 +495,9 @@ export function startProcessMessageWorker() {
             entity_id: conversationId,
             metadata: { agent_id: agentId, actor: "system" },
           });
+        } else {
+          // C8: conditional update — won't overwrite "resolved" set by a concurrent human action
+          await setConversationWaiting(db, conversationId, organizationId, new Date().toISOString());
         }
 
         const sendQueue = getSendMessageQueue();

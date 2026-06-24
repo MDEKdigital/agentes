@@ -63,6 +63,7 @@ export type AuditAction =
   | "conversation.deleted"
   | "conversation.keyword_activated"
   | "conversation.resolved"
+  | "conversation.human_handoff"
   | "conversation.note_created";
 
 export type AuditEntityType =

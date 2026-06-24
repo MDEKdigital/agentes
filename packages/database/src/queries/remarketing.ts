@@ -71,7 +71,8 @@ export async function getConversationsEligibleForEnrollment(
     .eq("agent_id", flow.agent_id)
     .eq("evolution_instance_id", flow.instance_id)
     .eq("organization_id", flow.organization_id)
-    .in("status", ["open", "waiting"]);
+    .in("status", ["open", "waiting"])
+    .eq("is_human_takeover", false);
 
   if (error) throw error;
   if (!conversations || conversations.length === 0) return [];
@@ -255,6 +256,20 @@ export async function returnConversationToAgent(
     .update({ agent_id: agentId, status: "open" })
     .eq("id", conversationId)
     .eq("organization_id", organizationId);
+  if (error) throw error;
+}
+
+export async function cancelEnrollmentsByConversation(
+  client: SupabaseClient,
+  conversationId: string,
+  organizationId: string,
+): Promise<void> {
+  const { error } = await client
+    .from("remarketing_enrollments")
+    .update({ status: "cancelled", cancel_reason: "human_takeover" })
+    .eq("conversation_id", conversationId)
+    .eq("organization_id", organizationId)
+    .eq("status", "active");
   if (error) throw error;
 }
 

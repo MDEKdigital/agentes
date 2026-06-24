@@ -54,12 +54,17 @@ export function ConversationList({ conversations, selectedId, onSelect, onDelete
 
         return (
           <div key={conv.id} className="group relative">
+            {conv.is_human_takeover && !isActive && (
+              <span className="pointer-events-none absolute inset-0 animate-pulse rounded-sm bg-amber-500/5" />
+            )}
             <button
               onClick={() => onSelect(conv.id)}
               className={cn(
                 "relative w-full flex items-center gap-3 px-3 py-3 text-left transition-all",
                 isActive
                   ? "border-l-[3px] border-blue-electric-400 bg-blue-electric-500/10 pl-[9px]"
+                  : conv.is_human_takeover
+                  ? "border-l-[3px] border-amber-500 pl-[9px] hover:bg-elevated"
                   : "border-l-[3px] border-transparent hover:bg-elevated"
               )}
             >
@@ -93,8 +98,8 @@ export function ConversationList({ conversations, selectedId, onSelect, onDelete
                     {conv.agents?.name}
                   </span>
                   {conv.is_human_takeover && (
-                    <span className="shrink-0 rounded px-1 py-px text-[10px] font-medium bg-blue-electric-500/10 text-blue-electric-300 border border-blue-electric-500/20">
-                      Humano
+                    <span className="shrink-0 animate-pulse rounded px-1 py-px text-[10px] font-medium bg-amber-500/15 text-amber-400 border border-amber-500/30">
+                      Aguardando
                     </span>
                   )}
                 </div>

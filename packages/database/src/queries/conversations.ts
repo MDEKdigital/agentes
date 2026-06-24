@@ -201,6 +201,30 @@ export async function activateHumanTakeover(
 }
 
 /**
+ * Worker-triggered takeover: agent detected a human handoff request.
+ * No assigned_to required — the human team picks it up from the inbox.
+ * C8: only succeeds when is_human_takeover=false (idempotent on retry).
+ */
+export async function workerActivateHumanTakeover(
+  client: SupabaseClient,
+  id: string,
+  organizationId: string,
+): Promise<boolean> {
+  const { data, error } = await client
+    .from("conversations")
+    .update({
+      is_human_takeover: true,
+      human_takeover_at: new Date().toISOString(),
+    })
+    .eq("id", id)
+    .eq("organization_id", organizationId)
+    .eq("is_human_takeover", false)
+    .select("id");
+  if (error) throw error;
+  return (data ?? []).length > 0;
+}
+
+/**
  * C8: Conditional status update for worker — only writes "waiting" when the conversation
  * is NOT already "resolved", preventing the worker from reopening a human-resolved chat.
  * Returns true if the row was updated.
