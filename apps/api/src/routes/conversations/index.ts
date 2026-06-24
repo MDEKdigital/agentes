@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { getAdminClient, getConversationNotes, addConversationNote, updateConversationTags, getConversationById, getMessagesByConversation, getInboxConversations, activateHumanTakeover } from "@aula-agente/database";
+import { getAdminClient, getConversationNotes, addConversationNote, updateConversationTags, getConversationById, getMessagesByConversation, getInboxConversations, activateHumanTakeover, cancelEnrollmentsByConversation } from "@aula-agente/database";
 import { authMiddleware } from "../../middleware/auth";
 import { fireAudit } from "../../lib/audit";
 
@@ -276,6 +276,9 @@ export default async function conversationRoutes(app: FastifyInstance) {
         if (!activated) {
           return reply.status(409).send({ error: "Conversa já está em atendimento humano" });
         }
+
+        // Cancela qualquer enrollment de remarketing ativo para esta conversa
+        await cancelEnrollmentsByConversation(db, conversationId, conv.organization_id);
       } else {
         const { error } = await db
           .from("conversations")

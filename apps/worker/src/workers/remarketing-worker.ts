@@ -208,6 +208,20 @@ export async function processRemarketingCycle() {
         continue;
       }
 
+      // Para imediatamente se a conversa estiver em atendimento humano
+      if (conversation.is_human_takeover) {
+        await cancelEnrollment(db, enrollment.id, "human_takeover", enrollment.organization_id);
+        fireAudit(db, {
+          organization_id: enrollment.organization_id,
+          action: "remarketing.enrollment_cancelled",
+          entity_type: "remarketing_enrollment",
+          entity_id: enrollment.id,
+          metadata: { reason: "human_takeover", conversation_id: enrollment.conversation_id, actor: "system" },
+        });
+        console.log(`[remarketing] Cancelled enrollment ${enrollment.id}: conversation in human takeover`);
+        continue;
+      }
+
       const contact = conversation.contacts as { phone: string } | null;
       if (!contact?.phone) {
         workerLog("remarketing", "error", {
