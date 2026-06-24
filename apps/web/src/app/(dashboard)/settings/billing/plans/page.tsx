@@ -61,7 +61,8 @@ export default function PlansPage() {
   }, [currentOrg]);
 
   useEffect(() => {
-    if (orgLoading || !currentOrg) return;
+    if (orgLoading) return;
+    if (!currentOrg) { setLoading(false); return; }
     load();
   }, [currentOrg, orgLoading, load]);
 
@@ -140,8 +141,14 @@ export default function PlansPage() {
 
                   <div className="space-y-1">
                     <div className="flex items-baseline gap-1">
-                      <span className="text-2xl font-bold text-foreground">{fmtBRL(plan.price_monthly)}</span>
-                      <span className="text-xs text-muted-foreground">/mês</span>
+                      {plan.price_monthly === 0 ? (
+                        <span className="text-2xl font-bold text-foreground">Gratuito</span>
+                      ) : (
+                        <>
+                          <span className="text-2xl font-bold text-foreground">{fmtBRL(plan.price_monthly)}</span>
+                          <span className="text-xs text-muted-foreground">/mês</span>
+                        </>
+                      )}
                     </div>
                     {plan.price_yearly > 0 && (
                       <p className="text-xs text-muted-foreground">

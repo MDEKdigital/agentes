@@ -1,12 +1,16 @@
 import type { FastifyInstance } from "fastify";
 import { getAdminClient, getActivePlans } from "@aula-agente/database";
-import { authMiddleware } from "../../middleware/auth";
+import { authMiddleware, requireOrg } from "../../middleware/auth";
 import { withTimeout, TimeoutError, QUERY_MS } from "../../lib/db-timeout";
 
 export default async function plansRoute(app: FastifyInstance) {
   app.addHook("preHandler", authMiddleware);
+  app.addHook("preHandler", requireOrg);
 
   app.get("/billing/plans", async (request, reply) => {
+    if (request.userRole === "agent") {
+      return reply.status(403).send({ error: "Acesso restrito a administradores." });
+    }
     const db = getAdminClient();
     try {
       const plans = await withTimeout(getActivePlans(db), QUERY_MS, "plans");
