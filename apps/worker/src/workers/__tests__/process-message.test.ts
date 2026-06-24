@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+﻿import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const { mockAcquireConversationLock, mockReleaseConversationLock } = vi.hoisted(() => ({
   mockAcquireConversationLock: vi.fn(async () => "lock-value"),
@@ -96,7 +96,7 @@ const activeAgent = {
   temperature: 0.7,
   max_tokens: 1024,
   max_steps: 5,
-  tools_config: { search_knowledge: false, search_faq: false },
+  tools_config: { search_knowledge: false, search_faq: false, search_web: false },
   is_active: true,
   activation_rules: [],
 };
@@ -111,7 +111,7 @@ const conversation = {
 };
 
 const messages = [
-  { id: "msg-1", role: "contact", content: "Olá" },
+  { id: "msg-1", role: "contact", content: "OlÃ¡" },
 ];
 
 beforeEach(() => {
@@ -139,13 +139,13 @@ async function runJob() {
 }
 
 describe("startProcessMessageWorker", () => {
-  it("não processa se agente estiver inativo", async () => {
+  it("nÃ£o processa se agente estiver inativo", async () => {
     vi.mocked(getAgentById).mockResolvedValue({ ...activeAgent, is_active: false } as never);
     await runJob();
     expect(createMessage).not.toHaveBeenCalled();
   });
 
-  it("não processa se conversa estiver em human takeover", async () => {
+  it("nÃ£o processa se conversa estiver em human takeover", async () => {
     vi.mocked(getConversationById).mockResolvedValue({ ...conversation, is_human_takeover: true } as never);
     await runJob();
     expect(createMessage).not.toHaveBeenCalled();
@@ -203,7 +203,7 @@ describe("startProcessMessageWorker", () => {
     );
   });
 
-  it("agente retorna string vazia — não salva no DB e não enfileira sendQueue", async () => {
+  it("agente retorna string vazia â€” nÃ£o salva no DB e nÃ£o enfileira sendQueue", async () => {
     mockRunAgent.mockResolvedValue({
       text: "",
       model: "gpt-4o-mini",
@@ -227,7 +227,7 @@ describe("startProcessMessageWorker", () => {
     );
   });
 
-  it("seta status 'waiting' quando agente não chamou close_conversation", async () => {
+  it("seta status 'waiting' quando agente nÃ£o chamou close_conversation", async () => {
     mockRunAgent.mockResolvedValue({
       text: "Resposta",
       model: "gpt-4o-mini",
@@ -249,7 +249,7 @@ describe("startProcessMessageWorker", () => {
 
   it("seta status 'resolved' quando agente chamou close_conversation", async () => {
     mockRunAgent.mockResolvedValue({
-      text: "Até logo!",
+      text: "AtÃ© logo!",
       model: "gpt-4o-mini",
       tokensUsed: 50,
       latencyMs: 100,
@@ -272,12 +272,12 @@ describe("keyword gate", () => {
     mockEvaluateActivation.mockResolvedValue({ action: "activate" as const });
   });
 
-  it("não filtra quando agente não tem regras de ativação", async () => {
+  it("nÃ£o filtra quando agente nÃ£o tem regras de ativaÃ§Ã£o", async () => {
     await runJob();
     expect(createMessage).toHaveBeenCalled();
   });
 
-  it("não filtra quando conversa já está ativada", async () => {
+  it("nÃ£o filtra quando conversa jÃ¡ estÃ¡ ativada", async () => {
     vi.mocked(getAgentById).mockResolvedValue({
       ...activeAgent,
       activation_rules: [{ type: "single_word", value: "suporte" }],
@@ -311,7 +311,7 @@ describe("keyword gate", () => {
     mockEvaluateActivation.mockResolvedValue({ action: "activate" as const });
     vi.mocked(getAgentById).mockResolvedValue({
       ...activeAgent,
-      activation_rules: [{ type: "single_word", value: "olá" }],
+      activation_rules: [{ type: "single_word", value: "olÃ¡" }],
     } as never);
     vi.mocked(getConversationById).mockResolvedValue({
       ...conversation,
@@ -329,7 +329,7 @@ describe("keyword gate", () => {
     expect(createMessage).toHaveBeenCalled();
   });
 
-  it("não ativa quando mídia falhou na transcrição (isMediaFallback)", async () => {
+  it("nÃ£o ativa quando mÃ­dia falhou na transcriÃ§Ã£o (isMediaFallback)", async () => {
     vi.mocked(getAgentById).mockResolvedValue({
       ...activeAgent,
       activation_rules: [{ type: "single_word", value: "processar" }],
@@ -339,7 +339,7 @@ describe("keyword gate", () => {
       is_keyword_activated: false,
       awaiting_activation_confirmation: false,
     } as never);
-    // Audio message — preprocessAudioMessage will fail (evolution mock throws) → isMediaFallback=true
+    // Audio message â€” preprocessAudioMessage will fail (evolution mock throws) â†’ isMediaFallback=true
     vi.mocked(getRecentMessages).mockResolvedValue([
       {
         id: "msg-1",
@@ -404,10 +404,10 @@ describe("keyword gate", () => {
   });
 });
 
-// ── audit log assertions ───────────────────────────────────────────────────────
+// â”€â”€ audit log assertions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-describe("audit logs — process-message", () => {
-  it("(audit): keyword ativada → registra conversation.keyword_activated", async () => {
+describe("audit logs â€” process-message", () => {
+  it("(audit): keyword ativada â†’ registra conversation.keyword_activated", async () => {
     vi.mocked(getAgentById).mockResolvedValue({
       ...activeAgent,
       activation_rules: [{ type: "single_word", value: "suporte" }],
@@ -432,7 +432,7 @@ describe("audit logs — process-message", () => {
     );
   });
 
-  it("(audit): NÃO audita keyword_activated quando conversa já está ativada", async () => {
+  it("(audit): NÃƒO audita keyword_activated quando conversa jÃ¡ estÃ¡ ativada", async () => {
     vi.mocked(getConversationById).mockResolvedValue({
       ...conversation,
       is_keyword_activated: true,
@@ -447,9 +447,9 @@ describe("audit logs — process-message", () => {
     expect(keywordCalls).toHaveLength(0);
   });
 
-  it("(audit): conversa resolvida pelo agente → registra conversation.resolved", async () => {
+  it("(audit): conversa resolvida pelo agente â†’ registra conversation.resolved", async () => {
     mockRunAgent.mockResolvedValue({
-      text: "Até logo!",
+      text: "AtÃ© logo!",
       model: "gpt-4o-mini",
       tokensUsed: 50,
       latencyMs: 100,
@@ -469,9 +469,9 @@ describe("audit logs — process-message", () => {
     );
   });
 
-  it("(audit): NÃO audita conversation.resolved quando agente não chamou close_conversation", async () => {
+  it("(audit): NÃƒO audita conversation.resolved quando agente nÃ£o chamou close_conversation", async () => {
     mockRunAgent.mockResolvedValue({
-      text: "Olá!",
+      text: "OlÃ¡!",
       model: "gpt-4o-mini",
       tokensUsed: 50,
       latencyMs: 100,
@@ -510,16 +510,16 @@ describe("audit logs — process-message", () => {
   });
 });
 
-// ── R6: idempotência em retry de conversa já resolvida ─────────────────────────
+// â”€â”€ R6: idempotÃªncia em retry de conversa jÃ¡ resolvida â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-describe("R6: retry com conversa já resolved — NÃO emite segundo conversation.resolved", () => {
-  it("R6: conversation.status=resolved → job retorna sem auditar conversation.resolved", async () => {
+describe("R6: retry com conversa jÃ¡ resolved â€” NÃƒO emite segundo conversation.resolved", () => {
+  it("R6: conversation.status=resolved â†’ job retorna sem auditar conversation.resolved", async () => {
     vi.mocked(getConversationById).mockResolvedValue({
       ...conversation,
       status: "resolved",
     } as never);
     mockRunAgent.mockResolvedValue({
-      text: "Até logo!",
+      text: "AtÃ© logo!",
       model: "gpt-4o-mini",
       tokensUsed: 50,
       latencyMs: 100,
@@ -535,9 +535,9 @@ describe("R6: retry com conversa já resolved — NÃO emite segundo conversatio
   });
 });
 
-// ── C1 + C14: idempotência em retry de process-message ─────────────────────────
+// â”€â”€ C1 + C14: idempotÃªncia em retry de process-message â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-describe("C1 — resposta do agente não deve ser duplicada em retry", () => {
+describe("C1 â€” resposta do agente nÃ£o deve ser duplicada em retry", () => {
   it("C1 nominal: createMessage de resposta inclui source_message_id no metadata", async () => {
     await runJob();
 
@@ -550,7 +550,7 @@ describe("C1 — resposta do agente não deve ser duplicada em retry", () => {
     );
   });
 
-  it("C1: sendQueue.add para resposta usa jobId estável baseado em messageId", async () => {
+  it("C1: sendQueue.add para resposta usa jobId estÃ¡vel baseado em messageId", async () => {
     const sendQueue = { add: vi.fn() };
     vi.mocked(getSendMessageQueue).mockReturnValue(sendQueue as never);
 
@@ -563,9 +563,9 @@ describe("C1 — resposta do agente não deve ser duplicada em retry", () => {
     );
   });
 
-  it("C1: retry não chama runAgent quando resposta já existe no histórico para messageId", async () => {
+  it("C1: retry nÃ£o chama runAgent quando resposta jÃ¡ existe no histÃ³rico para messageId", async () => {
     vi.mocked(getRecentMessages).mockResolvedValue([
-      { id: "msg-1", role: "contact", content: "Olá", metadata: null },
+      { id: "msg-1", role: "contact", content: "OlÃ¡", metadata: null },
       {
         id: "msg-resp-existing",
         role: "agent",
@@ -579,9 +579,9 @@ describe("C1 — resposta do agente não deve ser duplicada em retry", () => {
     expect(mockRunAgent).not.toHaveBeenCalled();
   });
 
-  it("C1: retry não cria segunda mensagem de resposta do agente", async () => {
+  it("C1: retry nÃ£o cria segunda mensagem de resposta do agente", async () => {
     vi.mocked(getRecentMessages).mockResolvedValue([
-      { id: "msg-1", role: "contact", content: "Olá", metadata: null },
+      { id: "msg-1", role: "contact", content: "OlÃ¡", metadata: null },
       {
         id: "msg-resp-existing",
         role: "agent",
@@ -597,7 +597,7 @@ describe("C1 — resposta do agente não deve ser duplicada em retry", () => {
 
   it("C1: retry enfileira send-message usando id da resposta existente (garante entrega)", async () => {
     vi.mocked(getRecentMessages).mockResolvedValue([
-      { id: "msg-1", role: "contact", content: "Olá", metadata: null },
+      { id: "msg-1", role: "contact", content: "OlÃ¡", metadata: null },
       {
         id: "msg-resp-existing",
         role: "agent",
@@ -619,11 +619,11 @@ describe("C1 — resposta do agente não deve ser duplicada em retry", () => {
 
   it("C1: audit conversation.resolved dispara corretamente via metadata da resposta existente", async () => {
     vi.mocked(getRecentMessages).mockResolvedValue([
-      { id: "msg-1", role: "contact", content: "Olá", metadata: null },
+      { id: "msg-1", role: "contact", content: "OlÃ¡", metadata: null },
       {
         id: "msg-resp-existing",
         role: "agent",
-        content: "Até logo!",
+        content: "AtÃ© logo!",
         metadata: { source_message_id: "msg-1", tool_calls: ["close_conversation"] },
       },
     ] as never);
@@ -633,13 +633,13 @@ describe("C1 — resposta do agente não deve ser duplicada em retry", () => {
     const resolvedCalls = mockCreateAuditLog.mock.calls.filter(
       (args: unknown[]) => (args[1] as { action: string })?.action === "conversation.resolved"
     );
-    // current code: runAgent returns [] toolCalls → no audit → 0 calls → FAIL (expects 1)
-    // after fix: reads tool_calls from metadata → wasResolved=true → audit fires → 1 call
+    // current code: runAgent returns [] toolCalls â†’ no audit â†’ 0 calls â†’ FAIL (expects 1)
+    // after fix: reads tool_calls from metadata â†’ wasResolved=true â†’ audit fires â†’ 1 call
     expect(resolvedCalls).toHaveLength(1);
   });
 });
 
-describe("C14 — mensagem de confirmação não deve ser duplicada em retry", () => {
+describe("C14 â€” mensagem de confirmaÃ§Ã£o nÃ£o deve ser duplicada em retry", () => {
   const withActivationRules = {
     ...activeAgent,
     activation_rules: [{ type: "single_word", value: "suporte" }],
@@ -653,7 +653,7 @@ describe("C14 — mensagem de confirmação não deve ser duplicada em retry", (
   beforeEach(() => {
     mockEvaluateActivation.mockResolvedValue({
       action: "confirm" as const,
-      confirmationMessage: "Você quis dizer 'suporte'?",
+      confirmationMessage: "VocÃª quis dizer 'suporte'?",
     });
     vi.mocked(getAgentById).mockResolvedValue(withActivationRules as never);
     vi.mocked(getConversationById).mockResolvedValue(unactivatedConv as never);
@@ -663,7 +663,7 @@ describe("C14 — mensagem de confirmação não deve ser duplicada em retry", (
     vi.mocked(createMessage).mockResolvedValue({ id: "confirm-new" } as never);
   });
 
-  it("C14 nominal: createMessage de confirmação inclui source_message_id e type no metadata", async () => {
+  it("C14 nominal: createMessage de confirmaÃ§Ã£o inclui source_message_id e type no metadata", async () => {
     await runJob();
 
     expect(createMessage).toHaveBeenCalledWith(
@@ -678,7 +678,7 @@ describe("C14 — mensagem de confirmação não deve ser duplicada em retry", (
     );
   });
 
-  it("C14: sendQueue.add para confirmação usa jobId estável baseado em messageId", async () => {
+  it("C14: sendQueue.add para confirmaÃ§Ã£o usa jobId estÃ¡vel baseado em messageId", async () => {
     const sendQueue = { add: vi.fn() };
     vi.mocked(getSendMessageQueue).mockReturnValue(sendQueue as never);
 
@@ -691,31 +691,31 @@ describe("C14 — mensagem de confirmação não deve ser duplicada em retry", (
     );
   });
 
-  it("C14: retry não cria segunda mensagem de confirmação quando já existe no histórico", async () => {
+  it("C14: retry nÃ£o cria segunda mensagem de confirmaÃ§Ã£o quando jÃ¡ existe no histÃ³rico", async () => {
     vi.mocked(getRecentMessages).mockResolvedValue([
       { id: "msg-1", role: "contact", content: "suporte", metadata: null },
       {
         id: "confirm-existing",
         role: "agent",
-        content: "Você quis dizer 'suporte'?",
+        content: "VocÃª quis dizer 'suporte'?",
         metadata: { source_message_id: "msg-1", type: "activation_confirmation" },
       },
     ] as never);
 
     await runJob();
 
-    // current code: createMessage IS called again → FAIL → RED
-    // after fix: existing found → createMessage NOT called → GREEN
+    // current code: createMessage IS called again â†’ FAIL â†’ RED
+    // after fix: existing found â†’ createMessage NOT called â†’ GREEN
     expect(createMessage).not.toHaveBeenCalled();
   });
 
-  it("C14: retry enfileira send-message de confirmação com id existente", async () => {
+  it("C14: retry enfileira send-message de confirmaÃ§Ã£o com id existente", async () => {
     vi.mocked(getRecentMessages).mockResolvedValue([
       { id: "msg-1", role: "contact", content: "suporte", metadata: null },
       {
         id: "confirm-existing",
         role: "agent",
-        content: "Você quis dizer 'suporte'?",
+        content: "VocÃª quis dizer 'suporte'?",
         metadata: { source_message_id: "msg-1", type: "activation_confirmation" },
       },
     ] as never);

@@ -35,7 +35,7 @@ const baseAgent = {
   temperature: 0.7,
   max_tokens: 1024,
   max_steps: 3,
-  tools_config: { search_knowledge: false, search_faq: false },
+  tools_config: { search_knowledge: false, search_faq: false, search_web: false },
   activation_rules: [],
   is_active: true,
   created_at: "",
@@ -97,7 +97,7 @@ describe("runAgent", () => {
 
   it("chama buildToolsForAgent com tools_config correto", async () => {
     await runAgent({
-      agent: { ...baseAgent, tools_config: { search_knowledge: true, search_faq: false } },
+      agent: { ...baseAgent, tools_config: { search_knowledge: true, search_faq: false, search_web: false } },
       messages: [],
       currentMessage,
       apiKey: "sk-test",
@@ -107,7 +107,7 @@ describe("runAgent", () => {
 
     expect(mockBuildToolsForAgent).toHaveBeenCalledWith(
       expect.objectContaining({
-        toolsConfig: { search_knowledge: true, search_faq: false },
+        toolsConfig: { search_knowledge: true, search_faq: false, search_web: false },
       })
     );
   });

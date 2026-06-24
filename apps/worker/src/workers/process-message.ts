@@ -444,6 +444,7 @@ export function startProcessMessageWorker() {
             organizationId,
             imageContent,
             conversationId,
+            contactName: (contact as { name?: string | null }).name ?? null,
           });
           responseContent = result.text;
           if (!responseContent?.trim()) {

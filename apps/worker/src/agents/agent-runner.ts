@@ -12,6 +12,7 @@ interface RunAgentParams {
   apiKey: string;
   organizationId: string;
   conversationId: string;
+  contactName?: string | null;
   imageContent?: { base64: string; mimeType: string };
 }
 
@@ -136,7 +137,7 @@ ou
 }
 
 export async function runAgent(params: RunAgentParams): Promise<RunAgentResult> {
-  const { agent, messages, currentMessage, apiKey, organizationId, conversationId, imageContent } = params;
+  const { agent, messages, currentMessage, apiKey, organizationId, conversationId, contactName, imageContent } = params;
 
   const startTime = Date.now();
   const useVisionFallback = !!imageContent && !isVisionCapable(agent.model);
@@ -167,7 +168,10 @@ export async function runAgent(params: RunAgentParams): Promise<RunAgentResult> 
   let totalTokens = 0;
   let allToolCalls: string[] = [];
   let lastText = "";
-  const effectiveBasePrompt = `${agent.system_prompt}\n\n${CLOSE_CONVERSATION_INSTRUCTION}\n\n${HUMAN_HANDOFF_INSTRUCTION}\n\n${SECURITY_INSTRUCTION}`;
+  const contactContext = contactName
+    ? `\n\n[CONTEXTO DO CONTATO]\nNome do lead: ${contactName}\nUse o nome do lead para personalizar sua saudação e respostas quando apropriado.`
+    : "";
+  const effectiveBasePrompt = `${agent.system_prompt}${contactContext}\n\n${CLOSE_CONVERSATION_INSTRUCTION}\n\n${HUMAN_HANDOFF_INSTRUCTION}\n\n${SECURITY_INSTRUCTION}`;
   let systemPrompt = effectiveBasePrompt;
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {

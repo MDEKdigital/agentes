@@ -1,8 +1,8 @@
-/**
- * C8 — Lost update: worker process-message vs humano
+﻿/**
+ * C8 â€” Lost update: worker process-message vs humano
  *
- * Worker termina após humano marcar "resolved" → não deve sobrescrever.
- * Solução: usar setConversationWaiting (WHERE status != 'resolved') em vez de
+ * Worker termina apÃ³s humano marcar "resolved" â†’ nÃ£o deve sobrescrever.
+ * SoluÃ§Ã£o: usar setConversationWaiting (WHERE status != 'resolved') em vez de
  * updateConversation incondicional quando wasResolved=false.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -97,7 +97,7 @@ const activeAgent = {
   temperature: 0.7,
   max_tokens: 1024,
   max_steps: 5,
-  tools_config: { search_knowledge: false, search_faq: false },
+  tools_config: { search_knowledge: false, search_faq: false, search_web: false },
   is_active: true,
   activation_rules: [],
 };
@@ -132,16 +132,16 @@ async function runJob() {
   await workerInstance._processor({ data: jobData });
 }
 
-// ── STATUS RACE ───────────────────────────────────────────────────────────────
+// â”€â”€ STATUS RACE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-describe("C8 — race condition worker vs humano (process-message)", () => {
+describe("C8 â€” race condition worker vs humano (process-message)", () => {
 
-  // 1. Worker usa setConversationWaiting (não updateConversation com status: "waiting")
+  // 1. Worker usa setConversationWaiting (nÃ£o updateConversation com status: "waiting")
   it("C8: caminho waiting usa setConversationWaiting (update condicional)", async () => {
     await runJob();
 
     // RED: current code calls updateConversation with status: "waiting"
-    // setConversationWaiting is never called → fails
+    // setConversationWaiting is never called â†’ fails
     expect(mockSetConversationWaiting).toHaveBeenCalledWith(
       expect.anything(),
       "conv-c8",
@@ -150,8 +150,8 @@ describe("C8 — race condition worker vs humano (process-message)", () => {
     );
   });
 
-  // 2. updateConversation NÃO é chamado com status: "waiting" (guard no DB evita overwrite)
-  it("C8: updateConversation NÃO é chamado com status 'waiting' (responsabilidade delegada ao helper)", async () => {
+  // 2. updateConversation NÃƒO Ã© chamado com status: "waiting" (guard no DB evita overwrite)
+  it("C8: updateConversation NÃƒO Ã© chamado com status 'waiting' (responsabilidade delegada ao helper)", async () => {
     await runJob();
 
     // RED: current code calls updateConversation({ status: "waiting" }) directly
@@ -163,8 +163,8 @@ describe("C8 — race condition worker vs humano (process-message)", () => {
     );
   });
 
-  // 3. setConversationWaiting retorna false (resolved) → sem regressão no audit
-  it("C8: se setConversationWaiting retorna false (conversa resolvida), audit resolved NÃO dispara por race", async () => {
+  // 3. setConversationWaiting retorna false (resolved) â†’ sem regressÃ£o no audit
+  it("C8: se setConversationWaiting retorna false (conversa resolvida), audit resolved NÃƒO dispara por race", async () => {
     mockSetConversationWaiting.mockResolvedValue(false); // 0 rows affected
     await runJob();
 
@@ -179,17 +179,17 @@ describe("C8 — race condition worker vs humano (process-message)", () => {
     expect(resolvedAuditCalls).toHaveLength(0);
   });
 
-  // 4. Caminho normal: não resolved → setConversationWaiting chamado, conversa vai para waiting
-  it("C8: conversa não resolved → setConversationWaiting chamado com sucesso (retorna true)", async () => {
+  // 4. Caminho normal: nÃ£o resolved â†’ setConversationWaiting chamado, conversa vai para waiting
+  it("C8: conversa nÃ£o resolved â†’ setConversationWaiting chamado com sucesso (retorna true)", async () => {
     mockSetConversationWaiting.mockResolvedValue(true);
     await runJob();
     expect(mockSetConversationWaiting).toHaveBeenCalledOnce();
   });
 
-  // 5. Caminho resolved: agent chamou close_conversation → updateConversation com "resolved" (inalterado)
-  it("regressão: caminho resolved → updateConversation chamado com status 'resolved'", async () => {
+  // 5. Caminho resolved: agent chamou close_conversation â†’ updateConversation com "resolved" (inalterado)
+  it("regressÃ£o: caminho resolved â†’ updateConversation chamado com status 'resolved'", async () => {
     mockRunAgent.mockResolvedValue({
-      text: "Até!",
+      text: "AtÃ©!",
       model: "gpt-4o-mini",
       tokensUsed: 10,
       latencyMs: 50,
@@ -198,7 +198,7 @@ describe("C8 — race condition worker vs humano (process-message)", () => {
 
     await runJob();
 
-    // This path is unchanged — updateConversation must still be called with "resolved"
+    // This path is unchanged â€” updateConversation must still be called with "resolved"
     expect(mockUpdateConversation).toHaveBeenCalledWith(
       expect.anything(),
       "conv-c8",
@@ -207,10 +207,10 @@ describe("C8 — race condition worker vs humano (process-message)", () => {
     );
   });
 
-  // 6. Caminho resolved: setConversationWaiting NÃO é chamado
-  it("regressão: caminho resolved → setConversationWaiting NÃO é chamado", async () => {
+  // 6. Caminho resolved: setConversationWaiting NÃƒO Ã© chamado
+  it("regressÃ£o: caminho resolved â†’ setConversationWaiting NÃƒO Ã© chamado", async () => {
     mockRunAgent.mockResolvedValue({
-      text: "Até!",
+      text: "AtÃ©!",
       model: "gpt-4o-mini",
       tokensUsed: 10,
       latencyMs: 50,
@@ -222,10 +222,10 @@ describe("C8 — race condition worker vs humano (process-message)", () => {
     expect(mockSetConversationWaiting).not.toHaveBeenCalled();
   });
 
-  // 7. Audit resolved dispara quando wasResolved=true (regressão)
-  it("regressão: audit conversation.resolved dispara quando agente resolve", async () => {
+  // 7. Audit resolved dispara quando wasResolved=true (regressÃ£o)
+  it("regressÃ£o: audit conversation.resolved dispara quando agente resolve", async () => {
     mockRunAgent.mockResolvedValue({
-      text: "Até!",
+      text: "AtÃ©!",
       model: "gpt-4o-mini",
       tokensUsed: 10,
       latencyMs: 50,
@@ -240,8 +240,8 @@ describe("C8 — race condition worker vs humano (process-message)", () => {
     );
   });
 
-  // 8. Fluxo nominal não quebrado: mensagem criada e enfileirada
-  it("regressão: caminho nominal continua criando mensagem e enfileirando send", async () => {
+  // 8. Fluxo nominal nÃ£o quebrado: mensagem criada e enfileirada
+  it("regressÃ£o: caminho nominal continua criando mensagem e enfileirando send", async () => {
     await runJob();
     expect(createMessage).toHaveBeenCalled();
   });
