@@ -17,13 +17,16 @@ export default async function plansRoute(app: FastifyInstance) {
       return reply.status(403).send({ error: "Acesso restrito a administradores." });
     }
 
-    // Forcibly send 503 if the query hasn't responded by HARD_TIMEOUT_MS.
-    // Calling reply.send() from a setTimeout callback sends the HTTP response
-    // even while the route handler's async function is still suspended on await.
+    // reply.hijack() + reply.raw.end() bypasses Fastify's async handler tracking
+    // entirely, writing directly to the HTTP socket. This works even when the
+    // route handler is suspended on an await that never resolves.
     const hardTimer = setTimeout(() => {
       if (!reply.sent) {
-        request.log.error("[billing/plans] hard timeout — forcing 503");
-        void reply.status(503).send({ error: "Serviço temporariamente indisponível." });
+        request.log.error("[billing/plans] hard timeout — forcing 503 via raw socket");
+        reply.hijack();
+        reply.raw.statusCode = 503;
+        reply.raw.setHeader("Content-Type", "application/json");
+        reply.raw.end(JSON.stringify({ error: "Serviço temporariamente indisponível." }));
       }
     }, HARD_TIMEOUT_MS);
 

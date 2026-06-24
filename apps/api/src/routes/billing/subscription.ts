@@ -22,11 +22,15 @@ export default async function subscriptionRoute(app: FastifyInstance) {
       return reply.status(403).send({ error: "Acesso restrito a administradores." });
     }
 
-    // Forcibly send 503 if the queries haven't all resolved by HARD_TIMEOUT_MS.
+    // reply.hijack() + reply.raw.end() bypasses Fastify's async handler tracking
+    // entirely, writing directly to the HTTP socket.
     const hardTimer = setTimeout(() => {
       if (!reply.sent) {
-        request.log.error("[billing/subscription] hard timeout — forcing 503");
-        void reply.status(503).send({ error: "Serviço temporariamente indisponível. Tente novamente em instantes." });
+        request.log.error("[billing/subscription] hard timeout — forcing 503 via raw socket");
+        reply.hijack();
+        reply.raw.statusCode = 503;
+        reply.raw.setHeader("Content-Type", "application/json");
+        reply.raw.end(JSON.stringify({ error: "Serviço temporariamente indisponível. Tente novamente em instantes." }));
       }
     }, HARD_TIMEOUT_MS);
 
