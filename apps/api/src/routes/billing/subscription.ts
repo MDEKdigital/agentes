@@ -1,11 +1,21 @@
 import type { FastifyInstance } from "fastify";
 import { getAdminClient } from "@aula-agente/database";
 import { authMiddleware, requireOrg } from "../../middleware/auth";
-import { withTimeout, QUERY_MS } from "../../lib/db-timeout";
 import type { Plan, Subscription, BillingEvent } from "@aula-agente/shared";
 
+const QUERY_MS  = 8_000;
 const EVENTS_MS = 5_000;
+
 type PlanLimits = Pick<Plan, "max_agents" | "max_members" | "max_instances">;
+
+// Creates a one-shot AbortSignal that fires after `ms` milliseconds.
+// Uses setTimeout so the timer is visible to the Node.js event loop
+// AND the fetch-level timeout in getAdminClient() acts as a safety net.
+function makeSignal(ms: number): [AbortSignal, () => void] {
+  const ctrl = new AbortController();
+  const id = setTimeout(() => ctrl.abort(), ms);
+  return [ctrl.signal, () => clearTimeout(id)];
+}
 
 export default async function subscriptionRoute(app: FastifyInstance) {
   app.addHook("preHandler", authMiddleware);
@@ -21,36 +31,43 @@ export default async function subscriptionRoute(app: FastifyInstance) {
 
     const db = getAdminClient();
 
-    // withTimeout usa Promise.race internamente: mesmo que o fetch do Supabase
-    // não honre AbortSignal, o timer rejeita a promise externa e o allSettled
-    // avança — a rota sempre responde dentro de QUERY_MS / EVENTS_MS.
+    // Each query gets its own AbortController so they can be cancelled
+    // independently. The fetch-level timeout in getAdminClient() (15 s) acts
+    // as a second safety net in case the socket stalls at a lower layer.
+    const [subSig,   clearSub]   = makeSignal(QUERY_MS);
+    const [agSig,    clearAg]    = makeSignal(QUERY_MS);
+    const [memSig,   clearMem]   = makeSignal(QUERY_MS);
+    const [instSig,  clearInst]  = makeSignal(QUERY_MS);
+    const [evSig,    clearEv]    = makeSignal(EVENTS_MS);
+
     const [subResult, agentsResult, membersResult, instancesResult, eventsResult] =
       await Promise.allSettled([
-        withTimeout(
-          db.from("subscriptions").select("*, plans(*)").eq("organization_id", orgId).maybeSingle(),
-          QUERY_MS, "subscriptions"
-        ),
-        withTimeout(
-          db.from("agents").select("*", { count: "exact", head: true }).eq("organization_id", orgId),
-          QUERY_MS, "agents-count"
-        ),
-        withTimeout(
-          db.from("organization_members").select("*", { count: "exact", head: true }).eq("organization_id", orgId),
-          QUERY_MS, "members-count"
-        ),
-        withTimeout(
-          db.from("evolution_instances").select("*", { count: "exact", head: true }).eq("organization_id", orgId),
-          QUERY_MS, "instances-count"
-        ),
-        withTimeout(
-          db.from("billing_events")
-            .select("id, gateway, event_type, status, created_at")
-            .eq("organization_id", orgId)
-            .order("created_at", { ascending: false })
-            .limit(50),
-          EVENTS_MS, "billing-events"
-        ),
+        db.from("subscriptions")
+          .select("*, plans(*)")
+          .eq("organization_id", orgId)
+          .abortSignal(subSig)
+          .maybeSingle(),
+        db.from("agents")
+          .select("*", { count: "exact", head: true })
+          .eq("organization_id", orgId)
+          .abortSignal(agSig),
+        db.from("organization_members")
+          .select("*", { count: "exact", head: true })
+          .eq("organization_id", orgId)
+          .abortSignal(memSig),
+        db.from("evolution_instances")
+          .select("*", { count: "exact", head: true })
+          .eq("organization_id", orgId)
+          .abortSignal(instSig),
+        db.from("billing_events")
+          .select("id, gateway, event_type, status, created_at")
+          .eq("organization_id", orgId)
+          .order("created_at", { ascending: false })
+          .limit(50)
+          .abortSignal(evSig),
       ]);
+
+    clearSub(); clearAg(); clearMem(); clearInst(); clearEv();
 
     // Subscription is the only critical query — fail fast if it timed out or errored
     if (subResult.status === "rejected") {

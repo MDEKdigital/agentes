@@ -2,20 +2,19 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import Fastify from "fastify";
 
 // ── hoisted mocks ─────────────────────────────────────────────────────────────
-const { mockGetAdminClient, mockGetActivePlans, mockAuthMiddleware } = vi.hoisted(() => ({
+const { mockGetAdminClient, mockAuthMiddleware, mockRequireOrg } = vi.hoisted(() => ({
   mockGetAdminClient: vi.fn(),
-  mockGetActivePlans: vi.fn(),
   mockAuthMiddleware: vi.fn(async () => {}),
+  mockRequireOrg: vi.fn(async () => {}),
 }));
 
 vi.mock("@aula-agente/database", () => ({
   getAdminClient: mockGetAdminClient,
-  getActivePlans: mockGetActivePlans,
 }));
 
 vi.mock("../../../middleware/auth", () => ({
   authMiddleware: mockAuthMiddleware,
-  requireOrg: vi.fn(async () => {}),
+  requireOrg: mockRequireOrg,
 }));
 
 import billingRoutes from "../index";
@@ -63,19 +62,33 @@ const mockPlans = [
   },
 ];
 
+function makePlansChain(result: { data: unknown; error: unknown }) {
+  const chain: Record<string, unknown> = {};
+  chain["select"]      = vi.fn().mockReturnValue(chain);
+  chain["eq"]          = vi.fn().mockReturnValue(chain);
+  chain["order"]       = vi.fn().mockReturnValue(chain);
+  chain["abortSignal"] = vi.fn().mockResolvedValue(result);
+  return chain;
+}
+
 // ── default mock state ────────────────────────────────────────────────────────
 
 beforeEach(() => {
   vi.clearAllMocks();
 
-  // Default auth: authenticated user
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (mockAuthMiddleware as any).mockImplementation(async (req: any) => {
     req.user = { id: "user-1", email: "u@test.com", memberships: [] };
   });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (mockRequireOrg as any).mockImplementation(async (req: any) => {
+    req.organizationId = "org-1";
+    req.userRole = "owner";
+  });
 
-  mockGetAdminClient.mockReturnValue({});
-  mockGetActivePlans.mockResolvedValue(mockPlans);
+  mockGetAdminClient.mockReturnValue({
+    from: vi.fn().mockReturnValue(makePlansChain({ data: mockPlans, error: null })),
+  });
 });
 
 // ── tests ─────────────────────────────────────────────────────────────────────
@@ -130,14 +143,12 @@ describe("GET /billing/plans", () => {
     expect(proPlan.max_members).toBe(10);
     expect(proPlan.price_monthly).toBe(9900);
     expect(proPlan.is_active).toBe(true);
-
-    // Verify getActivePlans was called with the db client
-    expect(mockGetActivePlans).toHaveBeenCalledOnce();
-    expect(mockGetActivePlans).toHaveBeenCalledWith(expect.anything());
   });
 
   it("cenário 3: erro no banco → retorna 500", async () => {
-    mockGetActivePlans.mockRejectedValue(new Error("db error"));
+    mockGetAdminClient.mockReturnValue({
+      from: vi.fn().mockReturnValue(makePlansChain({ data: null, error: new Error("db error") })),
+    });
 
     const app = await buildApp();
     const res = await app.inject({
@@ -148,5 +159,52 @@ describe("GET /billing/plans", () => {
 
     expect(res.statusCode).toBe(500);
     expect(JSON.parse(res.body).error).toMatch(/Failed to fetch plans/);
+  });
+
+  it("cenário 4: role agent → retorna 403 sem chamar o banco", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (mockRequireOrg as any).mockImplementation(async (req: any) => {
+      req.organizationId = "org-1";
+      req.userRole = "agent";
+    });
+
+    const mockFrom = vi.fn();
+    mockGetAdminClient.mockReturnValue({ from: mockFrom });
+
+    const app = await buildApp();
+    const res = await app.inject({
+      method: "GET",
+      url: "/billing/plans",
+      headers: { authorization: "Bearer token-x", "x-organization-id": "org-1" },
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(mockFrom).not.toHaveBeenCalled();
+  });
+
+  it("cenário 5: AbortError → retorna 503", async () => {
+    const abortErr = new Error("This operation was aborted");
+    abortErr.name = "AbortError";
+    mockGetAdminClient.mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            order: vi.fn().mockReturnValue({
+              abortSignal: vi.fn().mockRejectedValue(abortErr),
+            }),
+          }),
+        }),
+      }),
+    });
+
+    const app = await buildApp();
+    const res = await app.inject({
+      method: "GET",
+      url: "/billing/plans",
+      headers: { authorization: "Bearer token-x" },
+    });
+
+    expect(res.statusCode).toBe(503);
+    expect(JSON.parse(res.body).error).toMatch(/temporariamente indisponível/);
   });
 });

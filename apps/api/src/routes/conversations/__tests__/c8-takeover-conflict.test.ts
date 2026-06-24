@@ -28,6 +28,7 @@ vi.mock("@aula-agente/database", () => ({
   getAdminClient: mockGetAdminClient,
   createAuditLog: mockCreateAuditLog,
   activateHumanTakeover: mockActivateHumanTakeover,
+  cancelEnrollmentsByConversation: vi.fn().mockResolvedValue(undefined),
   // other helpers used by other routes in the same index.ts
   getConversationNotes: vi.fn(),
   addConversationNote: vi.fn(),

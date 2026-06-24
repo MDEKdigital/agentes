@@ -24,8 +24,22 @@ export function getAdminClient(): SupabaseClient {
 
   assertWebSocket();
 
+  // Every HTTP request made by the admin client gets a hard fetch-level
+  // timeout. setTimeout-based races don't cancel stuck sockets; wrapping
+  // the native fetch with AbortSignal.timeout does, because Node.js aborts
+  // the underlying TCP read at libuv level when the signal fires.
+  const FETCH_TIMEOUT_MS = 15_000;
+  const fetchWithTimeout = (input: RequestInfo | URL, init: RequestInit = {}) =>
+    fetch(input, {
+      ...init,
+      signal: init.signal
+        ? AbortSignal.any([init.signal, AbortSignal.timeout(FETCH_TIMEOUT_MS)])
+        : AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
+
   adminClient = createClient(url, serviceRoleKey, {
     auth: { autoRefreshToken: false, persistSession: false },
+    global: { fetch: fetchWithTimeout as typeof fetch },
   });
 
   return adminClient;

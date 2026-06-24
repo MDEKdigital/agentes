@@ -23,6 +23,7 @@ vi.mock("@aula-agente/database", () => ({
   getAdminClient: mockGetAdminClient,
   createAuditLog: mockCreateAuditLog,
   activateHumanTakeover: mockActivateHumanTakeover,
+  cancelEnrollmentsByConversation: vi.fn().mockResolvedValue(undefined),
   getConversationNotes: vi.fn(),
   addConversationNote: vi.fn(),
   updateConversationTags: vi.fn(),

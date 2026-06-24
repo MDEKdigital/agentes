@@ -1,7 +1,8 @@
 import type { FastifyInstance } from "fastify";
-import { getAdminClient, getActivePlans } from "@aula-agente/database";
+import type { Plan } from "@aula-agente/shared";
+import { getAdminClient } from "@aula-agente/database";
 import { authMiddleware, requireOrg } from "../../middleware/auth";
-import { withTimeout, TimeoutError, QUERY_MS } from "../../lib/db-timeout";
+import { QUERY_MS } from "../../lib/db-timeout";
 
 export default async function plansRoute(app: FastifyInstance) {
   app.addHook("preHandler", authMiddleware);
@@ -12,15 +13,26 @@ export default async function plansRoute(app: FastifyInstance) {
       return reply.status(403).send({ error: "Acesso restrito a administradores." });
     }
     const db = getAdminClient();
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), QUERY_MS);
     try {
-      const plans = await withTimeout(getActivePlans(db), QUERY_MS, "plans");
-      return reply.send(plans);
-    } catch (err) {
-      request.log.error({ err }, "Failed to fetch plans");
-      const isTimeout = err instanceof TimeoutError;
+      const { data, error } = await db
+        .from("plans")
+        .select("*")
+        .eq("is_active", true)
+        .order("sort_order")
+        .abortSignal(ctrl.signal);
+      if (error) throw error;
+      return reply.send(data as Plan[]);
+    } catch (err: unknown) {
+      const isAbort = err instanceof Error && err.name === "AbortError";
+      const isTimeout = isAbort || (err instanceof Error && err.message.includes("timeout"));
+      request.log.error({ err }, "[billing/plans] query failed");
       return reply
         .status(isTimeout ? 503 : 500)
         .send({ error: isTimeout ? "Serviço temporariamente indisponível." : "Failed to fetch plans" });
+    } finally {
+      clearTimeout(timer);
     }
   });
 }

@@ -35,7 +35,8 @@ function makeDataChain(data: unknown) {
   return chain;
 }
 
-/** Chain for count-style queries (.select('*', {count:'exact',head:true}).eq(...).abortSignal(...)) */
+/** Chain for count-style queries (.select('*', {count:'exact',head:true}).eq(...).abortSignal(...))
+ *  abortSignal() is the terminal method — it must be a thenable. */
 function makeCountChain(count: number | null, error: object | null = null) {
   const result = { count, data: null, error };
   const chain: Record<string, unknown> = {};
@@ -45,7 +46,8 @@ function makeCountChain(count: number | null, error: object | null = null) {
   return chain;
 }
 
-/** Chain for billing_events: ends with .limit() */
+/** Chain for billing_events: ends with .limit().abortSignal()
+ *  abortSignal() is the terminal method — it must be a thenable. */
 function makeEventsChain(events: unknown[]) {
   const result = { data: events, error: null };
   const chain: Record<string, unknown> = {};
@@ -199,22 +201,14 @@ describe("GET /billing/subscription", () => {
     expect(body.recentEvents[0].id).toBe("evt-1");
   });
 
-  it("cenário 4: role agent — não busca billing_events", async () => {
+  it("cenário 4: role agent — retorna 403 (acesso restrito a administradores)", async () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (mockRequireOrg as any).mockImplementation(async (req: any) => {
       req.organizationId = "org-1";
       req.userRole = "agent";
     });
 
-    const mockFrom = vi.fn((table: string) => {
-      if (table === "subscriptions")        return makeDataChain(null);
-      if (table === "agents")               return makeCountChain(1);
-      if (table === "organization_members") return makeCountChain(1);
-      if (table === "evolution_instances")  return makeCountChain(1);
-      if (table === "billing_events")       return makeEventsChain([{ id: "evt-secret" }]);
-      return makeDataChain(null);
-    });
-
+    const mockFrom = vi.fn();
     mockGetAdminClient.mockReturnValue({ from: mockFrom });
 
     const app = await buildApp();
@@ -224,9 +218,8 @@ describe("GET /billing/subscription", () => {
       headers: { authorization: "Bearer token-x", "x-organization-id": "org-1" },
     });
 
-    expect(res.statusCode).toBe(200);
-    expect(JSON.parse(res.body).recentEvents).toEqual([]);
-    expect(mockFrom).not.toHaveBeenCalledWith("billing_events");
+    expect(res.statusCode).toBe(403);
+    expect(mockFrom).not.toHaveBeenCalled(); // nenhuma query ao banco para agentes
   });
 
   it("cenário 5: subscription query falha — retorna 503", async () => {
