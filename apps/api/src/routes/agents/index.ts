@@ -84,9 +84,9 @@ export default async function agentRoutes(app: FastifyInstance) {
     async (request, reply) => {
       const { organizationId, agentId } = request.params;
       const membership = request.user.memberships.find(
-        (m) => m.organization_id === organizationId && m.role !== "agent"
+        (m) => m.organization_id === organizationId
       );
-      if (!membership) return reply.status(403).send({ error: "Acesso de administrador necessário" });
+      if (!membership) return reply.status(403).send({ error: "Acesso negado" });
 
       const db = getAdminClient();
       const existing = await getAgentById(db, agentId, organizationId);
@@ -127,9 +127,9 @@ export default async function agentRoutes(app: FastifyInstance) {
     async (request, reply) => {
       const { organizationId, agentId } = request.params;
       const membership = request.user.memberships.find(
-        (m) => m.organization_id === organizationId && m.role !== "agent"
+        (m) => m.organization_id === organizationId
       );
-      if (!membership) return reply.status(403).send({ error: "Acesso de administrador necessário" });
+      if (!membership) return reply.status(403).send({ error: "Acesso negado" });
 
       const db = getAdminClient();
       const existing = await getAgentById(db, agentId, organizationId);
