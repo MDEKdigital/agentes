@@ -1,6 +1,7 @@
 // Salomão — Consultor Oficial de Prompts
-// Agente de validação interno. Audita respostas geradas por outros agentes
-// antes do envio ao cliente. Nunca fala diretamente com o usuário final.
+// Dois papéis:
+//   1. validateResponse  — audita respostas do agente antes do envio (usado em agent-runner.ts)
+//   2. salomaoDecisor    — classifica o lead e decide como o agente deve se comportar
 
 import { generateText } from "ai";
 import type { LLMProvider } from "@aula-agente/shared";
@@ -10,14 +11,18 @@ import { withTimeout, VALIDATION_TIMEOUT_MS } from "../lib/with-timeout";
 // UUID fixo que identifica o Salomão como agente de sistema
 export const SALOMAO_ID = "00000000-0000-0000-0000-000000534c4d";
 
-// Modelos rápidos usados pelo Salomão — só precisa classificar, não gerar
+// Modelos rápidos — só classificam, não geram texto longo
 export const VALIDATION_MODELS: Record<LLMProvider, string> = {
   openai: "gpt-4.1-mini",
   anthropic: "claude-haiku-4-20250414",
   google: "gemini-2.0-flash",
 };
 
-export const SALOMAO_IDENTITY = `Você é Salomão, Consultor Oficial de Prompts do Projeto Agentes.
+// ─────────────────────────────────────────────
+// PAPEL 1: Auditor de conformidade
+// ─────────────────────────────────────────────
+
+const SALOMAO_IDENTITY = `Você é Salomão, Consultor Oficial de Prompts do Projeto Agentes.
 Sua função é auditar e validar respostas geradas por outros agentes, garantindo conformidade com as regras do sistema.
 
 REGRAS DE SEGURANÇA
@@ -86,5 +91,68 @@ ou
   } catch {
     // Em caso de falha na validação, aprova para não bloquear o atendimento
     return { compliant: true };
+  }
+}
+
+// ─────────────────────────────────────────────
+// PAPEL 2: Decisor de lead
+// ─────────────────────────────────────────────
+
+export type LeadType = "frio" | "morno" | "quente";
+export type LeadStage = "inicio" | "desenvolvimento" | "travado" | "decisao";
+export type LeadObjective = "qualificar" | "diagnosticar" | "avançar" | "fechar";
+export type LeadBehavior = "curto" | "medio" | "direto" | "consultivo";
+export type LeadFlow = "lead-frio" | "lead-morno" | "lead-quente" | "objecao" | "follow-up";
+
+export interface LeadDecision {
+  lead_type: LeadType;
+  stage: LeadStage;
+  objective: LeadObjective;
+  behavior: LeadBehavior;
+  flow: LeadFlow;
+}
+
+const DECISOR_SYSTEM = `Você é SALOMÃO DECISOR.
+
+Sua função é analisar a mensagem do lead e decidir como o agente deve responder.
+
+Responda APENAS em JSON válido.
+
+Classifique:
+
+- lead_type: frio | morno | quente
+- stage: inicio | desenvolvimento | travado | decisao
+- objective: qualificar | diagnosticar | avançar | fechar
+- behavior: curto | medio | direto | consultivo
+- flow: lead-frio | lead-morno | lead-quente | objecao | follow-up
+
+Regras:
+
+- Nunca explique
+- Nunca escreva texto fora do JSON
+- Seja objetivo`;
+
+export async function salomaoDecisor(
+  message: string,
+  apiKey: string
+): Promise<LeadDecision | null> {
+  const model = createModel("openai", VALIDATION_MODELS.openai, apiKey);
+
+  try {
+    const result = await withTimeout(
+      generateText({
+        model,
+        system: DECISOR_SYSTEM,
+        messages: [{ role: "user", content: message }],
+        maxTokens: 150,
+        temperature: 0,
+      }),
+      VALIDATION_TIMEOUT_MS
+    );
+
+    return JSON.parse(result.text.trim()) as LeadDecision;
+  } catch (e) {
+    console.error("[salomaoDecisor] erro parse:", e);
+    return null;
   }
 }
