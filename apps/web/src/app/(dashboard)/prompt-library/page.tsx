@@ -416,7 +416,7 @@ export default function PromptLibraryPage() {
         </div>
         <Button onClick={() => setStudioOpen(true)}>
           <Sparkles className="h-4 w-4 mr-2" />
-          Criar com Salomão
+          Crie seu Prompt
         </Button>
       </div>
 
