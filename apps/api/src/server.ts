@@ -63,6 +63,7 @@ import membersRoutes from "./routes/members/index";
 import contactRoutes from "./routes/contacts/index";
 import productRoutes from "./routes/products/index";
 import promptStudioRoutes from "./routes/prompt-studio/index";
+import { runMigrations } from "./lib/migrate";
 
 const server = Fastify({ logger: true });
 
@@ -161,6 +162,7 @@ server.register(promptStudioRoutes);
 
 // Start
 const start = async () => {
+  await runMigrations();
   const port = parseInt(process.env.API_PORT || "3001", 10);
   await server.listen({ port, host: "0.0.0.0" });
   server.log.info(`API server running on port ${port}`);
