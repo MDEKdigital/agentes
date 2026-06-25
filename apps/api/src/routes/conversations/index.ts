@@ -408,6 +408,51 @@ export default async function conversationRoutes(app: FastifyInstance) {
     }
   );
 
+  app.patch<{ Params: { conversationId: string } }>(
+    "/conversations/:conversationId/block",
+    async (request, reply) => {
+      const { conversationId } = request.params;
+      const body = request.body as Record<string, unknown> | null | undefined;
+
+      if (typeof body?.blocked !== "boolean") {
+        return reply.status(400).send({ error: "Campo 'blocked' (boolean) é obrigatório." });
+      }
+      const blocked = body.blocked as boolean;
+
+      const db = getAdminClient();
+      const { data: conv } = await db
+        .from("conversations")
+        .select("organization_id")
+        .eq("id", conversationId)
+        .single();
+
+      if (!conv) return reply.status(404).send({ error: "Conversa não encontrada" });
+
+      const membership = request.user.memberships.find(
+        (m) => m.organization_id === conv.organization_id
+      );
+      if (!membership) return reply.status(403).send({ error: "Acesso negado" });
+
+      const { error } = await db
+        .from("conversations")
+        .update({ is_blocked: blocked })
+        .eq("id", conversationId)
+        .eq("organization_id", conv.organization_id);
+
+      if (error) return reply.status(500).send({ error: "Falha ao atualizar bloqueio da conversa" });
+
+      fireAudit(db, {
+        organization_id: conv.organization_id,
+        user_id: request.user.id,
+        action: blocked ? "conversation.blocked" : "conversation.unblocked",
+        entity_type: "conversation",
+        entity_id: conversationId,
+      }, request.log);
+
+      return reply.status(204).send();
+    }
+  );
+
   app.delete<{ Params: { conversationId: string } }>(
     "/conversations/:conversationId",
     async (request, reply) => {
