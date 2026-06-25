@@ -378,7 +378,8 @@ function SalomaoStudio({ onClose, onSaved }: { onClose: () => void; onSaved: (p:
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function PromptLibraryPage() {
   const router = useRouter();
-  const { currentOrg } = useOrganization();
+  const { currentOrg, currentRole } = useOrganization();
+  const isAdmin = currentRole === "owner" || currentRole === "admin";
   const { savedPrompts, loading, deletePrompt } = usePromptStudio(currentOrg?.id);
 
   const [search, setSearch] = useState("");
@@ -496,9 +497,11 @@ export default function PromptLibraryPage() {
                     <Button variant="outline" size="sm" onClick={() => setEditPrompt(p)}>
                       <Edit2 className="h-3.5 w-3.5" />
                     </Button>
-                    <Button variant="outline" size="sm" className="text-destructive hover:text-destructive" onClick={() => setDeleteConfirm(p.id)}>
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
+                    {isAdmin && (
+                      <Button variant="outline" size="sm" className="text-destructive hover:text-destructive" onClick={() => setDeleteConfirm(p.id)}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
                   </div>
                 </div>
               ))}

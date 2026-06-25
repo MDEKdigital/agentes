@@ -213,6 +213,9 @@ export default async function promptStudioRoutes(app: FastifyInstance) {
       const { organizationId, promptId } = request.params;
       const membership = request.user.memberships.find((m) => m.organization_id === organizationId);
       if (!membership) return reply.status(403).send({ error: "Acesso negado" });
+      if (membership.role !== "owner" && membership.role !== "admin") {
+        return reply.status(403).send({ error: "Apenas administradores podem excluir prompts." });
+      }
 
       const db = getAdminClient();
       const { error } = await db
