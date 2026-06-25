@@ -14,6 +14,7 @@ export interface Conversation {
   last_message_at: string;
   is_keyword_activated: boolean;
   awaiting_activation_confirmation: boolean;
+  is_blocked: boolean;
   created_at: string;
   updated_at: string;
 }
