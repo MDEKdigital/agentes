@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useOrganization } from "@/providers/organization-provider";
 import { apiFetch } from "@/lib/api";
-import { UserCircle, Phone, MessageSquare, Search } from "lucide-react";
+import { UserCircle, Phone, MessageSquare, Search, Trash2 } from "lucide-react";
 
 interface Conversation {
   id: string;
@@ -46,6 +46,8 @@ export default function LeadsPage() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState<Lead | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (!currentOrg) return;
@@ -55,6 +57,22 @@ export default function LeadsPage() {
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [currentOrg]);
+
+  const handleDeleteConfirm = async () => {
+    if (!currentOrg || !confirmDelete) return;
+    setDeleting(true);
+    try {
+      await apiFetch(`/organizations/${currentOrg.id}/contacts/${confirmDelete.id}`, {
+        method: "DELETE",
+      });
+      setLeads((prev) => prev.filter((l) => l.id !== confirmDelete.id));
+      setConfirmDelete(null);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Erro ao apagar lead");
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const filtered = leads.filter((l) => {
     const q = search.toLowerCase();
@@ -131,6 +149,9 @@ export default function LeadsPage() {
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
                     Última atividade
                   </th>
+                  <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    Ações
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -183,6 +204,15 @@ export default function LeadsPage() {
                       <td className="px-4 py-3 text-muted-foreground">
                         {lastConv ? formatDate(lastConv.updated_at) : "—"}
                       </td>
+                      <td className="px-4 py-3 text-center">
+                        <button
+                          onClick={() => setConfirmDelete(lead)}
+                          className="inline-flex items-center justify-center rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+                          title="Apagar lead"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </td>
                     </tr>
                   );
                 })}
@@ -191,6 +221,46 @@ export default function LeadsPage() {
           </div>
         )}
       </div>
+
+      {/* Confirmation dialog */}
+      {confirmDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="mx-4 w-full max-w-sm rounded-xl border border-border bg-card p-6 shadow-xl">
+            <h2 className="text-base font-semibold text-foreground">Apagar lead?</h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Você está prestes a excluir{" "}
+              <span className="font-medium text-foreground">
+                {confirmDelete.name || formatPhone(confirmDelete.phone)}
+              </span>
+              . Isso vai apagar permanentemente o contato,{" "}
+              <span className="font-medium text-foreground">
+                {confirmDelete.conversations.length}{" "}
+                {confirmDelete.conversations.length === 1 ? "conversa" : "conversas"}
+              </span>{" "}
+              e todas as mensagens associadas.
+            </p>
+            <p className="mt-2 text-xs font-medium text-destructive">
+              Esta ação não pode ser desfeita.
+            </p>
+            <div className="mt-5 flex gap-3">
+              <button
+                onClick={() => setConfirmDelete(null)}
+                disabled={deleting}
+                className="flex-1 rounded-md border border-border px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-accent disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleDeleteConfirm}
+                disabled={deleting}
+                className="flex-1 rounded-md bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50"
+              >
+                {deleting ? "Apagando..." : "Sim, excluir tudo"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
