@@ -28,7 +28,13 @@ export function TakeoverBar({
   organizationId,
   onUpdate,
 }: TakeoverBarProps) {
-  const [members, setMembers] = useState<Array<{ user_id: string; role: string }>>([]);
+  const [members, setMembers] = useState<Array<{ user_id: string; email: string; role: string }>>([]);
+
+  const roleLabel: Record<string, string> = {
+    owner: "Gerente",
+    admin: "Supervisor",
+    agent: "Atendente",
+  };
 
   useEffect(() => {
     apiFetch(`/organizations/${organizationId}/members`)
@@ -100,7 +106,7 @@ export function TakeoverBar({
           <SelectItem value="none">Ninguém</SelectItem>
           {members.map((m) => (
             <SelectItem key={m.user_id} value={m.user_id}>
-              {m.user_id.slice(0, 8)}... ({m.role})
+              {m.email} · {roleLabel[m.role] ?? m.role}
             </SelectItem>
           ))}
         </SelectContent>
