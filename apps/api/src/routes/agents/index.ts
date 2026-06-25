@@ -1,5 +1,8 @@
 import type { FastifyInstance } from "fastify";
 import { getAdminClient, createAgent, checkResourceLimit, getAgentsByOrganization, getAgentById, updateAgent, deleteAgent, resetAgentConversationsKeywordActivation } from "@aula-agente/database";
+
+const SALOMAO_ID = "00000000-0000-0000-0000-000000534c4d";
+const MDEK_ORG_ID = "c2b5fbb9-81a9-4712-94a4-bcb6e4942127";
 import { createAgentSchema, updateAgentSchema } from "@aula-agente/shared";
 import { authMiddleware } from "../../middleware/auth";
 import { fireAudit } from "../../lib/audit";
@@ -61,7 +64,11 @@ export default async function agentRoutes(app: FastifyInstance) {
 
       const db = getAdminClient();
       const agents = await getAgentsByOrganization(db, organizationId);
-      return reply.send({ agents });
+      // Salomão is a system-level agent — visible only to Mdek Digital (admin org)
+      const filtered = organizationId === MDEK_ORG_ID
+        ? agents
+        : agents.filter((a) => a.id !== SALOMAO_ID);
+      return reply.send({ agents: filtered });
     }
   );
 
