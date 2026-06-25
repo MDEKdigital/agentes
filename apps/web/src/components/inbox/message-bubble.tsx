@@ -1,5 +1,65 @@
+"use client";
+
+import { useRef, useState } from "react";
+import { Play, Pause } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Message } from "@aula-agente/shared";
+
+function AudioPlayer({ src }: { src: string }) {
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const [playing, setPlaying] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [duration, setDuration] = useState(0);
+
+  const toggle = () => {
+    const a = audioRef.current;
+    if (!a) return;
+    if (playing) { a.pause(); } else { a.play(); }
+    setPlaying(!playing);
+  };
+
+  const fmt = (s: number) => {
+    const m = Math.floor(s / 60);
+    const sec = Math.floor(s % 60);
+    return `${m}:${sec.toString().padStart(2, "0")}`;
+  };
+
+  return (
+    <div className="flex items-center gap-2 w-[220px]">
+      <audio
+        ref={audioRef}
+        src={src}
+        preload="metadata"
+        onLoadedMetadata={() => setDuration(audioRef.current?.duration ?? 0)}
+        onTimeUpdate={() => {
+          const a = audioRef.current;
+          if (a && a.duration) setProgress(a.currentTime / a.duration);
+        }}
+        onEnded={() => { setPlaying(false); setProgress(0); if (audioRef.current) audioRef.current.currentTime = 0; }}
+      />
+      <button
+        onClick={toggle}
+        className="flex-shrink-0 flex h-8 w-8 items-center justify-center rounded-full bg-primary/20 hover:bg-primary/30 transition-colors"
+      >
+        {playing ? <Pause className="h-3.5 w-3.5 text-blue-electric-300" /> : <Play className="h-3.5 w-3.5 text-blue-electric-300 ml-0.5" />}
+      </button>
+      <div className="flex-1 space-y-1">
+        <div
+          className="relative h-1.5 w-full rounded-full bg-muted cursor-pointer"
+          onClick={(e) => {
+            const rect = e.currentTarget.getBoundingClientRect();
+            const ratio = (e.clientX - rect.left) / rect.width;
+            const a = audioRef.current;
+            if (a && a.duration) { a.currentTime = ratio * a.duration; setProgress(ratio); }
+          }}
+        >
+          <div className="h-full rounded-full bg-blue-electric-400 transition-all" style={{ width: `${progress * 100}%` }} />
+        </div>
+        <p className="text-[10px] text-muted-foreground">{fmt(progress * duration)} / {fmt(duration)}</p>
+      </div>
+    </div>
+  );
+}
 
 interface MessageBubbleProps {
   message: Message;
@@ -45,12 +105,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
         )}
 
         {message.media_type === "audio" && message.media_url ? (
-          <audio
-            controls
-            src={message.media_url}
-            className="w-full max-w-[260px] h-8"
-            preload="metadata"
-          />
+          <AudioPlayer src={message.media_url} />
         ) : null}
 
         {message.media_type === "image" && message.media_url ? (
