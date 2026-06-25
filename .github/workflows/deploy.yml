@@ -1,0 +1,27 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Trigger Easypanel deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy API
+        run: |
+          curl -s -o /dev/null -w "%{http_code}" -X POST "${{ secrets.EASYPANEL_WEBHOOK_API }}" \
+            -H "Content-Type: application/json" | grep -q "^2" && echo "API: OK" || echo "API: FALHOU"
+
+      - name: Deploy Web
+        run: |
+          curl -s -o /dev/null -w "%{http_code}" -X POST "${{ secrets.EASYPANEL_WEBHOOK_WEB }}" \
+            -H "Content-Type: application/json" | grep -q "^2" && echo "Web: OK" || echo "Web: FALHOU"
+
+      - name: Deploy Worker
+        run: |
+          curl -s -o /dev/null -w "%{http_code}" -X POST "${{ secrets.EASYPANEL_WEBHOOK_WORKER }}" \
+            -H "Content-Type: application/json" | grep -q "^2" && echo "Worker: OK" || echo "Worker: FALHOU"
