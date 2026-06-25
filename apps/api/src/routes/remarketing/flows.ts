@@ -129,12 +129,24 @@ export default async function remarketingFlowRoutes(app: FastifyInstance) {
     if (!flow) return reply.status(404).send({ error: "Fluxo não encontrado" });
 
     const { name, product_campaign, agent_id, instance_id, entry_silence_minutes,
-            cancel_on_reply, cancel_on_resolved, cancel_on_opt_out, system_prompt } = request.body;
+            cancel_on_reply, cancel_on_resolved, cancel_on_opt_out, system_prompt, status } = request.body as {
+      name?: string; product_campaign?: string; agent_id?: string; instance_id?: string;
+      entry_silence_minutes?: number; cancel_on_reply?: boolean; cancel_on_resolved?: boolean;
+      cancel_on_opt_out?: boolean; system_prompt?: string; status?: "active" | "inactive";
+    };
     const updates = Object.fromEntries(
       Object.entries({ name, product_campaign, agent_id, instance_id, entry_silence_minutes,
-                       cancel_on_reply, cancel_on_resolved, cancel_on_opt_out, system_prompt })
+                       cancel_on_reply, cancel_on_resolved, cancel_on_opt_out, system_prompt, status })
         .filter(([, v]) => v !== undefined)
     );
+
+    if (updates.status === "inactive") {
+      await db
+        .from("remarketing_enrollments")
+        .update({ status: "cancelled", cancel_reason: "flow_deactivated" })
+        .eq("flow_id", request.params.id)
+        .eq("status", "active");
+    }
 
     if (updates.agent_id) {
       const { data: agent } = await db.from("agents").select("id")

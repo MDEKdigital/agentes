@@ -30,15 +30,24 @@ export function FlowList({ flows, onRefresh, apiUrl, orgId }: FlowListProps) {
 
   async function handleToggleStatus(flow: RemarketingFlow) {
     setLoadingId(flow.id);
-    const headers = await getAuthHeaders();
-    const newStatus = flow.status === "active" ? "inactive" : "active";
-    await fetch(`${apiUrl}/remarketing/flows/${flow.id}/status`, {
-      method: "PATCH",
-      headers,
-      body: JSON.stringify({ status: newStatus }),
-    });
-    onRefresh();
-    setLoadingId(null);
+    try {
+      const headers = await getAuthHeaders();
+      const newStatus = flow.status === "active" ? "inactive" : "active";
+      const res = await fetch(`${apiUrl}/remarketing/flows/${flow.id}/status`, {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ status: newStatus }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        alert(body.error || "Erro ao atualizar status do fluxo");
+      }
+    } catch {
+      alert("Erro ao conectar com o servidor");
+    } finally {
+      onRefresh();
+      setLoadingId(null);
+    }
   }
 
   async function handleDuplicate(flow: RemarketingFlow) {

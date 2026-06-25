@@ -119,7 +119,7 @@ export default function FlowEditPage() {
       router.push("/remarketing");
     } catch (err) {
       console.error("Erro ao salvar:", err);
-      alert("Erro ao salvar o fluxo. Verifique os campos e tente novamente.");
+      alert(err instanceof Error ? err.message : "Erro ao salvar o fluxo. Verifique os campos e tente novamente.");
     } finally {
       setSaving(false);
     }
