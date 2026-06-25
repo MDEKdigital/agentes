@@ -35,6 +35,12 @@ const roleBadge: Record<string, string> = {
   agent: "bg-muted text-muted-foreground border border-border",
 };
 
+const roleLabel: Record<string, string> = {
+  owner: "Gerente",
+  admin: "Supervisor",
+  agent: "Atendente",
+};
+
 export function MembersList({ members, currentUserId, currentUserRole, orgId, onRefresh }: MembersListProps) {
   const canManage = currentUserRole === "owner" || currentUserRole === "admin";
 
@@ -92,8 +98,8 @@ export function MembersList({ members, currentUserId, currentUserRole, orgId, on
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="admin">Admin</SelectItem>
-                      <SelectItem value="agent">Agente</SelectItem>
+                      <SelectItem value="admin">Supervisor</SelectItem>
+                      <SelectItem value="agent">Atendente</SelectItem>
                     </SelectContent>
                   </Select>
                   {currentUserRole === "owner" && (
@@ -113,7 +119,7 @@ export function MembersList({ members, currentUserId, currentUserRole, orgId, on
                   "rounded-md px-2 py-0.5 text-[11px] font-medium capitalize",
                   roleBadge[member.role] ?? roleBadge.agent
                 )}>
-                  {member.role}
+                  {roleLabel[member.role] ?? member.role}
                 </span>
               )}
             </div>

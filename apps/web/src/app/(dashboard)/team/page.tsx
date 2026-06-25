@@ -28,6 +28,12 @@ const roleBadge: Record<string, string> = {
   agent: "bg-muted text-muted-foreground border border-border",
 };
 
+const roleLabel: Record<string, string> = {
+  owner: "Gerente",
+  admin: "Supervisor",
+  agent: "Atendente",
+};
+
 export default function TeamPage() {
   const { currentOrg } = useOrganization();
   const [members, setMembers] = useState<Member[]>([]);
@@ -147,8 +153,8 @@ export default function TeamPage() {
                     </div>
                   </div>
                 </div>
-                <span className={`rounded-md px-2 py-0.5 text-[11px] font-medium capitalize ${roleBadge[inv.role] ?? roleBadge.agent}`}>
-                  {inv.role}
+                <span className={`rounded-md px-2 py-0.5 text-[11px] font-medium ${roleBadge[inv.role] ?? roleBadge.agent}`}>
+                  {roleLabel[inv.role] ?? inv.role}
                 </span>
               </div>
             ))}

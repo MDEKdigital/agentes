@@ -89,8 +89,8 @@ export function InviteDialog({ onInvited }: InviteDialogProps) {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="admin">Admin</SelectItem>
-                <SelectItem value="agent">Agente</SelectItem>
+                <SelectItem value="admin">Supervisor</SelectItem>
+                <SelectItem value="agent">Atendente</SelectItem>
               </SelectContent>
             </Select>
           </div>
