@@ -322,6 +322,10 @@ export function startProcessMessageWorker() {
           console.log(`Conversation ${conversationId} is in human takeover, skipping`);
           return;
         }
+        if ((conversation as { is_blocked?: boolean }).is_blocked) {
+          console.log(`Conversation ${conversationId} is blocked, skipping agent`);
+          return;
+        }
         if ((conversation as { status?: string }).status === "resolved") {
           console.log(`Conversation ${conversationId} already resolved, skipping retry`);
           return;
