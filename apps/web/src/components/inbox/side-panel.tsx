@@ -11,7 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { apiFetch } from "@/lib/api";
-import { Phone, User, Trash2 } from "lucide-react";
+import { Phone, User, Trash2, Ban, CheckCircle2 } from "lucide-react";
 import type { ConversationStatus } from "@aula-agente/shared";
 
 interface SidePanelProps {
@@ -20,6 +20,7 @@ interface SidePanelProps {
     organization_id: string;
     status: ConversationStatus;
     is_human_takeover: boolean;
+    is_blocked: boolean;
     assigned_to: string | null;
     tags: string[];
     contacts: { phone: string; name: string | null };
@@ -49,6 +50,19 @@ export function SidePanel({ conversation, onUpdate, onDelete }: SidePanelProps) 
     }
   };
 
+  const handleToggleBlock = async () => {
+    const newBlocked = !conversation.is_blocked;
+    try {
+      await apiFetch(`/conversations/${conversation.id}/block`, {
+        method: "PATCH",
+        body: JSON.stringify({ blocked: newBlocked }),
+      });
+      onUpdate();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Erro ao atualizar bloqueio");
+    }
+  };
+
   return (
     <div className="flex w-[280px] shrink-0 flex-col overflow-y-auto border-l border-border bg-card">
       {/* Contato */}
@@ -75,6 +89,12 @@ export function SidePanel({ conversation, onUpdate, onDelete }: SidePanelProps) 
       {/* Status */}
       <div className="border-b border-border p-4">
         <SectionHeader>Status</SectionHeader>
+        {conversation.is_blocked && (
+          <div className="mb-2 flex items-center gap-1.5 rounded-md bg-destructive/10 px-2 py-1">
+            <Ban className="h-3 w-3 text-destructive" />
+            <span className="text-[11px] font-medium text-destructive">Conversa bloqueada</span>
+          </div>
+        )}
         <Select value={conversation.status} onValueChange={handleStatusChange}>
           <SelectTrigger className="h-8 text-xs bg-muted border-border">
             <SelectValue />
@@ -119,8 +139,28 @@ export function SidePanel({ conversation, onUpdate, onDelete }: SidePanelProps) 
         />
       </div>
 
-      {/* Apagar conversa */}
-      <div className="p-4 mt-auto">
+      {/* Ações */}
+      <div className="mt-auto flex flex-col gap-2 p-4">
+        <button
+          onClick={handleToggleBlock}
+          className={`flex w-full items-center justify-center gap-2 rounded-md border px-3 py-2 text-xs font-medium transition-colors ${
+            conversation.is_blocked
+              ? "border-amber-500/30 text-amber-500 hover:bg-amber-500/10"
+              : "border-destructive/30 text-destructive hover:bg-destructive/10"
+          }`}
+        >
+          {conversation.is_blocked ? (
+            <>
+              <CheckCircle2 className="h-3.5 w-3.5" />
+              Desbloquear conversa
+            </>
+          ) : (
+            <>
+              <Ban className="h-3.5 w-3.5" />
+              Bloquear conversa
+            </>
+          )}
+        </button>
         <button
           onClick={onDelete}
           className="flex w-full items-center justify-center gap-2 rounded-md border border-destructive/30 px-3 py-2 text-xs font-medium text-destructive hover:bg-destructive/10 transition-colors"
