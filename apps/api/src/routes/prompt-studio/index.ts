@@ -104,7 +104,7 @@ export default async function promptStudioRoutes(app: FastifyInstance) {
       if (!membership) return reply.status(403).send({ error: "Acesso negado" });
 
       const { messages } = request.body as { messages: { role: string; content: string }[] };
-      if (!messages?.length) return reply.status(400).send({ error: "Mensagens obrigatórias" });
+      if (!Array.isArray(messages)) return reply.status(400).send({ error: "Mensagens obrigatórias" });
 
       const apiKey = await resolveOrgOpenAIKey(organizationId);
 

@@ -380,7 +380,7 @@ export default function PromptLibraryPage() {
   const router = useRouter();
   const { currentOrg, currentRole } = useOrganization();
   const isAdmin = currentRole === "owner" || currentRole === "admin";
-  const { savedPrompts, loading, deletePrompt } = usePromptStudio(currentOrg?.id);
+  const { savedPrompts, loading, deletePrompt, updatePrompt } = usePromptStudio(currentOrg?.id);
 
   const [search, setSearch] = useState("");
   const [niche, setNiche] = useState("Todos");
@@ -557,7 +557,7 @@ export default function PromptLibraryPage() {
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setEditPrompt(null)}>Cancelar</Button>
-              <Button onClick={async () => { /* updatePrompt handled in hook */ setEditPrompt(null); }}>Salvar</Button>
+              <Button onClick={async () => { if (editPrompt) { await updatePrompt(editPrompt.id, { name: editPrompt.name, niche: editPrompt.niche, content: editPrompt.content }); } setEditPrompt(null); }}>Salvar</Button>
             </DialogFooter>
           </DialogContent>
         )}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useOrganization } from "@/providers/organization-provider";
 import { apiFetch } from "@/lib/api";
@@ -32,27 +32,34 @@ export default function FlowEditPage() {
   const [agents, setAgents] = useState<{ id: string; name: string }[]>([]);
   const [instances, setInstances] = useState<{ id: string; instance_name: string }[]>([]);
   const [loading, setLoading] = useState(!isNew);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!currentOrg) return;
 
     const load = async () => {
-      const [agData, instData] = await Promise.all([
-        apiFetch(`/organizations/${currentOrg.id}/agents`),
-        apiFetch(`/organizations/${currentOrg.id}/instances`),
-      ]);
-      setAgents(((agData as { agents: { id: string; name: string }[] })?.agents) ?? []);
-      setInstances((instData as { id: string; instance_name: string }[]) ?? []);
-
-      if (!isNew) {
-        const [allFlows, stepsData] = await Promise.all([
-          apiFetch(`/remarketing/flows`),
-          apiFetch(`/remarketing/flows/${params.flowId}/steps`),
+      try {
+        const [agData, instData] = await Promise.all([
+          apiFetch(`/organizations/${currentOrg.id}/agents`),
+          apiFetch(`/organizations/${currentOrg.id}/instances`),
         ]);
-        const flow = (allFlows as RemarketingFlow[] | null)?.find((f) => f.id === params.flowId);
-        if (flow) setFlowData(flow);
-        setSteps(((stepsData as RemarketingStep[] | null) ?? []).map((s) => ({ ...s, _tempId: s.id })));
+        setAgents(((agData as { agents: { id: string; name: string }[] })?.agents) ?? []);
+        setInstances((instData as { id: string; instance_name: string }[]) ?? []);
+
+        if (!isNew) {
+          const orgHeader = { headers: { "x-organization-id": currentOrg.id } };
+          const [allFlows, stepsData] = await Promise.all([
+            apiFetch(`/remarketing/flows`, orgHeader),
+            apiFetch(`/remarketing/flows/${params.flowId}/steps`, orgHeader),
+          ]);
+          const flow = (allFlows as RemarketingFlow[] | null)?.find((f) => f.id === params.flowId);
+          if (flow) setFlowData(flow);
+          setSteps(((stepsData as RemarketingStep[] | null) ?? []).map((s) => ({ ...s, _tempId: s.id })));
+        }
+      } catch (err) {
+        setLoadError(err instanceof Error ? err.message : "Erro ao carregar fluxo");
+      } finally {
         setLoading(false);
       }
     };
@@ -66,26 +73,29 @@ export default function FlowEditPage() {
 
     try {
       let flowId = params.flowId;
+      const orgHeader = { "x-organization-id": currentOrg.id };
 
       if (isNew) {
         const created = await apiFetch(`/remarketing/flows`, {
           method: "POST",
+          headers: orgHeader,
           body: JSON.stringify(flowData),
         }) as { id: string };
         flowId = created.id;
       } else {
         await apiFetch(`/remarketing/flows/${flowId}`, {
           method: "PUT",
+          headers: orgHeader,
           body: JSON.stringify(flowData),
         });
       }
 
       const currentStepIds = new Set(steps.filter((s) => s.id).map((s) => s.id!));
 
-      const dbSteps = await apiFetch(`/remarketing/flows/${flowId}/steps`) as { id: string }[];
+      const dbSteps = await apiFetch(`/remarketing/flows/${flowId}/steps`, { headers: orgHeader }) as { id: string }[];
       for (const dbStep of dbSteps) {
         if (!currentStepIds.has(dbStep.id)) {
-          await apiFetch(`/remarketing/flows/${flowId}/steps/${dbStep.id}`, { method: "DELETE" });
+          await apiFetch(`/remarketing/flows/${flowId}/steps/${dbStep.id}`, { method: "DELETE", headers: orgHeader });
         }
       }
 
@@ -94,11 +104,13 @@ export default function FlowEditPage() {
         if (id) {
           await apiFetch(`/remarketing/flows/${flowId}/steps/${id}`, {
             method: "PUT",
+            headers: orgHeader,
             body: JSON.stringify(body),
           });
         } else {
           await apiFetch(`/remarketing/flows/${flowId}/steps`, {
             method: "POST",
+            headers: orgHeader,
             body: JSON.stringify(body),
           });
         }
@@ -117,6 +129,20 @@ export default function FlowEditPage() {
     return (
       <div className="flex items-center justify-center py-20">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-3 py-20 text-center">
+        <p className="text-sm text-destructive">{loadError}</p>
+        <button
+          onClick={() => router.push("/remarketing")}
+          className="text-xs text-muted-foreground underline hover:text-foreground"
+        >
+          Voltar para Remarketing
+        </button>
       </div>
     );
   }
