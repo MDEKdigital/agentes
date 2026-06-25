@@ -19,9 +19,11 @@ export function createSearchProductsTool(organizationId: string) {
 
         const list = products.map((p) => {
           const price = p.price != null ? `R$ ${Number(p.price).toFixed(2)}` : "Consultar";
+          const category = p.category ? ` [${p.category}]` : "";
+          const stock = p.stock_quantity != null ? `\n   Estoque: ${p.stock_quantity} unidades` : "";
           const desc = p.description ? `\n   Descrição: ${p.description}` : "";
           const photo = p.photo_url ? `\n   Foto: ${p.photo_url}` : "";
-          return `- ${p.name} | Preço: ${price}${desc}${photo}`;
+          return `- ${p.name}${category} | Preço: ${price}${stock}${desc}${photo}`;
         }).join("\n");
 
         return `<product_search_result>\nProdutos encontrados:\n${list}\n</product_search_result>`;

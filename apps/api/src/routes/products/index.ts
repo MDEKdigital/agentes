@@ -45,15 +45,17 @@ export default async function productRoutes(app: FastifyInstance) {
       const membership = request.user.memberships.find((m) => m.organization_id === organizationId);
       if (!membership) return reply.status(403).send({ error: "Acesso negado" });
 
-      const { name, description, price } = request.body as { name: string; description?: string; price?: number };
+      const { name, category, description, price, stock_quantity } = request.body as { name: string; category?: string; description?: string; price?: number; stock_quantity?: number };
       if (!name?.trim()) return reply.status(400).send({ error: "Nome do produto é obrigatório" });
 
       const db = getAdminClient();
       const product = await createProduct(db, {
         organization_id: organizationId,
         name: name.trim(),
+        category: category?.trim() ?? "",
         description: description?.trim() ?? "",
         price: price ?? null,
+        stock_quantity: stock_quantity ?? null,
         photo_url: null,
         metadata: {},
       });
@@ -69,12 +71,14 @@ export default async function productRoutes(app: FastifyInstance) {
       const membership = request.user.memberships.find((m) => m.organization_id === organizationId);
       if (!membership) return reply.status(403).send({ error: "Acesso negado" });
 
-      const { name, description, price } = request.body as { name?: string; description?: string; price?: number };
+      const { name, category, description, price, stock_quantity } = request.body as { name?: string; category?: string; description?: string; price?: number; stock_quantity?: number | null };
       const db = getAdminClient();
       const product = await updateProduct(db, productId, organizationId, {
         ...(name !== undefined && { name: name.trim() }),
+        ...(category !== undefined && { category: category.trim() }),
         ...(description !== undefined && { description: description.trim() }),
         ...(price !== undefined && { price }),
+        ...(stock_quantity !== undefined && { stock_quantity }),
       });
       return reply.send(product);
     }

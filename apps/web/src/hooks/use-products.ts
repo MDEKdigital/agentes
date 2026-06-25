@@ -7,8 +7,10 @@ interface Product {
   id: string;
   organization_id: string;
   name: string;
+  category: string;
   description: string;
   price: number | null;
+  stock_quantity: number | null;
   photo_url: string | null;
   created_at: string;
   updated_at: string;
@@ -46,7 +48,7 @@ export function useProducts(organizationId: string | undefined) {
     fetchProducts();
   }, [fetchProducts]);
 
-  async function createProduct(payload: { name: string; description?: string; price?: number }) {
+  async function createProduct(payload: { name: string; category?: string; description?: string; price?: number; stock_quantity?: number }) {
     const h = await getHeaders();
     const r = await fetch(`${apiBase}/organizations/${organizationId}/products`, {
       method: "POST",
@@ -55,11 +57,11 @@ export function useProducts(organizationId: string | undefined) {
     });
     if (!r.ok) throw new Error("Erro ao criar produto");
     const product = await r.json();
-    setProducts((prev) => [...prev, product].sort((a, b) => a.name.localeCompare(b.name)));
+    setProducts((prev) => [...prev, product].sort((a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name)));
     return product as Product;
   }
 
-  async function updateProduct(productId: string, payload: Partial<{ name: string; description: string; price: number }>) {
+  async function updateProduct(productId: string, payload: Partial<{ name: string; category: string; description: string; price: number; stock_quantity: number }>) {
     const h = await getHeaders();
     const r = await fetch(`${apiBase}/organizations/${organizationId}/products/${productId}`, {
       method: "PATCH",

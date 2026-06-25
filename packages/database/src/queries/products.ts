@@ -4,8 +4,10 @@ export interface Product {
   id: string;
   organization_id: string;
   name: string;
+  category: string;
   description: string;
   price: number | null;
+  stock_quantity: number | null;
   photo_url: string | null;
   metadata: Record<string, unknown>;
   created_at: string;
@@ -20,6 +22,7 @@ export async function getProductsByOrganization(
     .from("products")
     .select("*")
     .eq("organization_id", organizationId)
+    .order("category", { ascending: true })
     .order("name", { ascending: true });
   if (error) throw error;
   return data as Product[];
@@ -57,7 +60,7 @@ export async function updateProduct(
   client: SupabaseClient,
   productId: string,
   organizationId: string,
-  updates: Partial<Pick<Product, "name" | "description" | "price" | "photo_url">>
+  updates: Partial<Pick<Product, "name" | "category" | "description" | "price" | "stock_quantity" | "photo_url">>
 ) {
   const { data, error } = await client
     .from("products")
@@ -92,7 +95,8 @@ export async function searchProducts(
     .from("products")
     .select("*")
     .eq("organization_id", organizationId)
-    .ilike("name", `%${query}%`)
+    .or(`name.ilike.%${query}%,category.ilike.%${query}%,description.ilike.%${query}%`)
+    .order("category", { ascending: true })
     .order("name", { ascending: true })
     .limit(10);
   if (error) throw error;
