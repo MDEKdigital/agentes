@@ -51,9 +51,9 @@ export default async function remarketingFlowRoutes(app: FastifyInstance) {
     if (!orgId) return reply.status(400).send({ error: "x-organization-id obrigatório" });
 
     const membership = request.user.memberships.find(
-      (m) => m.organization_id === orgId && m.role !== "agent"
+      (m) => m.organization_id === orgId
     );
-    if (!membership) return reply.status(403).send({ error: "Acesso de administrador necessário" });
+    if (!membership) return reply.status(403).send({ error: "Acesso negado" });
 
     const { name, product_campaign, agent_id, instance_id, entry_silence_minutes,
             cancel_on_reply = true, cancel_on_resolved = true, cancel_on_opt_out = true,
@@ -115,9 +115,9 @@ export default async function remarketingFlowRoutes(app: FastifyInstance) {
   }>("/remarketing/flows/:id", async (request, reply) => {
     const orgId = request.headers["x-organization-id"] as string;
     const membership = request.user.memberships.find(
-      (m) => m.organization_id === orgId && m.role !== "agent"
+      (m) => m.organization_id === orgId
     );
-    if (!membership) return reply.status(403).send({ error: "Acesso de administrador necessário" });
+    if (!membership) return reply.status(403).send({ error: "Acesso negado" });
 
     const db = getAdminClient();
     const { data: flow } = await db
@@ -183,9 +183,9 @@ export default async function remarketingFlowRoutes(app: FastifyInstance) {
   app.delete<{ Params: { id: string } }>("/remarketing/flows/:id", async (request, reply) => {
     const orgId = request.headers["x-organization-id"] as string;
     const membership = request.user.memberships.find(
-      (m) => m.organization_id === orgId && m.role !== "agent"
+      (m) => m.organization_id === orgId
     );
-    if (!membership) return reply.status(403).send({ error: "Acesso de administrador necessário" });
+    if (!membership) return reply.status(403).send({ error: "Acesso negado" });
 
     const db = getAdminClient();
     const { data: flow } = await db
@@ -232,9 +232,9 @@ export default async function remarketingFlowRoutes(app: FastifyInstance) {
     async (request, reply) => {
       const orgId = request.headers["x-organization-id"] as string;
       const membership = request.user.memberships.find(
-        (m) => m.organization_id === orgId && m.role !== "agent"
+        (m) => m.organization_id === orgId
       );
-      if (!membership) return reply.status(403).send({ error: "Acesso de administrador necessário" });
+      if (!membership) return reply.status(403).send({ error: "Acesso negado" });
 
       const db = getAdminClient();
       const { data: original } = await db
@@ -283,9 +283,9 @@ export default async function remarketingFlowRoutes(app: FastifyInstance) {
     async (request, reply) => {
       const orgId = request.headers["x-organization-id"] as string;
       const membership = request.user.memberships.find(
-        (m) => m.organization_id === orgId && m.role !== "agent"
+        (m) => m.organization_id === orgId
       );
-      if (!membership) return reply.status(403).send({ error: "Acesso de administrador necessário" });
+      if (!membership) return reply.status(403).send({ error: "Acesso negado" });
 
       const { status } = request.body;
       if (!["active", "inactive"].includes(status)) {
