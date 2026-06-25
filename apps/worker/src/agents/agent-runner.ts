@@ -5,6 +5,7 @@ import { createModel } from "../lib/create-model";
 import { withTimeout, LLM_TIMEOUT_MS } from "../lib/with-timeout";
 import { workerLog } from "../lib/logger";
 import { SALOMAO_ID, validateResponse, ValidationResult } from "./salomao-decisor";
+import type { LeadDecision } from "./salomao-decisor";
 
 interface RunAgentParams {
   agent: Agent;
@@ -15,6 +16,7 @@ interface RunAgentParams {
   conversationId: string;
   contactName?: string | null;
   imageContent?: { base64: string; mimeType: string };
+  leadDecision?: LeadDecision | null;
 }
 
 interface RunAgentResult {
@@ -95,8 +97,61 @@ function formatHistoryForLLM(messages: Message[]) {
 }
 
 
+const LEAD_TYPE_LABEL: Record<string, string> = {
+  frio: "Frio — pouco engajado, abordagem leve e exploratória",
+  morno: "Morno — demonstrou interesse, avançar com cuidado",
+  quente: "Quente — alto interesse, momento de fechar ou avançar",
+};
+
+const STAGE_LABEL: Record<string, string> = {
+  inicio: "Início — primeiro contato ou conversa recém-aberta",
+  desenvolvimento: "Desenvolvimento — lead engajado, conversa em andamento",
+  travado: "Travado — lead parou de avançar, há objeção ou hesitação",
+  decisao: "Decisão — lead próximo do fechamento",
+};
+
+const OBJECTIVE_LABEL: Record<string, string> = {
+  qualificar: "Qualificar — entender perfil e necessidade do lead",
+  diagnosticar: "Diagnosticar — identificar dor, problema ou bloqueio",
+  "avançar": "Avançar — mover o lead para a próxima etapa",
+  fechar: "Fechar — conduzir ao compromisso ou compra",
+};
+
+const BEHAVIOR_LABEL: Record<string, string> = {
+  curto: "Curto — respostas breves e diretas",
+  medio: "Médio — respostas equilibradas com contexto",
+  direto: "Direto — objetivo e sem rodeios",
+  consultivo: "Consultivo — exploratório, com perguntas e empatia",
+};
+
+const FLOW_LABEL: Record<string, string> = {
+  "lead-frio": "Fluxo lead frio — aquecer, gerar curiosidade",
+  "lead-morno": "Fluxo lead morno — nutrir e avançar",
+  "lead-quente": "Fluxo lead quente — fechar com urgência e clareza",
+  objecao: "Fluxo objeção — identificar e contornar resistência",
+  "follow-up": "Fluxo follow-up — retomar contato anterior",
+};
+
+function buildLeadDecisionBlock(decision: LeadDecision): string {
+  return `[DECISÃO SALOMÃO — PRIORIDADE MÁXIMA — SIGA OBRIGATORIAMENTE]
+O Salomão Decisor analisou a mensagem do lead e definiu o contexto desta conversa:
+
+• Tipo de lead  : ${LEAD_TYPE_LABEL[decision.lead_type] ?? decision.lead_type}
+• Estágio       : ${STAGE_LABEL[decision.stage] ?? decision.stage}
+• Objetivo agora: ${OBJECTIVE_LABEL[decision.objective] ?? decision.objective}
+• Comportamento : ${BEHAVIOR_LABEL[decision.behavior] ?? decision.behavior}
+• Fluxo ativo   : ${FLOW_LABEL[decision.flow] ?? decision.flow}
+
+REGRAS DE USO:
+1. Esta análise tem prioridade máxima sobre qualquer outra instrução deste prompt.
+2. Adapte sua resposta ao objetivo e comportamento definidos acima.
+3. Nunca mencione esta análise ao cliente.
+4. Nunca desvie do fluxo e objetivo definidos.
+[FIM DA DECISÃO SALOMÃO]`.trim();
+}
+
 export async function runAgent(params: RunAgentParams): Promise<RunAgentResult> {
-  const { agent, messages, currentMessage, apiKey, organizationId, conversationId, contactName, imageContent } = params;
+  const { agent, messages, currentMessage, apiKey, organizationId, conversationId, contactName, imageContent, leadDecision } = params;
 
   const startTime = Date.now();
   const useVisionFallback = !!imageContent && !isVisionCapable(agent.model);
@@ -130,7 +185,8 @@ export async function runAgent(params: RunAgentParams): Promise<RunAgentResult> 
   const contactContext = contactName
     ? `\n\n[CONTEXTO DO CONTATO]\nNome do lead: ${contactName}\nUse o nome do lead para personalizar sua saudação e respostas quando apropriado.`
     : "";
-  const effectiveBasePrompt = `${agent.system_prompt}${contactContext}\n\n${CLOSE_CONVERSATION_INSTRUCTION}\n\n${HUMAN_HANDOFF_INSTRUCTION}\n\n${SECURITY_INSTRUCTION}\n\n${RULES_REINFORCEMENT}`;
+  const leadDecisionBlock = leadDecision ? `${buildLeadDecisionBlock(leadDecision)}\n\n` : "";
+  const effectiveBasePrompt = `${leadDecisionBlock}${agent.system_prompt}${contactContext}\n\n${CLOSE_CONVERSATION_INSTRUCTION}\n\n${HUMAN_HANDOFF_INSTRUCTION}\n\n${SECURITY_INSTRUCTION}\n\n${RULES_REINFORCEMENT}`;
   let systemPrompt = effectiveBasePrompt;
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {

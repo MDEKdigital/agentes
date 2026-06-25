@@ -23,6 +23,8 @@ import { acquireConversationLock, releaseConversationLock, renewConversationLock
 import { resolveApiKey } from "../lib/vault";
 import { validateMediaPayload } from "../lib/media-validation";
 import { runAgent } from "../agents/agent-runner";
+import { salomaoDecisor } from "../agents/salomao-decisor";
+import type { LeadDecision } from "../agents/salomao-decisor";
 import { evaluateActivation } from "./evaluate-activation";
 import { CLOSE_CONVERSATION_TOOL_NAME } from "../agents/tools/close-conversation";
 import { HUMAN_HANDOFF_TOOL_NAME } from "../agents/tools/registry";
@@ -497,6 +499,24 @@ export function startProcessMessageWorker() {
           wasResolved = savedToolCalls.includes(CLOSE_CONVERSATION_TOOL_NAME);
           wasHandoff = savedToolCalls.includes(HUMAN_HANDOFF_TOOL_NAME);
         } else {
+          // Salomão Decisor — classifica o lead antes do agente responder
+          let leadDecision: LeadDecision | null = null;
+          if (!isMediaFallback && effectiveMessage.content?.trim()) {
+            try {
+              leadDecision = await salomaoDecisor(effectiveMessage.content, apiKey);
+              if (leadDecision) {
+                workerLog("process-message", "info", {
+                  conversationId,
+                  messageId,
+                  organizationId,
+                  leadDecision,
+                }, "salomao-decisor classified lead");
+              }
+            } catch (err) {
+              workerLog("process-message", "warn", { conversationId, messageId }, `salomao-decisor failed: ${(err as Error).message}`);
+            }
+          }
+
           const result = await runAgent({
             agent,
             messages: history,
@@ -506,6 +526,7 @@ export function startProcessMessageWorker() {
             imageContent,
             conversationId,
             contactName: (contact as { name?: string | null }).name ?? null,
+            leadDecision,
           });
           responseContent = result.text;
           if (!responseContent?.trim()) {
