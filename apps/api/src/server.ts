@@ -61,6 +61,7 @@ import agentRoutes from "./routes/agents/index";
 import invitationRoutes from "./routes/invitations/index";
 import membersRoutes from "./routes/members/index";
 import contactRoutes from "./routes/contacts/index";
+import productRoutes from "./routes/products/index";
 
 const server = Fastify({ logger: true });
 
@@ -154,6 +155,7 @@ server.register(agentRoutes);
 server.register(invitationRoutes);
 server.register(membersRoutes);
 server.register(contactRoutes);
+server.register(productRoutes);
 
 // Start
 const start = async () => {

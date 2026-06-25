@@ -5,6 +5,7 @@ export const toolsConfigSchema = z.object({
   search_knowledge: z.boolean().default(true),
   search_faq: z.boolean().default(true),
   search_web: z.boolean().default(false),
+  search_products: z.boolean().default(false),
 });
 
 export const singleWordRuleSchema = z.object({

@@ -84,7 +84,7 @@ const baseAgent = {
   temperature: 0.7,
   max_tokens: 1024,
   max_steps: 3,
-  tools_config: { search_knowledge: false, search_faq: false, search_web: false },
+  tools_config: { search_knowledge: false, search_faq: false, search_web: false, search_products: false },
   activation_rules: [],
   is_active: true,
   created_at: "",
@@ -366,3 +366,4 @@ describe("DE-1: agent-runner â€” instruÃ§Ã£o anti-exfiltraÃ§Ã£o no 
     expect(call.system).toMatch(/tool result|resultado.*ferramenta|ferramenta.*result/i);
   });
 });
+

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+﻿import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const { mockBuildToolsForAgent } = vi.hoisted(() => ({
   mockBuildToolsForAgent: vi.fn(() => ({})),
@@ -35,7 +35,7 @@ const baseAgent = {
   temperature: 0.7,
   max_tokens: 1024,
   max_steps: 3,
-  tools_config: { search_knowledge: false, search_faq: false, search_web: false },
+  tools_config: { search_knowledge: false, search_faq: false, search_web: false, search_products: false },
   activation_rules: [],
   is_active: true,
   created_at: "",
@@ -48,7 +48,7 @@ const currentMessage = {
   organization_id: "org-1",
   evolution_message_id: null,
   role: "contact" as const,
-  content: "Olá",
+  content: "OlÃ¡",
   media_url: null,
   media_type: null,
   metadata: {},
@@ -58,14 +58,14 @@ const currentMessage = {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(generateText).mockResolvedValue({
-    text: "Olá! Como posso ajudar?",
+    text: "OlÃ¡! Como posso ajudar?",
     usage: { totalTokens: 50, promptTokens: 30, completionTokens: 20 },
     steps: [],
   } as never);
 });
 
 describe("runAgent", () => {
-  it("retorna texto, modelo, tokens e latência", async () => {
+  it("retorna texto, modelo, tokens e latÃªncia", async () => {
     const result = await runAgent({
       agent: baseAgent,
       messages: [],
@@ -75,7 +75,7 @@ describe("runAgent", () => {
       conversationId: "conv-1",
     });
 
-    expect(result.text).toBe("Olá! Como posso ajudar?");
+    expect(result.text).toBe("OlÃ¡! Como posso ajudar?");
     expect(result.model).toBe("gpt-4o-mini");
     expect(result.tokensUsed).toBeGreaterThanOrEqual(50);
     expect(result.latencyMs).toBeGreaterThanOrEqual(0);
@@ -97,7 +97,7 @@ describe("runAgent", () => {
 
   it("chama buildToolsForAgent com tools_config correto", async () => {
     await runAgent({
-      agent: { ...baseAgent, tools_config: { search_knowledge: true, search_faq: false, search_web: false } },
+      agent: { ...baseAgent, tools_config: { search_knowledge: true, search_faq: false, search_web: false, search_products: false } },
       messages: [],
       currentMessage,
       apiKey: "sk-test",
@@ -107,12 +107,12 @@ describe("runAgent", () => {
 
     expect(mockBuildToolsForAgent).toHaveBeenCalledWith(
       expect.objectContaining({
-        toolsConfig: { search_knowledge: true, search_faq: false, search_web: false },
+        toolsConfig: { search_knowledge: true, search_faq: false, search_web: false, search_products: false },
       })
     );
   });
 
-  it("inclui histórico formatado nas mensagens do LLM", async () => {
+  it("inclui histÃ³rico formatado nas mensagens do LLM", async () => {
     const history = [
       { ...currentMessage, id: "msg-0", role: "agent" as const, content: "Como posso ajudar?" },
     ];
@@ -131,12 +131,12 @@ describe("runAgent", () => {
     expect(messages[0]).toEqual({ role: "assistant", content: "Como posso ajudar?" });
     const lastMsg = messages[messages.length - 1];
     expect(lastMsg.role).toBe("user");
-    expect(lastMsg.content).toContain("Olá");
+    expect(lastMsg.content).toContain("OlÃ¡");
     expect(lastMsg.content).toContain("<user_message>");
   });
 
   it("retorna resposta diretamente se validador aprova na primeira tentativa", async () => {
-    // generateText: 1ª chamada = resposta do agente, 2ª chamada = validador retorna compliant
+    // generateText: 1Âª chamada = resposta do agente, 2Âª chamada = validador retorna compliant
     vi.mocked(generateText)
       .mockResolvedValueOnce({
         text: "Resposta ok",
@@ -195,14 +195,14 @@ describe("runAgent", () => {
     });
 
     expect(result.text).toBe("Resposta corrigida");
-    // 2 gerações + 2 validações = 4 chamadas
+    // 2 geraÃ§Ãµes + 2 validaÃ§Ãµes = 4 chamadas
     expect(vi.mocked(generateText)).toHaveBeenCalledTimes(4);
   });
 
-  it("retorna última resposta (fail open) se todas as 3 tentativas violam", async () => {
+  it("retorna Ãºltima resposta (fail open) se todas as 3 tentativas violam", async () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
-    // 3 gerações + 3 validações = 6 chamadas
+    // 3 geraÃ§Ãµes + 3 validaÃ§Ãµes = 6 chamadas
     vi.mocked(generateText)
       .mockResolvedValueOnce({ text: "Ruim 1", usage: { totalTokens: 50, promptTokens: 30, completionTokens: 20 }, steps: [] } as never)
       .mockResolvedValueOnce({ text: '{"compliant": false, "violation": "erro 1"}', usage: { totalTokens: 10, promptTokens: 8, completionTokens: 2 }, steps: [] } as never)
@@ -225,10 +225,10 @@ describe("runAgent", () => {
     warnSpy.mockRestore();
   });
 
-  it("trata parse inválido do validador como compliant (fail open)", async () => {
+  it("trata parse invÃ¡lido do validador como compliant (fail open)", async () => {
     vi.mocked(generateText)
       .mockResolvedValueOnce({ text: "Resposta ok", usage: { totalTokens: 50, promptTokens: 30, completionTokens: 20 }, steps: [] } as never)
-      .mockResolvedValueOnce({ text: "não é json", usage: { totalTokens: 10, promptTokens: 8, completionTokens: 2 }, steps: [] } as never);
+      .mockResolvedValueOnce({ text: "nÃ£o Ã© json", usage: { totalTokens: 10, promptTokens: 8, completionTokens: 2 }, steps: [] } as never);
 
     const result = await runAgent({
       agent: baseAgent,
@@ -243,7 +243,7 @@ describe("runAgent", () => {
     expect(vi.mocked(generateText)).toHaveBeenCalledTimes(2);
   });
 
-  it("system prompt de retry usa mensagem estática (PI-3: violation não contamina system prompt)", async () => {
+  it("system prompt de retry usa mensagem estÃ¡tica (PI-3: violation nÃ£o contamina system prompt)", async () => {
     vi.mocked(generateText)
       .mockResolvedValueOnce({ text: "Ruim", usage: { totalTokens: 50, promptTokens: 30, completionTokens: 20 }, steps: [] } as never)
       .mockResolvedValueOnce({ text: '{"compliant": false, "violation": "mencionou concorrente X"}', usage: { totalTokens: 10, promptTokens: 8, completionTokens: 2 }, steps: [] } as never)
@@ -259,11 +259,11 @@ describe("runAgent", () => {
       conversationId: "conv-1",
     });
 
-    // A 3ª chamada é a retentativa — NÃO deve conter o texto da violation (PI-3)
+    // A 3Âª chamada Ã© a retentativa â€” NÃƒO deve conter o texto da violation (PI-3)
     const retryCall = vi.mocked(generateText).mock.calls[2][0];
     const retrySystem = (retryCall as { system: string }).system;
     expect(retrySystem).not.toContain("mencionou concorrente X");
-    expect(retrySystem).toMatch(/não.conform|violou|regras|corrija|nova.*resposta/i);
+    expect(retrySystem).toMatch(/nÃ£o.conform|violou|regras|corrija|nova.*resposta/i);
   });
 
   it("passa conversationId para buildToolsForAgent", async () => {
@@ -281,7 +281,7 @@ describe("runAgent", () => {
     );
   });
 
-  it("inclui instrução REGRA DE ENCERRAMENTO no system prompt enviado ao LLM", async () => {
+  it("inclui instruÃ§Ã£o REGRA DE ENCERRAMENTO no system prompt enviado ao LLM", async () => {
     await runAgent({
       agent: baseAgent,
       messages: [],
@@ -295,7 +295,7 @@ describe("runAgent", () => {
     expect((call as { system: string }).system).toContain("REGRA DE ENCERRAMENTO");
   });
 
-  it("mantém instrução de encerramento no system prompt da retentativa após violation", async () => {
+  it("mantÃ©m instruÃ§Ã£o de encerramento no system prompt da retentativa apÃ³s violation", async () => {
     vi.mocked(generateText)
       .mockResolvedValueOnce({ text: "Ruim", usage: { totalTokens: 50, promptTokens: 30, completionTokens: 20 }, steps: [] } as never)
       .mockResolvedValueOnce({ text: '{"compliant": false, "violation": "erro"}', usage: { totalTokens: 10, promptTokens: 8, completionTokens: 2 }, steps: [] } as never)
@@ -311,13 +311,13 @@ describe("runAgent", () => {
       conversationId: "conv-1",
     });
 
-    // 3ª chamada = retentativa — system prompt deve ainda conter a instrução de encerramento
+    // 3Âª chamada = retentativa â€” system prompt deve ainda conter a instruÃ§Ã£o de encerramento
     const retryCall = vi.mocked(generateText).mock.calls[2][0];
     expect((retryCall as { system: string }).system).toContain("REGRA DE ENCERRAMENTO");
   });
 });
 
-describe("runAgent — suporte a imagem multimodal", () => {
+describe("runAgent â€” suporte a imagem multimodal", () => {
   const imageContent = { base64: "aW1hZ2U=", mimeType: "image/jpeg" };
   let openaiCallable: ReturnType<typeof vi.fn>;
 
@@ -332,7 +332,7 @@ describe("runAgent — suporte a imagem multimodal", () => {
     } as never);
   });
 
-  it("inclui image part na mensagem quando imageContent é fornecido", async () => {
+  it("inclui image part na mensagem quando imageContent Ã© fornecido", async () => {
     await runAgent({
       agent: { ...baseAgent, model: "gpt-4o", provider: "openai" },
       messages: [],
@@ -358,7 +358,7 @@ describe("runAgent — suporte a imagem multimodal", () => {
     );
   });
 
-  it("usa modelo vision fallback (gpt-4o) quando modelo configurado não suporta visão (gpt-4.1-nano)", async () => {
+  it("usa modelo vision fallback (gpt-4o) quando modelo configurado nÃ£o suporta visÃ£o (gpt-4.1-nano)", async () => {
     await runAgent({
       agent: { ...baseAgent, model: "gpt-4.1-nano", provider: "openai" },
       messages: [],
@@ -372,7 +372,7 @@ describe("runAgent — suporte a imagem multimodal", () => {
     expect(openaiCallable).toHaveBeenCalledWith("gpt-4o");
   });
 
-  it("sem imageContent, mensagem é texto simples encapsulado em <user_message>", async () => {
+  it("sem imageContent, mensagem Ã© texto simples encapsulado em <user_message>", async () => {
     await runAgent({
       agent: { ...baseAgent, model: "gpt-4o", provider: "openai" },
       messages: [],
@@ -389,3 +389,4 @@ describe("runAgent — suporte a imagem multimodal", () => {
     expect(lastMsg.content).toContain("<user_message>");
   });
 });
+

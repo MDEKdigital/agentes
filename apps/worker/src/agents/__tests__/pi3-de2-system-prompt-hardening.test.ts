@@ -42,7 +42,7 @@ const baseAgent = {
   temperature: 0.7,
   max_tokens: 1024,
   max_steps: 3,
-  tools_config: { search_knowledge: false, search_faq: false, search_web: false },
+  tools_config: { search_knowledge: false, search_faq: false, search_web: false, search_products: false },
   activation_rules: [],
   is_active: true,
   created_at: "",
@@ -219,3 +219,4 @@ describe("DE-2: system prompt protege contra exfiltraÃ§Ã£o das instruÃ§Ã�
     expect(result.text).toBe("Posso ajudar com sua pergunta!");
   });
 });
+

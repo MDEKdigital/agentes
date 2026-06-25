@@ -2,6 +2,7 @@ import type { ToolsConfig, Message } from "@aula-agente/shared";
 import { createSearchKnowledgeTool } from "./search-knowledge";
 import { createSearchFaqTool } from "./search-faq";
 import { createSearchWebTool } from "./search-web";
+import { createSearchProductsTool } from "./search-products";
 import { buildCloseConversationTool, CLOSE_CONVERSATION_TOOL_NAME } from "./close-conversation";
 import { buildRequestHumanHandoffTool, HUMAN_HANDOFF_TOOL_NAME } from "./request-human-handoff";
 
@@ -32,6 +33,10 @@ export function buildToolsForAgent(params: RegistryParams) {
 
   if (toolsConfig.search_web) {
     tools.searchWeb = createSearchWebTool();
+  }
+
+  if (toolsConfig.search_products) {
+    tools.searchProducts = createSearchProductsTool(organizationId);
   }
 
   tools[CLOSE_CONVERSATION_TOOL_NAME] = buildCloseConversationTool(
