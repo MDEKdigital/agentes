@@ -63,6 +63,7 @@ import membersRoutes from "./routes/members/index";
 import contactRoutes from "./routes/contacts/index";
 import productRoutes from "./routes/products/index";
 import promptStudioRoutes from "./routes/prompt-studio/index";
+import adminRoutes from "./routes/admin/index";
 import { runMigrations } from "./lib/migrate";
 
 const server = Fastify({ logger: true });
@@ -159,6 +160,7 @@ server.register(membersRoutes);
 server.register(contactRoutes);
 server.register(productRoutes);
 server.register(promptStudioRoutes);
+server.register(adminRoutes);
 
 // Start
 const start = async () => {

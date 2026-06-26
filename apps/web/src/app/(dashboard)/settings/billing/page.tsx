@@ -18,6 +18,8 @@ import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/api";
 import { useOrganization } from "@/providers/organization-provider";
 import type { Subscription, Plan, BillingEvent } from "@aula-agente/shared";
+import { AdminPanel } from "./admin-panel";
+import type { AdminOrgRow } from "./admin-panel";
 
 interface BillingData {
   subscription: Subscription | null;
@@ -25,6 +27,11 @@ interface BillingData {
   usage: { agents_used: number; members_used: number; instances_used: number };
   limits: { max_agents: number; max_members: number; max_instances: number } | null;
   recentEvents: BillingEvent[];
+}
+
+interface AdminData {
+  orgs: AdminOrgRow[];
+  plans: Plan[];
 }
 
 const STATUS_LABEL: Record<string, { text: string; cls: string }> = {
@@ -103,6 +110,9 @@ export default function BillingPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [adminData, setAdminData] = useState<AdminData | null>(null);
+  const [activeTab, setActiveTab] = useState<"billing" | "admin">("billing");
+
   const isAdmin = currentRole === "owner" || currentRole === "admin";
 
   useEffect(() => {
@@ -120,11 +130,18 @@ export default function BillingPage() {
       .catch((err: Error) => { setError(err.message); setLoading(false); });
   }, [currentOrg]);
 
+  const loadAdmin = useCallback(() => {
+    apiFetch("/admin/organizations")
+      .then((res) => setAdminData(res as AdminData))
+      .catch(() => { /* 403 para usuários normais — ignorar silenciosamente */ });
+  }, []);
+
   useEffect(() => {
     if (orgLoading) return;
     if (!currentOrg) { setLoading(false); return; }
     load();
-  }, [currentOrg, orgLoading, load]);
+    loadAdmin();
+  }, [currentOrg, orgLoading, load, loadAdmin]);
 
   if (loading || orgLoading) {
     return (
@@ -162,163 +179,193 @@ export default function BillingPage() {
   const statusCfg = STATUS_LABEL[sub?.status ?? ""] ?? null;
 
   return (
-    <div className="mx-auto max-w-2xl space-y-5">
+    <div className="mx-auto max-w-4xl space-y-5">
 
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-lg font-semibold text-foreground">Assinatura</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">Plano e utilização da sua organização</p>
+      {/* Tab switcher — visível apenas para super-admin */}
+      {adminData && (
+        <div className="flex gap-1 rounded-lg border border-border bg-muted/30 p-1 w-fit">
+          {(["billing", "admin"] as const).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={cn(
+                "rounded-md px-4 py-1.5 text-xs font-medium transition-colors",
+                activeTab === tab
+                  ? "bg-card border border-border text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {tab === "billing" ? "Minha assinatura" : "Admin"}
+            </button>
+          ))}
         </div>
-        <Link
-          href="/settings/billing/plans"
-          className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-xs font-medium text-foreground hover:bg-accent transition-colors"
-        >
-          <LayoutGrid className="h-3.5 w-3.5 text-blue-electric-400" />
-          Ver planos
-        </Link>
-      </div>
-
-      {/* Plano atual */}
-      <Card title="Plano atual" icon={CreditCard}>
-        {!sub ? (
-          <div className="p-5 space-y-1">
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <AlertTriangle className="h-4 w-4 shrink-0" />
-              <p className="text-sm">Nenhuma assinatura encontrada.</p>
-            </div>
-            <p className="text-xs text-muted-foreground pl-6">
-              Se você acabou de comprar, aguarde alguns instantes — o processamento é automático.
-            </p>
-          </div>
-        ) : (
-          <div className="p-5 space-y-4">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-base font-semibold text-foreground">{plan?.name ?? "—"}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {({
-                    monthly:  "Cobrança mensal",
-                    yearly:   "Cobrança anual",
-                    lifetime: "Acesso vitalício",
-                    manual:   "Plano manual",
-                  } as Record<string, string>)[sub.billing_interval] ?? sub.billing_interval}
-                </p>
-              </div>
-              {statusCfg && (
-                <span className={cn("shrink-0 rounded-md border px-2.5 py-0.5 text-xs font-semibold", statusCfg.cls)}>
-                  {statusCfg.text}
-                </span>
-              )}
-            </div>
-
-            <div className="divide-y divide-border/50 rounded-lg border border-border bg-muted/20 px-4">
-              {plan && (
-                <Row
-                  label="Valor"
-                  value={
-                    sub.billing_interval === "yearly"
-                      ? fmtBRL(plan.price_yearly) + "/ano"
-                      : sub.billing_interval === "monthly"
-                        ? fmtBRL(plan.price_monthly) + "/mês"
-                        : "—"
-                  }
-                />
-              )}
-              {(sub.current_period_start || sub.current_period_end) && (
-                <Row
-                  label="Período"
-                  value={
-                    <span className="flex items-center gap-1.5">
-                      <Clock className="h-3 w-3 text-muted-foreground" />
-                      {fmtDate(sub.current_period_start)} → {fmtDate(sub.current_period_end)}
-                    </span>
-                  }
-                />
-              )}
-              {sub.gateway && (
-                <Row label="Gateway" value={<span className="capitalize">{sub.gateway}</span>} />
-              )}
-              <Row label="ID da organização" value={<span className="font-mono text-[11px]">{currentOrg?.id}</span>} />
-            </div>
-
-            {plan && plan.features.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Recursos incluídos</p>
-                <ul className="grid grid-cols-2 gap-1">
-                  {plan.features.map((f) => (
-                    <li key={f} className="flex items-center gap-2 text-xs text-foreground">
-                      <CheckCircle className="h-3 w-3 text-green-400 shrink-0" />
-                      <span className="capitalize">{f.replace(/_/g, " ")}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
-        )}
-      </Card>
-
-      {/* Utilização */}
-      {limits && (
-        <Card title="Utilização atual" icon={Activity}>
-          <div className="p-5 space-y-4">
-            <div className="grid grid-cols-3 gap-3 mb-2">
-              {[
-                { label: "Agentes",    value: plan?.max_agents    ?? limits.max_agents },
-                { label: "Instâncias", value: plan?.max_instances ?? limits.max_instances },
-                { label: "Membros",    value: plan?.max_members   ?? limits.max_members },
-              ].map((item) => (
-                <div key={item.label} className="rounded-lg border border-border bg-muted/30 p-3 text-center">
-                  <p className="text-xl font-bold text-foreground">{item.value}</p>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">{item.label}</p>
-                </div>
-              ))}
-            </div>
-            <UsageBar used={usage.agents_used}    max={limits.max_agents}    label="Agentes" />
-            <UsageBar used={usage.members_used}   max={limits.max_members}   label="Membros" />
-            <UsageBar used={usage.instances_used} max={limits.max_instances} label="Instâncias WhatsApp" />
-          </div>
-        </Card>
       )}
 
-      {/* Histórico */}
-      <Card title="Histórico de billing" icon={Receipt}>
-        {events.length === 0 ? (
-          <div className="p-5">
-            <p className="text-sm text-muted-foreground">Nenhum evento registrado.</p>
+      {/* Admin tab */}
+      {adminData && activeTab === "admin" && (
+        <AdminPanel orgs={adminData.orgs} plans={adminData.plans} onRefresh={loadAdmin} />
+      )}
+
+      {/* Billing tab */}
+      {activeTab === "billing" && (
+        <>
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-lg font-semibold text-foreground">Assinatura</h1>
+              <p className="text-xs text-muted-foreground mt-0.5">Plano e utilização da sua organização</p>
+            </div>
+            <Link
+              href="/settings/billing/plans"
+              className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-xs font-medium text-foreground hover:bg-accent transition-colors"
+            >
+              <LayoutGrid className="h-3.5 w-3.5 text-blue-electric-400" />
+              Ver planos
+            </Link>
           </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="border-b border-border bg-muted/30">
-                  {["Data", "Gateway", "Tipo", "Status"].map((h) => (
-                    <th key={h} className="px-4 py-2.5 text-left font-medium uppercase tracking-wider text-muted-foreground">
-                      {h}
-                    </th>
+
+          {/* Plano atual */}
+          <Card title="Plano atual" icon={CreditCard}>
+            {!sub ? (
+              <div className="p-5 space-y-1">
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <AlertTriangle className="h-4 w-4 shrink-0" />
+                  <p className="text-sm">Nenhuma assinatura encontrada.</p>
+                </div>
+                <p className="text-xs text-muted-foreground pl-6">
+                  Se você acabou de comprar, aguarde alguns instantes — o processamento é automático.
+                </p>
+              </div>
+            ) : (
+              <div className="p-5 space-y-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-base font-semibold text-foreground">{plan?.name ?? "—"}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {({
+                        monthly:  "Cobrança mensal",
+                        yearly:   "Cobrança anual",
+                        lifetime: "Acesso vitalício",
+                        manual:   "Plano manual",
+                      } as Record<string, string>)[sub.billing_interval] ?? sub.billing_interval}
+                    </p>
+                  </div>
+                  {statusCfg && (
+                    <span className={cn("shrink-0 rounded-md border px-2.5 py-0.5 text-xs font-semibold", statusCfg.cls)}>
+                      {statusCfg.text}
+                    </span>
+                  )}
+                </div>
+
+                <div className="divide-y divide-border/50 rounded-lg border border-border bg-muted/20 px-4">
+                  {plan && (
+                    <Row
+                      label="Valor"
+                      value={
+                        sub.billing_interval === "yearly"
+                          ? fmtBRL(plan.price_yearly) + "/ano"
+                          : sub.billing_interval === "monthly"
+                            ? fmtBRL(plan.price_monthly) + "/mês"
+                            : "—"
+                      }
+                    />
+                  )}
+                  {(sub.current_period_start || sub.current_period_end) && (
+                    <Row
+                      label="Período"
+                      value={
+                        <span className="flex items-center gap-1.5">
+                          <Clock className="h-3 w-3 text-muted-foreground" />
+                          {fmtDate(sub.current_period_start)} → {fmtDate(sub.current_period_end)}
+                        </span>
+                      }
+                    />
+                  )}
+                  {sub.gateway && (
+                    <Row label="Gateway" value={<span className="capitalize">{sub.gateway}</span>} />
+                  )}
+                  <Row label="ID da organização" value={<span className="font-mono text-[11px]">{currentOrg?.id}</span>} />
+                </div>
+
+                {plan && plan.features.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Recursos incluídos</p>
+                    <ul className="grid grid-cols-2 gap-1">
+                      {plan.features.map((f) => (
+                        <li key={f} className="flex items-center gap-2 text-xs text-foreground">
+                          <CheckCircle className="h-3 w-3 text-green-400 shrink-0" />
+                          <span className="capitalize">{f.replace(/_/g, " ")}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+          </Card>
+
+          {/* Utilização */}
+          {limits && (
+            <Card title="Utilização atual" icon={Activity}>
+              <div className="p-5 space-y-4">
+                <div className="grid grid-cols-3 gap-3 mb-2">
+                  {[
+                    { label: "Agentes",    value: plan?.max_agents    ?? limits.max_agents },
+                    { label: "Instâncias", value: plan?.max_instances ?? limits.max_instances },
+                    { label: "Membros",    value: plan?.max_members   ?? limits.max_members },
+                  ].map((item) => (
+                    <div key={item.label} className="rounded-lg border border-border bg-muted/30 p-3 text-center">
+                      <p className="text-xl font-bold text-foreground">{item.value}</p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">{item.label}</p>
+                    </div>
                   ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {events.map((evt) => {
-                  const s = EVENT_LABEL[evt.status] ?? { text: evt.status, cls: "text-muted-foreground bg-muted border-border" };
-                  return (
-                    <tr key={evt.id} className="hover:bg-muted/20 transition-colors">
-                      <td className="px-4 py-2.5 text-foreground whitespace-nowrap">{fmtDateTime(evt.created_at)}</td>
-                      <td className="px-4 py-2.5 text-foreground capitalize">{evt.gateway}</td>
-                      <td className="px-4 py-2.5 text-foreground">{evt.event_type.replace(/_/g, " ")}</td>
-                      <td className="px-4 py-2.5">
-                        <span className={cn("rounded border px-2 py-0.5 text-[11px] font-semibold", s.cls)}>{s.text}</span>
-                      </td>
+                </div>
+                <UsageBar used={usage.agents_used}    max={limits.max_agents}    label="Agentes" />
+                <UsageBar used={usage.members_used}   max={limits.max_members}   label="Membros" />
+                <UsageBar used={usage.instances_used} max={limits.max_instances} label="Instâncias WhatsApp" />
+              </div>
+            </Card>
+          )}
+
+          {/* Histórico */}
+          <Card title="Histórico de billing" icon={Receipt}>
+            {events.length === 0 ? (
+              <div className="p-5">
+                <p className="text-sm text-muted-foreground">Nenhum evento registrado.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-border bg-muted/30">
+                      {["Data", "Gateway", "Tipo", "Status"].map((h) => (
+                        <th key={h} className="px-4 py-2.5 text-left font-medium uppercase tracking-wider text-muted-foreground">
+                          {h}
+                        </th>
+                      ))}
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Card>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {events.map((evt) => {
+                      const s = EVENT_LABEL[evt.status] ?? { text: evt.status, cls: "text-muted-foreground bg-muted border-border" };
+                      return (
+                        <tr key={evt.id} className="hover:bg-muted/20 transition-colors">
+                          <td className="px-4 py-2.5 text-foreground whitespace-nowrap">{fmtDateTime(evt.created_at)}</td>
+                          <td className="px-4 py-2.5 text-foreground capitalize">{evt.gateway}</td>
+                          <td className="px-4 py-2.5 text-foreground">{evt.event_type.replace(/_/g, " ")}</td>
+                          <td className="px-4 py-2.5">
+                            <span className={cn("rounded border px-2 py-0.5 text-[11px] font-semibold", s.cls)}>{s.text}</span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
+        </>
+      )}
 
     </div>
   );
