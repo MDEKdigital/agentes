@@ -25,5 +25,4 @@ export interface MessageMetadata {
   salomao_criador?: boolean;
   prompt_saved?: boolean;
   saved_prompt_id?: string | null;
-  [key: string]: unknown;
 }

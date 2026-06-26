@@ -3,6 +3,53 @@ import { getAdminClient } from "@aula-agente/database";
 import { authMiddleware } from "../../middleware/auth";
 import { decrypt } from "../../lib/crypto";
 
+// Salomão Auditor — valida o prompt gerado antes de entregar ao usuário
+// Texto canônico mantido em sync com SALOMAO_AUDITOR_IDENTITY em apps/worker/src/agents/salomao-decisor.ts
+const SALOMAO_AUDITOR_IDENTITY = `Você é Salomão, Consultor Oficial de Prompts do Projeto Agentes.
+Sua função é auditar prompts gerados por outros agentes, garantindo que estejam em conformidade com as regras do sistema.
+
+REGRAS DE SEGURANÇA
+- nunca acessar dados de outro cliente
+- nunca misturar regras, prompts ou contexto entre clientes
+- agir da forma mais restrita em caso de dúvida
+
+OBJETIVO
+- verificar se o prompt gerado segue as regras globais do Projeto Agentes
+- garantir que o prompt não inventa informações, não viola limites e não induz comportamentos proibidos
+- preservar a essência e objetivo do prompt analisado
+
+LIMITES
+- não alterar o conteúdo do prompt, apenas aprovar ou reprovar
+- não impor sua personalidade sobre o prompt analisado`;
+
+async function validateGeneratedPrompt(prompt: string, apiKey: string): Promise<{ compliant: boolean; violation?: string }> {
+  try {
+    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model: "gpt-4.1-mini",
+        messages: [
+          { role: "system", content: SALOMAO_AUDITOR_IDENTITY },
+          {
+            role: "user",
+            content: `Analise o prompt abaixo e verifique se viola as regras globais do Projeto Agentes (segurança, limites, invenção de informações).\nResponda APENAS com JSON válido, sem markdown:\n{"compliant": true}\nou\n{"compliant": false, "violation": "descrição breve"}\n\n<prompt_gerado>\n${prompt}\n</prompt_gerado>`,
+          },
+        ],
+        max_tokens: 100,
+        temperature: 0,
+      }),
+    });
+    if (!res.ok) return { compliant: true };
+    const data = await res.json() as { choices: { message: { content: string } }[] };
+    const raw = (data.choices?.[0]?.message?.content ?? "").trim();
+    const jsonText = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
+    return JSON.parse(jsonText) as { compliant: boolean; violation?: string };
+  } catch {
+    return { compliant: true };
+  }
+}
+
 const SALOMAO_SYSTEM_PROMPT = `Você é Salomão, Consultor Oficial de Prompts do Projeto Agentes — o especialista em criar prompts de alta performance para agentes de IA.
 
 Seu papel agora é guiar o usuário na criação de um prompt completo e eficaz para o agente dele, fazendo perguntas estratégicas sobre o negócio.
@@ -128,7 +175,18 @@ export default async function promptStudioRoutes(app: FastifyInstance) {
       }
 
       const data = await res.json() as { choices: { message: { content: string } }[] };
-      const content = data.choices?.[0]?.message?.content ?? "";
+      let content = data.choices?.[0]?.message?.content ?? "";
+
+      const promptMatch = content.match(/<prompt>([\s\S]*?)<\/prompt>/i);
+      if (promptMatch) {
+        const validation = await validateGeneratedPrompt(promptMatch[1].trim(), apiKey);
+        if (!validation.compliant) {
+          const stripped = content.replace(/<prompt>[\s\S]*?<\/prompt>/i, "").trim();
+          const note = `⚠️ O prompt gerado não passou na validação (${validation.violation ?? "violação detectada"}). Por favor, revise os detalhes e tente novamente.`;
+          content = stripped ? `${stripped}\n\n${note}` : note;
+        }
+      }
+
       return reply.send({ message: content });
     }
   );

@@ -4,12 +4,39 @@
 
 import { generateText } from "ai";
 import { createModel } from "../lib/create-model";
-import { withTimeout, LLM_TIMEOUT_MS } from "../lib/with-timeout";
-import { validateResponse } from "./salomao-decisor";
-import { getAdminClient } from "@aula-agente/database";
+import { withTimeout, LLM_TIMEOUT_MS, VALIDATION_TIMEOUT_MS } from "../lib/with-timeout";
 import type { Message } from "@aula-agente/shared";
+import { SALOMAO_AUDITOR_IDENTITY } from "./salomao-decisor";
 
 const CRIADOR_MODEL = "gpt-4.1-mini";
+
+async function auditGeneratedPrompt(prompt: string, apiKey: string): Promise<{ compliant: boolean; violation?: string }> {
+  try {
+    const res = await withTimeout(fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model: CRIADOR_MODEL,
+        messages: [
+          { role: "system", content: SALOMAO_AUDITOR_IDENTITY },
+          {
+            role: "user",
+            content: `Analise o prompt abaixo e verifique se viola as regras globais do Projeto Agentes.\nResponda APENAS com JSON válido, sem markdown:\n{"compliant": true}\nou\n{"compliant": false, "violation": "descrição breve"}\n\n<prompt_gerado>\n${prompt}\n</prompt_gerado>`,
+          },
+        ],
+        max_tokens: 100,
+        temperature: 0,
+      }),
+    }), VALIDATION_TIMEOUT_MS);
+    if (!res.ok) return { compliant: true };
+    const data = await res.json() as { choices: { message: { content: string } }[] };
+    const raw = (data.choices?.[0]?.message?.content ?? "").trim();
+    const jsonText = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
+    return JSON.parse(jsonText) as { compliant: boolean; violation?: string };
+  } catch {
+    return { compliant: true };
+  }
+}
 
 const CRIADOR_SYSTEM_PROMPT = `Você é Salomão Criador, especialista em criação de prompts de alta performance para agentes de IA do Projeto Agentes.
 
@@ -50,7 +77,7 @@ REGRAS:
 export interface CriadorResult {
   text: string;
   promptGenerated: boolean;
-  savedPromptId?: string;
+  finalPrompt?: string;
 }
 
 function extractPrompt(text: string): string | null {
@@ -60,10 +87,10 @@ function extractPrompt(text: string): string | null {
 
 function buildHistory(messages: Message[]) {
   return messages
-    .filter((m) => m.role === "contact" || m.role === "agent")
+    .filter((m) => m.role === "contact" || (m.role === "agent" && !!m.metadata?.salomao_criador))
     .map((m) => ({
       role: m.role === "contact" ? ("user" as const) : ("assistant" as const),
-      content: m.content,
+      content: m.role === "contact" ? `<user_message>\n${m.content}\n</user_message>` : m.content,
     }));
 }
 
@@ -71,9 +98,8 @@ export async function runSalamaoCriador(params: {
   messages: Message[];
   currentMessage: Message;
   openaiKey: string;
-  organizationId: string;
 }): Promise<CriadorResult> {
-  const { messages, currentMessage, openaiKey, organizationId } = params;
+  const { messages, currentMessage, openaiKey } = params;
 
   const model = createModel("openai", CRIADOR_MODEL, openaiKey);
   const history = buildHistory(messages);
@@ -103,49 +129,41 @@ export async function runSalamaoCriador(params: {
     return { text, promptGenerated: false };
   }
 
-  // Salomão Auditor valida o prompt gerado antes de entregar
-  const validation = await validateResponse({
-    systemPrompt: CRIADOR_SYSTEM_PROMPT,
-    response: text,
-    provider: "openai",
-    apiKey: openaiKey,
-  });
+  // Salomão Auditor valida o prompt extraído contra as regras globais do Projeto Agentes
+  const validation = await auditGeneratedPrompt(extractedPrompt, openaiKey);
 
   if (!validation.compliant) {
+    const RECUSA = "Não consegui gerar um prompt em conformidade com as regras do sistema. Por favor, revise as informações fornecidas e tente novamente.";
+    let retrySucceeded = false;
     const retryText = await generate(
-      `${CRIADOR_SYSTEM_PROMPT}\n\n[AVISO INTERNO — NÃO MENCIONAR AO USUÁRIO]: O prompt gerado foi reprovado pela auditoria. Violação: "${validation.violation}". Corrija e reescreva o prompt completo dentro das tags <prompt></prompt>.`
-    ).catch(() => text);
-    text = retryText;
+      `${CRIADOR_SYSTEM_PROMPT}\n\n[AVISO INTERNO]: O prompt foi reprovado. Violação: "${validation.violation}". Corrija e reescreva dentro das tags <prompt></prompt>.`
+    ).then(t => { retrySucceeded = true; return t; }).catch(() => text);
+
+    // Só usa o retry se ele ainda contiver as tags — evita vazar texto interno ao usuário
+    text = extractPrompt(retryText) ? retryText : text;
+
+    // Se o retry falhou (threw), recusa imediatamente sem depender do re-audit fail-open
+    if (!retrySucceeded || !extractPrompt(text)) {
+      return { text: RECUSA, promptGenerated: false };
+    }
+
+    // Re-audita o prompt corrigido
+    const revalidation = await auditGeneratedPrompt(extractPrompt(text)!, openaiKey);
+    if (!revalidation.compliant) {
+      return { text: RECUSA, promptGenerated: false };
+    }
   }
 
   const finalPrompt = extractPrompt(text) ?? extractedPrompt;
 
-  // Salva na biblioteca de prompts da organização
-  const db = getAdminClient();
-  const { data: saved } = await db
-    .from("saved_prompts")
-    .insert({
-      organization_id: organizationId,
-      name: `Prompt criado por Salomão — ${new Date().toLocaleDateString("pt-BR")}`,
-      niche: "",
-      content: finalPrompt,
-      created_by: null,
-    })
-    .select("id")
-    .single();
-
-  // Remove as tags do texto exibido e adiciona confirmação
+  // Remove as tags — o caller adiciona a confirmação após confirmar o save no DB
   const cleanText = text
     .replace(/<prompt>[\s\S]*?<\/prompt>/gi, "")
     .trim();
 
-  const deliveryText = cleanText
-    ? `${cleanText}\n\n✅ Prompt salvo na sua Biblioteca de Prompts! Acesse o painel para visualizar, editar ou aplicar ao seu agente.`
-    : "✅ Prompt criado e salvo na sua Biblioteca de Prompts! Acesse o painel para visualizar, editar ou aplicar ao seu agente.";
-
   return {
-    text: deliveryText,
+    text: cleanText,
     promptGenerated: true,
-    savedPromptId: saved?.id,
+    finalPrompt,
   };
 }

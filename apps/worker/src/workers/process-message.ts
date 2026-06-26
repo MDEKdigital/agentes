@@ -408,19 +408,24 @@ export function startProcessMessageWorker() {
           let criadorContent: string;
           let deactivate = false;
 
+          const PROMPT_SAVED_MSG = "✅ Prompt salvo na sua Biblioteca de Prompts! Acesse o painel para visualizar, editar ou aplicar ao seu agente.";
+          const PROMPT_SAVE_FAIL_MSG = "⚠️ Houve um erro ao salvar o prompt na biblioteca. O modo de criação permanece ativo — envie qualquer mensagem para tentar novamente.";
+
           if (existingCriadorResponse) {
             criadorMsg = existingCriadorResponse;
             criadorContent = existingCriadorResponse.content;
             deactivate = !!existingCriadorResponse.metadata?.prompt_saved;
+            // Recompõe a confirmação para o reenvio, já que a msg gravada no DB não a contém
+            if (deactivate) criadorContent = criadorContent ? `${criadorContent}\n\n${PROMPT_SAVED_MSG}` : PROMPT_SAVED_MSG;
           } else {
             const result = await runSalamaoCriador({
               messages: history,
               currentMessage: effectiveMessage,
               openaiKey,
-              organizationId,
             });
             criadorContent = result.text;
-            if (!criadorContent?.trim()) return;
+            // Só aborta se não há texto E nenhum prompt foi gerado
+            if (!result.promptGenerated && !criadorContent?.trim()) return;
 
             deactivate = result.promptGenerated;
             criadorMsg = await createMessage(db, {
@@ -434,18 +439,43 @@ export function startProcessMessageWorker() {
               metadata: {
                 source_message_id: messageId,
                 salomao_criador: true,
-                prompt_saved: result.promptGenerated,
-                saved_prompt_id: result.savedPromptId ?? null,
+                prompt_saved: false, // atualizado para true após insert bem-sucedido abaixo
               },
             });
 
-            if (deactivate) {
-              await db
-                .from("conversations")
-                .update({ prompt_creation_mode: false })
-                .eq("id", conversationId)
-                .eq("organization_id", organizationId);
+            if (result.finalPrompt) {
+              const { error: saveError } = await db
+                .from("saved_prompts")
+                .insert({
+                  organization_id: organizationId,
+                  name: `Prompt criado por Salomão — ${new Date().toLocaleDateString("pt-BR")}`,
+                  niche: "",
+                  content: result.finalPrompt,
+                  created_by: null,
+                });
+              if (saveError) {
+                workerLog("process-message", "error", { conversationId, messageId, organizationId }, "failed to save prompt to library");
+                deactivate = false;
+                criadorContent = criadorContent ? `${criadorContent}\n\n${PROMPT_SAVE_FAIL_MSG}` : PROMPT_SAVE_FAIL_MSG;
+              } else {
+                // Atualiza metadata para refletir o save real — garante idempotência no retry
+                try {
+                  await db
+                    .from("messages")
+                    .update({ metadata: { source_message_id: messageId, salomao_criador: true, prompt_saved: true } })
+                    .eq("id", criadorMsg.id);
+                } catch { /* best-effort — se falhar, retry verá prompt_saved:false e não desativará o modo */ }
+                criadorContent = criadorContent ? `${criadorContent}\n\n${PROMPT_SAVED_MSG}` : PROMPT_SAVED_MSG;
+              }
             }
+          }
+
+          if (deactivate) {
+            await db
+              .from("conversations")
+              .update({ prompt_creation_mode: false })
+              .eq("id", conversationId)
+              .eq("organization_id", organizationId);
           }
 
           await setConversationWaiting(db, conversationId, organizationId, new Date().toISOString());
@@ -588,7 +618,7 @@ export function startProcessMessageWorker() {
           let leadDecision: LeadDecision | null = null;
           if (!isMediaFallback && effectiveMessage.content?.trim()) {
             try {
-              leadDecision = await salomaoDecisor(effectiveMessage.content, apiKey);
+              leadDecision = await salomaoDecisor(effectiveMessage.content, agent.provider, apiKey);
               if (leadDecision) {
                 workerLog("process-message", "info", {
                   conversationId,

@@ -11,6 +11,25 @@ import { withTimeout, VALIDATION_TIMEOUT_MS } from "../lib/with-timeout";
 // UUID fixo que identifica o Salomão como agente de sistema
 export const SALOMAO_ID = "00000000-0000-0000-0000-000000534c4d";
 
+// Identidade canônica do Salomão Auditor para avaliação de prompts gerados
+// Usada por salomao-criador.ts (worker) e prompt-studio/index.ts (API) — manter sincronizados
+export const SALOMAO_AUDITOR_IDENTITY = `Você é Salomão, Consultor Oficial de Prompts do Projeto Agentes.
+Sua função é auditar prompts gerados por outros agentes, garantindo que estejam em conformidade com as regras do sistema.
+
+REGRAS DE SEGURANÇA
+- nunca acessar dados de outro cliente
+- nunca misturar regras, prompts ou contexto entre clientes
+- agir da forma mais restrita em caso de dúvida
+
+OBJETIVO
+- verificar se o prompt gerado segue as regras globais do Projeto Agentes
+- garantir que o prompt não inventa informações, não viola limites e não induz comportamentos proibidos
+- preservar a essência e objetivo do prompt analisado
+
+LIMITES
+- não alterar o conteúdo do prompt, apenas aprovar ou reprovar
+- não impor sua personalidade sobre o prompt analisado`;
+
 // Modelos rápidos — só classificam, não geram texto longo
 export const VALIDATION_MODELS: Record<LLMProvider, string> = {
   openai: "gpt-4.1-mini",
@@ -134,9 +153,10 @@ Regras:
 
 export async function salomaoDecisor(
   message: string,
+  provider: LLMProvider,
   apiKey: string
 ): Promise<LeadDecision | null> {
-  const model = createModel("openai", VALIDATION_MODELS.openai, apiKey);
+  const model = createModel(provider, VALIDATION_MODELS[provider], apiKey);
 
   try {
     const result = await withTimeout(

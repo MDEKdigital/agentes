@@ -465,18 +465,22 @@ export default async function conversationRoutes(app: FastifyInstance) {
       const active = body.active as boolean;
 
       const db = getAdminClient();
-      const { data: conv } = await db
+      const { data: conv, error: convError } = await db
         .from("conversations")
         .select("organization_id")
         .eq("id", conversationId)
         .single();
 
+      if (convError) return reply.status(500).send({ error: "Erro ao buscar conversa" });
       if (!conv) return reply.status(404).send({ error: "Conversa não encontrada" });
 
       const membership = request.user.memberships.find(
         (m) => m.organization_id === conv.organization_id
       );
       if (!membership) return reply.status(403).send({ error: "Acesso negado" });
+      if (membership.role !== "owner" && membership.role !== "admin") {
+        return reply.status(403).send({ error: "Apenas administradores podem alterar o modo de criação de prompt." });
+      }
 
       const { error } = await db
         .from("conversations")
