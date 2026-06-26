@@ -15,6 +15,7 @@ export interface Conversation {
   is_keyword_activated: boolean;
   awaiting_activation_confirmation: boolean;
   is_blocked: boolean;
+  prompt_creation_mode: boolean;
   created_at: string;
   updated_at: string;
 }

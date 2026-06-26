@@ -453,6 +453,51 @@ export default async function conversationRoutes(app: FastifyInstance) {
     }
   );
 
+  app.patch<{ Params: { conversationId: string } }>(
+    "/conversations/:conversationId/prompt-creation-mode",
+    async (request, reply) => {
+      const { conversationId } = request.params;
+      const body = request.body as Record<string, unknown> | null | undefined;
+
+      if (typeof body?.active !== "boolean") {
+        return reply.status(400).send({ error: "Campo 'active' (boolean) é obrigatório." });
+      }
+      const active = body.active as boolean;
+
+      const db = getAdminClient();
+      const { data: conv } = await db
+        .from("conversations")
+        .select("organization_id")
+        .eq("id", conversationId)
+        .single();
+
+      if (!conv) return reply.status(404).send({ error: "Conversa não encontrada" });
+
+      const membership = request.user.memberships.find(
+        (m) => m.organization_id === conv.organization_id
+      );
+      if (!membership) return reply.status(403).send({ error: "Acesso negado" });
+
+      const { error } = await db
+        .from("conversations")
+        .update({ prompt_creation_mode: active })
+        .eq("id", conversationId)
+        .eq("organization_id", conv.organization_id);
+
+      if (error) return reply.status(500).send({ error: "Falha ao atualizar modo de criação de prompt" });
+
+      fireAudit(db, {
+        organization_id: conv.organization_id,
+        user_id: request.user.id,
+        action: active ? "conversation.prompt_creation_mode_activated" : "conversation.prompt_creation_mode_deactivated",
+        entity_type: "conversation",
+        entity_id: conversationId,
+      }, request.log);
+
+      return reply.status(204).send();
+    }
+  );
+
   app.delete<{ Params: { conversationId: string } }>(
     "/conversations/:conversationId",
     async (request, reply) => {

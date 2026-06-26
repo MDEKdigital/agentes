@@ -64,7 +64,13 @@ export type AuditAction =
   | "conversation.keyword_activated"
   | "conversation.resolved"
   | "conversation.human_handoff"
-  | "conversation.note_created";
+  | "conversation.note_created"
+  // Contact
+  | "contact.deleted"
+  | "conversation.blocked"
+  | "conversation.unblocked"
+  | "conversation.prompt_creation_mode_activated"
+  | "conversation.prompt_creation_mode_deactivated";
 
 export type AuditEntityType =
   | "agent"
@@ -80,7 +86,8 @@ export type AuditEntityType =
   | "secret"
   | "remarketing_flow"
   | "remarketing_step"
-  | "remarketing_enrollment";
+  | "remarketing_enrollment"
+  | "contact";
 
 export interface AuditLog {
   id: string;

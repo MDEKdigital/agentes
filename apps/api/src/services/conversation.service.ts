@@ -52,6 +52,8 @@ export async function ensureConversation(params: EnsureConversationParams) {
     last_message_at: new Date().toISOString(),
     is_keyword_activated: false,
     awaiting_activation_confirmation: false,
+    is_blocked: false,
+    prompt_creation_mode: false,
   });
 
   return { conversation, contact, isNew: true };

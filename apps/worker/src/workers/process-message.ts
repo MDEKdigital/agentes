@@ -25,6 +25,7 @@ import { validateMediaPayload } from "../lib/media-validation";
 import { runAgent } from "../agents/agent-runner";
 import { salomaoDecisor } from "../agents/salomao-decisor";
 import type { LeadDecision } from "../agents/salomao-decisor";
+import { runSalamaoCriador } from "../agents/salomao-criador";
 import { evaluateActivation } from "./evaluate-activation";
 import { CLOSE_CONVERSATION_TOOL_NAME } from "../agents/tools/close-conversation";
 import { HUMAN_HANDOFF_TOOL_NAME } from "../agents/tools/registry";
@@ -328,6 +329,7 @@ export function startProcessMessageWorker() {
           console.log(`Conversation ${conversationId} is blocked, skipping agent`);
           return;
         }
+        const isPromptCreationMode = !!(conversation as { prompt_creation_mode?: boolean }).prompt_creation_mode;
         if ((conversation as { status?: string }).status === "resolved") {
           console.log(`Conversation ${conversationId} already resolved, skipping retry`);
           return;
@@ -386,6 +388,89 @@ export function startProcessMessageWorker() {
               media_type: null,
             };
           }
+        }
+
+        // PROMPT_CREATION_MODE: bypass activation gate and normal agent; route to Salomão Criador
+        if (isPromptCreationMode) {
+          let openaiKey: string;
+          try {
+            openaiKey = agent.provider === "openai" ? apiKey : await resolveApiKey(organizationId, "openai");
+          } catch {
+            workerLog("process-message", "error", { conversationId, messageId, organizationId }, "no OpenAI key for prompt creation mode");
+            return;
+          }
+
+          const existingCriadorResponse = recentMessages.find(
+            (m) => m.role === "agent" && m.metadata?.source_message_id === messageId && m.metadata?.salomao_criador
+          );
+
+          let criadorMsg: { id: string };
+          let criadorContent: string;
+          let deactivate = false;
+
+          if (existingCriadorResponse) {
+            criadorMsg = existingCriadorResponse;
+            criadorContent = existingCriadorResponse.content;
+            deactivate = !!existingCriadorResponse.metadata?.prompt_saved;
+          } else {
+            const result = await runSalamaoCriador({
+              messages: history,
+              currentMessage: effectiveMessage,
+              openaiKey,
+              organizationId,
+            });
+            criadorContent = result.text;
+            if (!criadorContent?.trim()) return;
+
+            deactivate = result.promptGenerated;
+            criadorMsg = await createMessage(db, {
+              conversation_id: conversationId,
+              organization_id: organizationId,
+              evolution_message_id: null,
+              role: "agent",
+              content: criadorContent,
+              media_url: null,
+              media_type: null,
+              metadata: {
+                source_message_id: messageId,
+                salomao_criador: true,
+                prompt_saved: result.promptGenerated,
+                saved_prompt_id: result.savedPromptId ?? null,
+              },
+            });
+
+            if (deactivate) {
+              await db
+                .from("conversations")
+                .update({ prompt_creation_mode: false })
+                .eq("id", conversationId)
+                .eq("organization_id", organizationId);
+            }
+          }
+
+          await setConversationWaiting(db, conversationId, organizationId, new Date().toISOString());
+
+          const sendQueue = getSendMessageQueue();
+          const parts = splitMessage(criadorContent);
+          await Promise.all(
+            parts.map((part, i) =>
+              sendQueue.add(
+                "send-message",
+                {
+                  conversationId,
+                  messageId: criadorMsg.id,
+                  instanceId: instance.id,
+                  phone: contact.phone,
+                  content: part,
+                  organizationId,
+                },
+                { jobId: `${messageId}_criador_part_${i}`, delay: i * INTER_PART_DELAY_MS }
+              )
+            )
+          );
+
+          workerLog("process-message", "info", { conversationId, messageId, organizationId, deactivate: String(deactivate) }, "prompt-creation-mode handled");
+          return;
         }
 
         // Activation gate — runs after preprocessing so audio content is matched
@@ -509,7 +594,8 @@ export function startProcessMessageWorker() {
                   conversationId,
                   messageId,
                   organizationId,
-                  leadDecision,
+                  leadType: leadDecision.lead_type,
+                  leadStage: leadDecision.stage,
                 }, "salomao-decisor classified lead");
               }
             } catch (err) {

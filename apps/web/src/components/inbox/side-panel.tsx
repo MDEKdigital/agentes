@@ -11,7 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { apiFetch } from "@/lib/api";
-import { Phone, User, Trash2, Ban, CheckCircle2 } from "lucide-react";
+import { Phone, User, Trash2, Ban, CheckCircle2, Wand2 } from "lucide-react";
 import type { ConversationStatus } from "@aula-agente/shared";
 
 interface SidePanelProps {
@@ -21,6 +21,7 @@ interface SidePanelProps {
     status: ConversationStatus;
     is_human_takeover: boolean;
     is_blocked: boolean;
+    prompt_creation_mode: boolean;
     assigned_to: string | null;
     tags: string[];
     contacts: { phone: string; name: string | null };
@@ -47,6 +48,19 @@ export function SidePanel({ conversation, onUpdate, onDelete }: SidePanelProps) 
       onUpdate();
     } catch (err) {
       alert(err instanceof Error ? err.message : "Erro ao atualizar status");
+    }
+  };
+
+  const handleTogglePromptCreation = async () => {
+    const newActive = !conversation.prompt_creation_mode;
+    try {
+      await apiFetch(`/conversations/${conversation.id}/prompt-creation-mode`, {
+        method: "PATCH",
+        body: JSON.stringify({ active: newActive }),
+      });
+      onUpdate();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Erro ao atualizar modo de criação");
     }
   };
 
@@ -95,6 +109,12 @@ export function SidePanel({ conversation, onUpdate, onDelete }: SidePanelProps) 
             <span className="text-[11px] font-medium text-destructive">Conversa bloqueada</span>
           </div>
         )}
+        {conversation.prompt_creation_mode && (
+          <div className="mb-2 flex items-center gap-1.5 rounded-md bg-violet-500/10 px-2 py-1">
+            <Wand2 className="h-3 w-3 text-violet-400" />
+            <span className="text-[11px] font-medium text-violet-400">Modo criação de prompt</span>
+          </div>
+        )}
         <Select value={conversation.status} onValueChange={handleStatusChange}>
           <SelectTrigger className="h-8 text-xs bg-muted border-border">
             <SelectValue />
@@ -141,6 +161,17 @@ export function SidePanel({ conversation, onUpdate, onDelete }: SidePanelProps) 
 
       {/* Ações */}
       <div className="mt-auto flex flex-col gap-2 p-4">
+        <button
+          onClick={handleTogglePromptCreation}
+          className={`flex w-full items-center justify-center gap-2 rounded-md border px-3 py-2 text-xs font-medium transition-colors ${
+            conversation.prompt_creation_mode
+              ? "border-violet-500/30 text-violet-400 hover:bg-violet-500/10"
+              : "border-violet-500/30 text-violet-400 hover:bg-violet-500/10"
+          }`}
+        >
+          <Wand2 className="h-3.5 w-3.5" />
+          {conversation.prompt_creation_mode ? "Desativar criação de prompt" : "Criar prompt com Salomão"}
+        </button>
         <button
           onClick={handleToggleBlock}
           className={`flex w-full items-center justify-center gap-2 rounded-md border px-3 py-2 text-xs font-medium transition-colors ${

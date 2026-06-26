@@ -26,6 +26,7 @@ export function ChatPanel({ conversationId, onDelete }: ChatPanelProps) {
     status: "open" | "waiting" | "resolved" | "closed";
     is_human_takeover: boolean;
     is_blocked: boolean;
+    prompt_creation_mode: boolean;
     assigned_to: string | null;
     tags: string[];
     contacts: { phone: string; name: string | null };

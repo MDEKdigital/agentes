@@ -22,4 +22,8 @@ export interface MessageMetadata {
   tool_calls?: string[];
   source_message_id?: string;
   type?: string;
+  salomao_criador?: boolean;
+  prompt_saved?: boolean;
+  saved_prompt_id?: string | null;
+  [key: string]: unknown;
 }
