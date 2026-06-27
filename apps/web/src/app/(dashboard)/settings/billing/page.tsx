@@ -132,7 +132,12 @@ export default function BillingPage() {
 
   const loadAdmin = useCallback(() => {
     apiFetch("/admin/organizations")
-      .then((res) => setAdminData(res as AdminData))
+      .then((res) => {
+        const d = res as AdminData | null;
+        if (d && Array.isArray(d.orgs) && Array.isArray(d.plans)) {
+          setAdminData(d);
+        }
+      })
       .catch(() => { /* 403 para usuários normais — ignorar silenciosamente */ });
   }, []);
 
@@ -203,7 +208,11 @@ export default function BillingPage() {
 
       {/* Admin tab */}
       {adminData && activeTab === "admin" && (
-        <AdminPanel orgs={adminData.orgs} plans={adminData.plans} onRefresh={loadAdmin} />
+        <AdminPanel
+          orgs={adminData.orgs ?? []}
+          plans={adminData.plans ?? []}
+          onRefresh={loadAdmin}
+        />
       )}
 
       {/* Billing tab */}

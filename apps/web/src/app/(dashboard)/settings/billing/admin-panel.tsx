@@ -127,7 +127,7 @@ function OrgRow({ org, plans, onRefresh }: { org: AdminOrgRow; plans: Plan[]; on
   const [expanded, setExpanded] = useState(false);
   const [modal, setModal] = useState<"activate" | "change-plan" | "cancel" | null>(null);
   const [modalLoading, setModalLoading] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState(plans[0]?.id ?? "");
+  const [selectedPlan, setSelectedPlan] = useState<string>((plans ?? [])[0]?.id ?? "");
   const [selectedInterval, setSelectedInterval] = useState("manual");
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
@@ -436,13 +436,16 @@ function OrgRow({ org, plans, onRefresh }: { org: AdminOrgRow; plans: Plan[]; on
 }
 
 export function AdminPanel({ orgs, plans, onRefresh }: AdminPanelProps) {
+  const safeOrgs = (orgs ?? []).filter((o): o is AdminOrgRow => !!o);
+  const safePlans = (plans ?? []).filter((p): p is Plan => !!p);
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-sm font-semibold text-foreground">Todas as organizações</h2>
           <p className="text-xs text-muted-foreground mt-0.5">
-            {orgs.length} organização{orgs.length !== 1 ? "s" : ""}
+            {safeOrgs.length} organização{safeOrgs.length !== 1 ? "s" : ""}
           </p>
         </div>
         <button
@@ -470,8 +473,8 @@ export function AdminPanel({ orgs, plans, onRefresh }: AdminPanelProps) {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {orgs.map((org) => (
-                <OrgRow key={org.id} org={org} plans={plans} onRefresh={onRefresh} />
+              {safeOrgs.map((org) => (
+                <OrgRow key={org.id} org={org} plans={safePlans} onRefresh={onRefresh} />
               ))}
             </tbody>
           </table>
