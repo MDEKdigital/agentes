@@ -99,7 +99,7 @@ function Modal({ title, onClose, onConfirm, loading, children }: {
 
 function OrgRow({ org, plans, onRefresh }: { org: OrgRow; plans: Plan[]; onRefresh: () => void }) {
   const [expanded, setExpanded] = useState(false);
-  const [modal, setModal] = useState<"activate" | "plan" | "cancel" | null>(null);
+  const [modal, setModal] = useState<"activate" | "plan" | "cancel" | "delete" | null>(null);
   const [busy, setBusy] = useState(false);
   const [planId, setPlanId] = useState(plans[0]?.id ?? "");
   const [interval, setInterval] = useState("manual");
@@ -147,7 +147,7 @@ function OrgRow({ org, plans, onRefresh }: { org: OrgRow; plans: Plan[]; onRefre
               ? <button onClick={() => { setPlanId(plans[0]?.id ?? ""); setInterval("manual"); setModal("activate"); }} className="rounded border border-green-500/40 px-2 py-1 text-[11px] font-medium text-green-400 hover:bg-green-500/10 transition-colors">Ativar</button>
               : <>
                   <button onClick={() => { setPlanId(sub.plan?.id ?? plans[0]?.id ?? ""); setModal("plan"); }} className="rounded border border-blue-500/40 px-2 py-1 text-[11px] font-medium text-blue-400 hover:bg-blue-500/10 transition-colors">Plano</button>
-                  <button onClick={() => setModal("cancel")} className="rounded border border-destructive/40 px-2 py-1 text-[11px] font-medium text-destructive hover:bg-destructive/10 transition-colors">Cancelar</button>
+                  <button onClick={() => setModal("cancel")} className="rounded border border-orange-500/40 px-2 py-1 text-[11px] font-medium text-orange-400 hover:bg-orange-500/10 transition-colors">Desativar</button>
                 </>
             }
             <button
@@ -158,6 +158,12 @@ function OrgRow({ org, plans, onRefresh }: { org: OrgRow; plans: Plan[]; onRefre
               className="rounded border border-border px-2 py-1 text-[11px] font-medium text-muted-foreground hover:bg-accent transition-colors"
             >
               Reenviar
+            </button>
+            <button
+              onClick={() => setModal("delete")}
+              className="rounded border border-destructive/40 px-2 py-1 text-[11px] font-medium text-destructive hover:bg-destructive/10 transition-colors"
+            >
+              Apagar
             </button>
           </div>
         </td>
@@ -268,6 +274,16 @@ function OrgRow({ org, plans, onRefresh }: { org: OrgRow; plans: Plan[]; onRefre
         <Modal title="Cancelar assinatura" onClose={() => setModal(null)} onConfirm={() => act(() => apiFetch(`/admin/subscriptions/${sub.id}`, { method: "DELETE" }).then(() => {}))} loading={busy}>
           <p className="text-xs text-muted-foreground">
             Cancelar a assinatura de <strong className="text-foreground">{org.name}</strong> imediatamente?
+          </p>
+          {msg && !msg.ok && <p className="text-[11px] text-destructive">{msg.text}</p>}
+        </Modal>
+      )}
+
+      {modal === "delete" && (
+        <Modal title="Apagar organização" onClose={() => setModal(null)} onConfirm={() => act(() => apiFetch(`/admin/organizations/${org.id}`, { method: "DELETE" }).then(() => {}))} loading={busy}>
+          <p className="text-xs text-muted-foreground">
+            Apagar <strong className="text-foreground">{org.name}</strong> permanentemente?
+            Isso remove a organização e todos os dados associados. Não tem volta.
           </p>
           {msg && !msg.ok && <p className="text-[11px] text-destructive">{msg.text}</p>}
         </Modal>

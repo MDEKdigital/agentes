@@ -111,6 +111,13 @@ export default function BillingPage() {
     }
   }, [orgLoading, currentOrg, isAdmin, router]);
 
+  // Super-admin não tem área de assinatura própria — redireciona para o painel
+  useEffect(() => {
+    apiFetch("/admin/organizations")
+      .then(() => router.replace("/painel-gestor"))
+      .catch(() => {});
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const load = useCallback(() => {
     if (!currentOrg) { setLoading(false); return; }
     setLoading(true);

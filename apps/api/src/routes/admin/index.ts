@@ -200,4 +200,33 @@ export default async function adminRoutes(app: FastifyInstance) {
       return reply.send({ message: "Convite reenviado para " + invitation.email });
     }
   );
+
+  // DELETE /admin/organizations/:orgId
+  app.delete<{ Params: { orgId: string } }>(
+    "/admin/organizations/:orgId",
+    async (request, reply) => {
+      const { orgId } = request.params;
+      const db = getAdminClient();
+      try {
+        const { error } = await db.from("organizations").delete().eq("id", orgId);
+        if (error) throw error;
+        fireAudit(
+          db,
+          {
+            organization_id: null,
+            user_id: request.user.id,
+            action: "organization.deleted",
+            entity_type: "organization",
+            entity_id: orgId,
+            metadata: { source: "admin_delete" },
+          },
+          request.log
+        );
+        return reply.status(204).send();
+      } catch (err) {
+        request.log.error({ err }, "admin: failed to delete organization");
+        return reply.status(500).send({ error: "Erro ao deletar organização." });
+      }
+    }
+  );
 }
