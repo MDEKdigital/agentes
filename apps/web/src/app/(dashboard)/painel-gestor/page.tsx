@@ -95,11 +95,101 @@ function Modal({ title, onClose, onConfirm, loading, children }: {
   );
 }
 
+// ─── SecretsModal ─────────────────────────────────────────────────────────────
+
+const PROVIDERS = [
+  { id: "openai", name: "OpenAI", placeholder: "sk-..." },
+  { id: "anthropic", name: "Anthropic", placeholder: "sk-ant-..." },
+  { id: "google", name: "Google AI", placeholder: "AI..." },
+] as const;
+
+function SecretsModal({ orgId, orgName, onClose }: { orgId: string; orgName: string; onClose: () => void }) {
+  const [configured, setConfigured] = useState<Record<string, boolean>>({});
+  const [keys, setKeys] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    apiFetch(`/admin/organizations/${orgId}/secrets`)
+      .then((d) => {
+        const cfg: Record<string, boolean> = {};
+        (d as { provider: string }[]).forEach((s) => { cfg[s.provider] = true; });
+        setConfigured(cfg);
+      })
+      .finally(() => setLoading(false));
+  }, [orgId]);
+
+  const save = async (provider: string) => {
+    const key = keys[provider]?.trim();
+    if (!key) return;
+    setSaving(provider);
+    try {
+      await apiFetch(`/admin/organizations/${orgId}/secrets/${provider}`, {
+        method: "PUT",
+        body: JSON.stringify({ key }),
+      });
+      setConfigured((p) => ({ ...p, [provider]: true }));
+      setKeys((p) => ({ ...p, [provider]: "" }));
+    } catch (e) {
+      alert((e as Error).message);
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+      <div className="w-full max-w-md rounded-xl border border-border bg-card p-5 shadow-xl">
+        <h3 className="mb-1 text-sm font-semibold text-foreground">Chaves API — {orgName}</h3>
+        <p className="mb-4 text-[11px] text-muted-foreground">Chaves salvas aqui substituem o fallback global para esta org.</p>
+        {loading ? (
+          <div className="flex justify-center py-6"><Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /></div>
+        ) : (
+          <div className="space-y-3">
+            {PROVIDERS.map((p) => (
+              <div key={p.id} className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-foreground">{p.name}</span>
+                  {configured[p.id]
+                    ? <span className="text-[10px] font-medium text-green-400">✓ Configurada</span>
+                    : <span className="text-[10px] text-muted-foreground">Não configurada</span>
+                  }
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={keys[p.id] ?? ""}
+                    onChange={(e) => setKeys((prev) => ({ ...prev, [p.id]: e.target.value }))}
+                    placeholder={configured[p.id] ? "Nova chave para substituir..." : p.placeholder}
+                    className="flex-1 rounded-lg border border-border bg-muted px-3 py-1.5 font-mono text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-border"
+                  />
+                  <button
+                    onClick={() => save(p.id)}
+                    disabled={saving === p.id || !keys[p.id]?.trim()}
+                    className="rounded-lg border border-border bg-muted px-3 text-xs font-medium text-foreground hover:bg-accent disabled:opacity-50 transition-colors"
+                  >
+                    {saving === p.id ? <Loader2 className="h-3 w-3 animate-spin" /> : "Salvar"}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="mt-5 flex justify-end">
+          <button onClick={onClose} className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-accent transition-colors">
+            Fechar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── OrgRow ──────────────────────────────────────────────────────────────────
 
 function OrgRow({ org, plans, onRefresh }: { org: OrgRow; plans: Plan[]; onRefresh: () => void }) {
   const [expanded, setExpanded] = useState(false);
-  const [modal, setModal] = useState<"activate" | "plan" | "cancel" | "delete" | null>(null);
+  const [modal, setModal] = useState<"activate" | "plan" | "cancel" | "delete" | "secrets" | null>(null);
   const [busy, setBusy] = useState(false);
   const [planId, setPlanId] = useState(plans[0]?.id ?? "");
   const [interval, setInterval] = useState("manual");
@@ -158,6 +248,12 @@ function OrgRow({ org, plans, onRefresh }: { org: OrgRow; plans: Plan[]; onRefre
               className="rounded border border-border px-2 py-1 text-[11px] font-medium text-muted-foreground hover:bg-accent transition-colors"
             >
               Reenviar
+            </button>
+            <button
+              onClick={() => setModal("secrets")}
+              className="rounded border border-border px-2 py-1 text-[11px] font-medium text-muted-foreground hover:bg-accent transition-colors"
+            >
+              Chaves
             </button>
             <button
               onClick={() => setModal("delete")}
@@ -287,6 +383,10 @@ function OrgRow({ org, plans, onRefresh }: { org: OrgRow; plans: Plan[]; onRefre
           </p>
           {msg && !msg.ok && <p className="text-[11px] text-destructive">{msg.text}</p>}
         </Modal>
+      )}
+
+      {modal === "secrets" && (
+        <SecretsModal orgId={org.id} orgName={org.name} onClose={() => setModal(null)} />
       )}
     </>
   );

@@ -292,16 +292,7 @@ export default function SettingsPage() {
                 >
                   {savingKey === provider.id ? "..." : "Salvar"}
                 </button>
-                {configuredProviders[provider.id] && (
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveApiKey(provider.id)}
-                    disabled={savingKey === provider.id}
-                    className="flex h-9 w-9 items-center justify-center rounded-lg border border-destructive/30 text-destructive/70 transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                )}
+                {/* Remoção de chave gerenciada pelo admin */}
               </div>
             </div>
           ))}

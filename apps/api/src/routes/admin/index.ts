@@ -13,7 +13,10 @@ import { authMiddleware } from "../../middleware/auth";
 import { superAdminMiddleware } from "../../middleware/super-admin";
 import { sendWelcomeEmailApi } from "../../lib/email";
 import { fireAudit } from "../../lib/audit";
+import { encrypt } from "../../lib/crypto";
 import type { BillingInterval, SubscriptionStatus } from "@aula-agente/shared";
+
+const ALLOWED_PROVIDERS = ["openai", "anthropic", "google"] as const;
 
 const VALID_INTERVALS = new Set<BillingInterval>(["manual", "monthly", "yearly", "lifetime"]);
 const VALID_STATUSES = new Set<SubscriptionStatus>(["active", "cancelled", "past_due", "paused", "trial"]);
@@ -198,6 +201,65 @@ export default async function adminRoutes(app: FastifyInstance) {
       );
 
       return reply.send({ message: "Convite reenviado para " + invitation.email });
+    }
+  );
+
+  // GET /admin/organizations/:orgId/secrets
+  app.get<{ Params: { orgId: string } }>(
+    "/admin/organizations/:orgId/secrets",
+    async (request, reply) => {
+      const { orgId } = request.params;
+      const db = getAdminClient();
+      const { data, error } = await db
+        .from("organization_secrets")
+        .select("provider")
+        .eq("organization_id", orgId);
+      if (error) return reply.status(500).send({ error: "Erro ao buscar secrets." });
+      return reply.send((data ?? []).map((s) => ({ provider: s.provider, has_key: true })));
+    }
+  );
+
+  // PUT /admin/organizations/:orgId/secrets/:provider
+  app.put<{ Params: { orgId: string; provider: string }; Body: { key: string } }>(
+    "/admin/organizations/:orgId/secrets/:provider",
+    async (request, reply) => {
+      const { orgId, provider } = request.params;
+      const { key } = request.body;
+      if (!key?.trim()) return reply.status(400).send({ error: "Chave obrigatória." });
+      if (!ALLOWED_PROVIDERS.includes(provider as (typeof ALLOWED_PROVIDERS)[number])) {
+        return reply.status(400).send({ error: "Provider inválido." });
+      }
+      const db = getAdminClient();
+      const { error } = await db.from("organization_secrets").upsert(
+        { organization_id: orgId, provider, encrypted_key: encrypt(key.trim()) },
+        { onConflict: "organization_id,provider" }
+      );
+      if (error) return reply.status(500).send({ error: "Erro ao salvar chave." });
+      fireAudit(db, {
+        organization_id: orgId,
+        user_id: request.user.id,
+        action: "secret.upserted",
+        entity_type: "secret",
+        entity_id: `${orgId}:${provider}`,
+        metadata: { provider, source: "admin" },
+      }, request.log);
+      return reply.status(204).send();
+    }
+  );
+
+  // DELETE /admin/organizations/:orgId/secrets/:provider
+  app.delete<{ Params: { orgId: string; provider: string } }>(
+    "/admin/organizations/:orgId/secrets/:provider",
+    async (request, reply) => {
+      const { orgId, provider } = request.params;
+      const db = getAdminClient();
+      const { error } = await db
+        .from("organization_secrets")
+        .delete()
+        .eq("organization_id", orgId)
+        .eq("provider", provider);
+      if (error) return reply.status(500).send({ error: "Erro ao remover chave." });
+      return reply.status(204).send();
     }
   );
 
