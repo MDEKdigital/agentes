@@ -1,4 +1,5 @@
 import type { FastifyInstance } from "fastify";
+import { Agent } from "undici";
 import { getAdminClient } from "@aula-agente/database";
 import { authMiddleware } from "../../middleware/auth";
 import { decrypt } from "../../lib/crypto";
@@ -83,6 +84,16 @@ REGRAS:
 - Nunca pule etapas sem perguntar
 - O prompt gerado deve seguir as regras globais do Projeto Agentes
 - O prompt deve ter: identidade do agente, objetivo, tom, regras, limites e formato de resposta`;
+
+async function resolveSystemPrompt(): Promise<string> {
+  const db = getAdminClient();
+  const { data } = await db
+    .from("salomao_config")
+    .select("system_prompt")
+    .limit(1)
+    .single();
+  return data?.system_prompt ?? SALOMAO_SYSTEM_PROMPT;
+}
 
 async function resolveOrgOpenAIKey(organizationId: string): Promise<string> {
   const db = getAdminClient();
@@ -188,6 +199,122 @@ export default async function promptStudioRoutes(app: FastifyInstance) {
       }
 
       return reply.send({ message: content });
+    }
+  );
+
+  // Streaming endpoint — SSE
+  app.post<{ Params: { organizationId: string } }>(
+    "/organizations/:organizationId/prompt-studio/chat/stream",
+    async (request, reply) => {
+      const { organizationId } = request.params;
+      const membership = request.user.memberships.find(
+        (m) => m.organization_id === organizationId
+      );
+      if (!membership) return reply.status(403).send({ error: "Acesso negado" });
+
+      const { messages } = request.body as { messages: { role: string; content: string }[] };
+      if (!Array.isArray(messages)) return reply.status(400).send({ error: "Mensagens obrigatórias" });
+
+      const [apiKey, systemPrompt] = await Promise.all([
+        resolveOrgOpenAIKey(organizationId),
+        resolveSystemPrompt(),
+      ]);
+
+      // Hijack response — Fastify não deve finalizar
+      reply.hijack();
+      const raw = reply.raw;
+      raw.setHeader("Content-Type", "text/event-stream");
+      raw.setHeader("Cache-Control", "no-cache");
+      raw.setHeader("Connection", "keep-alive");
+      raw.setHeader("X-Accel-Buffering", "no");
+      raw.flushHeaders();
+
+      const sendEvent = (data: object) => {
+        try { raw.write(`data: ${JSON.stringify(data)}\n\n`); } catch { /* client disconnected */ }
+      };
+
+      try {
+        // Bypass global undici bodyTimeout para streaming longo
+        const streamAgent = new Agent({ headersTimeout: 15_000, bodyTimeout: 0 });
+
+        const res = await (fetch as (url: string, init?: RequestInit & { dispatcher?: unknown }) => Promise<Response>)(
+          "https://api.openai.com/v1/chat/completions",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+            body: JSON.stringify({
+              model: "gpt-4.1-nano",
+              messages: [
+                { role: "system", content: systemPrompt },
+                ...messages,
+              ],
+              max_tokens: 1500,
+              temperature: 0.7,
+              stream: true,
+            }),
+            dispatcher: streamAgent,
+          } as RequestInit & { dispatcher?: unknown }
+        );
+
+        if (!res.ok || !res.body) {
+          sendEvent({ type: "error", message: "Erro ao chamar IA" });
+          raw.end();
+          return;
+        }
+
+        const decoder = new TextDecoder();
+        let accumulated = "";
+        let promptSent = false;
+
+        for await (const chunk of res.body as AsyncIterable<Uint8Array>) {
+          const text = decoder.decode(chunk, { stream: true });
+          const lines = text.split("\n");
+
+          for (const line of lines) {
+            if (!line.startsWith("data: ")) continue;
+            const data = line.slice(6).trim();
+            if (data === "[DONE]") continue;
+
+            try {
+              const parsed = JSON.parse(data) as {
+                choices: { delta: { content?: string }; finish_reason?: string }[];
+              };
+              const content = parsed.choices?.[0]?.delta?.content ?? "";
+              if (!content) continue;
+
+              accumulated += content;
+              sendEvent({ type: "chunk", content });
+
+              // Detecta prompt completo e valida
+              if (!promptSent) {
+                const match = accumulated.match(/<prompt>([\s\S]*?)<\/prompt>/i);
+                if (match) {
+                  const extractedPrompt = match[1].trim();
+                  const validation = await validateGeneratedPrompt(extractedPrompt, apiKey);
+                  if (!validation.compliant) {
+                    sendEvent({
+                      type: "error",
+                      message: `Prompt não passou na validação: ${validation.violation ?? "violação detectada"}`,
+                    });
+                  } else {
+                    sendEvent({ type: "prompt", content: extractedPrompt });
+                  }
+                  promptSent = true;
+                }
+              }
+            } catch {
+              // Ignora chunks malformados
+            }
+          }
+        }
+
+        sendEvent({ type: "done" });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Erro desconhecido";
+        sendEvent({ type: "error", message: msg });
+      } finally {
+        raw.end();
+      }
     }
   );
 
