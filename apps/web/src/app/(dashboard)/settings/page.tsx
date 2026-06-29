@@ -6,7 +6,7 @@ import { useOrganization } from "@/providers/organization-provider";
 import { apiFetch } from "@/lib/api";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Eye, EyeOff, Save, Trash2, CheckCircle, Building2, Key, AlertTriangle, CreditCard, ChevronRight } from "lucide-react";
+import { Eye, EyeOff, Save, CheckCircle, Building2, Key, AlertTriangle, CreditCard, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { LLMProvider } from "@aula-agente/shared";
 

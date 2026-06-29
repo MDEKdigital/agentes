@@ -235,7 +235,7 @@ export default async function adminRoutes(app: FastifyInstance) {
         { onConflict: "organization_id,provider" }
       );
       if (error) return reply.status(500).send({ error: "Erro ao salvar chave." });
-      fireAudit(db, {
+      await fireAudit(db, {
         organization_id: orgId,
         user_id: request.user.id,
         action: "secret.upserted",
@@ -252,6 +252,9 @@ export default async function adminRoutes(app: FastifyInstance) {
     "/admin/organizations/:orgId/secrets/:provider",
     async (request, reply) => {
       const { orgId, provider } = request.params;
+      if (!ALLOWED_PROVIDERS.includes(provider as (typeof ALLOWED_PROVIDERS)[number])) {
+        return reply.status(400).send({ error: "Provider inválido." });
+      }
       const db = getAdminClient();
       const { error } = await db
         .from("organization_secrets")
@@ -259,6 +262,14 @@ export default async function adminRoutes(app: FastifyInstance) {
         .eq("organization_id", orgId)
         .eq("provider", provider);
       if (error) return reply.status(500).send({ error: "Erro ao remover chave." });
+      await fireAudit(db, {
+        organization_id: orgId,
+        user_id: request.user.id,
+        action: "secret.deleted",
+        entity_type: "secret",
+        entity_id: `${orgId}:${provider}`,
+        metadata: { provider, source: "admin" },
+      }, request.log);
       return reply.status(204).send();
     }
   );

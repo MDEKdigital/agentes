@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, ChevronDown, ChevronRight, RefreshCw } from "lucide-react";
+import { Loader2, ChevronDown, ChevronRight, RefreshCw, Eye, EyeOff, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/api";
 import type { Plan } from "@aula-agente/shared";
@@ -106,8 +106,12 @@ const PROVIDERS = [
 function SecretsModal({ orgId, orgName, onClose }: { orgId: string; orgName: string; onClose: () => void }) {
   const [configured, setConfigured] = useState<Record<string, boolean>>({});
   const [keys, setKeys] = useState<Record<string, string>>({});
+  const [showKey, setShowKey] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
     apiFetch(`/admin/organizations/${orgId}/secrets`)
@@ -116,6 +120,7 @@ function SecretsModal({ orgId, orgName, onClose }: { orgId: string; orgName: str
         (d as { provider: string }[]).forEach((s) => { cfg[s.provider] = true; });
         setConfigured(cfg);
       })
+      .catch((e: Error) => setFetchError(e.message))
       .finally(() => setLoading(false));
   }, [orgId]);
 
@@ -123,6 +128,7 @@ function SecretsModal({ orgId, orgName, onClose }: { orgId: string; orgName: str
     const key = keys[provider]?.trim();
     if (!key) return;
     setSaving(provider);
+    setSaveError(null);
     try {
       await apiFetch(`/admin/organizations/${orgId}/secrets/${provider}`, {
         method: "PUT",
@@ -131,9 +137,22 @@ function SecretsModal({ orgId, orgName, onClose }: { orgId: string; orgName: str
       setConfigured((p) => ({ ...p, [provider]: true }));
       setKeys((p) => ({ ...p, [provider]: "" }));
     } catch (e) {
-      alert((e as Error).message);
+      setSaveError((e as Error).message);
     } finally {
       setSaving(null);
+    }
+  };
+
+  const remove = async (provider: string) => {
+    setDeleting(provider);
+    setSaveError(null);
+    try {
+      await apiFetch(`/admin/organizations/${orgId}/secrets/${provider}`, { method: "DELETE" });
+      setConfigured((p) => ({ ...p, [provider]: false }));
+    } catch (e) {
+      setSaveError((e as Error).message);
+    } finally {
+      setDeleting(null);
     }
   };
 
@@ -144,25 +163,49 @@ function SecretsModal({ orgId, orgName, onClose }: { orgId: string; orgName: str
         <p className="mb-4 text-[11px] text-muted-foreground">Chaves salvas aqui substituem o fallback global para esta org.</p>
         {loading ? (
           <div className="flex justify-center py-6"><Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /></div>
+        ) : fetchError ? (
+          <p className="text-[11px] text-destructive py-4 text-center">{fetchError}</p>
         ) : (
           <div className="space-y-3">
             {PROVIDERS.map((p) => (
               <div key={p.id} className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-medium text-foreground">{p.name}</span>
-                  {configured[p.id]
-                    ? <span className="text-[10px] font-medium text-green-400">✓ Configurada</span>
-                    : <span className="text-[10px] text-muted-foreground">Não configurada</span>
-                  }
+                  <div className="flex items-center gap-2">
+                    {configured[p.id]
+                      ? <span className="text-[10px] font-medium text-green-400">✓ Configurada</span>
+                      : <span className="text-[10px] text-muted-foreground">Não configurada</span>
+                    }
+                    {configured[p.id] && (
+                      <button
+                        onClick={() => remove(p.id)}
+                        disabled={deleting === p.id}
+                        className="flex items-center justify-center h-5 w-5 rounded text-destructive/70 hover:text-destructive hover:bg-destructive/10 disabled:opacity-50 transition-colors"
+                        title="Remover chave"
+                      >
+                        {deleting === p.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
+                      </button>
+                    )}
+                  </div>
                 </div>
                 <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={keys[p.id] ?? ""}
-                    onChange={(e) => setKeys((prev) => ({ ...prev, [p.id]: e.target.value }))}
-                    placeholder={configured[p.id] ? "Nova chave para substituir..." : p.placeholder}
-                    className="flex-1 rounded-lg border border-border bg-muted px-3 py-1.5 font-mono text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-border"
-                  />
+                  <div className="relative flex-1">
+                    <input
+                      type={showKey[p.id] ? "text" : "password"}
+                      value={keys[p.id] ?? ""}
+                      onChange={(e) => setKeys((prev) => ({ ...prev, [p.id]: e.target.value }))}
+                      placeholder={configured[p.id] ? "Nova chave para substituir..." : p.placeholder}
+                      autoComplete="new-password"
+                      className="w-full rounded-lg border border-border bg-muted px-3 py-1.5 pr-8 font-mono text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-border"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowKey((prev) => ({ ...prev, [p.id]: !prev[p.id] }))}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      {showKey[p.id] ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                    </button>
+                  </div>
                   <button
                     onClick={() => save(p.id)}
                     disabled={saving === p.id || !keys[p.id]?.trim()}
@@ -175,6 +218,7 @@ function SecretsModal({ orgId, orgName, onClose }: { orgId: string; orgName: str
             ))}
           </div>
         )}
+        {saveError && <p className="mt-3 text-[11px] text-destructive">{saveError}</p>}
         <div className="mt-5 flex justify-end">
           <button onClick={onClose} className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-accent transition-colors">
             Fechar
