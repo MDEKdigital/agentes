@@ -329,7 +329,7 @@ export default async function conversationRoutes(app: FastifyInstance) {
       const membership = request.user.memberships.find(
         (m) => m.organization_id === conv.organization_id
       );
-      if (!membership) return reply.status(403).send({ error: "Acesso negado" });
+      if (!membership || membership.role === "agent") return reply.status(403).send({ error: "Acesso negado" });
 
       await updateConversationTags(db, conversationId, conv.organization_id, tags);
 
@@ -369,7 +369,7 @@ export default async function conversationRoutes(app: FastifyInstance) {
       const membership = request.user.memberships.find(
         (m) => m.organization_id === conv.organization_id
       );
-      if (!membership) return reply.status(403).send({ error: "Acesso negado" });
+      if (!membership || membership.role === "agent") return reply.status(403).send({ error: "Acesso negado" });
 
       if (assignedTo !== null) {
         const { data: assigneeMembership } = await db
@@ -431,7 +431,7 @@ export default async function conversationRoutes(app: FastifyInstance) {
       const membership = request.user.memberships.find(
         (m) => m.organization_id === conv.organization_id
       );
-      if (!membership) return reply.status(403).send({ error: "Acesso negado" });
+      if (!membership || membership.role === "agent") return reply.status(403).send({ error: "Acesso negado" });
 
       const { error } = await db
         .from("conversations")

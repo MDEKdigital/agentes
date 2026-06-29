@@ -1,6 +1,9 @@
 import type { FastifyInstance } from "fastify";
 import { Agent } from "undici";
 import { getAdminClient } from "@aula-agente/database";
+
+// Singleton — evita TLS handshake por request SSE para o OpenAI
+const streamAgent = new Agent({ headersTimeout: 15_000, bodyTimeout: 0 });
 import { authMiddleware } from "../../middleware/auth";
 import { decrypt } from "../../lib/crypto";
 
@@ -41,13 +44,13 @@ async function validateGeneratedPrompt(prompt: string, apiKey: string): Promise<
         temperature: 0,
       }),
     });
-    if (!res.ok) return { compliant: true };
+    if (!res.ok) return { compliant: false, violation: "Serviço de validação indisponível" };
     const data = await res.json() as { choices: { message: { content: string } }[] };
     const raw = (data.choices?.[0]?.message?.content ?? "").trim();
     const jsonText = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
     return JSON.parse(jsonText) as { compliant: boolean; violation?: string };
   } catch {
-    return { compliant: true };
+    return { compliant: false, violation: "Serviço de validação indisponível" };
   }
 }
 
@@ -234,9 +237,6 @@ export default async function promptStudioRoutes(app: FastifyInstance) {
       };
 
       try {
-        // Bypass global undici bodyTimeout para streaming longo
-        const streamAgent = new Agent({ headersTimeout: 15_000, bodyTimeout: 0 });
-
         const res = await (fetch as (url: string, init?: RequestInit & { dispatcher?: unknown }) => Promise<Response>)(
           "https://api.openai.com/v1/chat/completions",
           {
@@ -265,10 +265,13 @@ export default async function promptStudioRoutes(app: FastifyInstance) {
         const decoder = new TextDecoder();
         let accumulated = "";
         let promptSent = false;
+        let validationFailed = false;
+        let lineBuffer = "";
 
-        for await (const chunk of res.body as AsyncIterable<Uint8Array>) {
-          const text = decoder.decode(chunk, { stream: true });
-          const lines = text.split("\n");
+        outer: for await (const chunk of res.body as AsyncIterable<Uint8Array>) {
+          lineBuffer += decoder.decode(chunk, { stream: true });
+          const lines = lineBuffer.split("\n");
+          lineBuffer = lines.pop() ?? "";
 
           for (const line of lines) {
             if (!line.startsWith("data: ")) continue;
@@ -296,6 +299,9 @@ export default async function promptStudioRoutes(app: FastifyInstance) {
                       type: "error",
                       message: `Prompt não passou na validação: ${validation.violation ?? "violação detectada"}`,
                     });
+                    validationFailed = true;
+                    promptSent = true;
+                    break outer;
                   } else {
                     sendEvent({ type: "prompt", content: extractedPrompt });
                   }
@@ -308,7 +314,9 @@ export default async function promptStudioRoutes(app: FastifyInstance) {
           }
         }
 
-        sendEvent({ type: "done" });
+        if (!validationFailed) {
+          sendEvent({ type: "done" });
+        }
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Erro desconhecido";
         sendEvent({ type: "error", message: msg });

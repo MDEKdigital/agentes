@@ -74,6 +74,7 @@ export function useSalomaoStream({
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
         let buffer = "";
+        let receivedDone = false;
 
         while (true) {
           const { done, value } = await reader.read();
@@ -95,6 +96,7 @@ export function useSalomaoStream({
               } else if (event.type === "prompt" && event.content) {
                 onPromptReady(event.content);
               } else if (event.type === "done") {
+                receivedDone = true;
                 setState("done");
                 onDone();
               } else if (event.type === "error") {
@@ -105,6 +107,12 @@ export function useSalomaoStream({
               // Ignora linhas malformadas
             }
           }
+        }
+
+        // Conexão fechou sem evento done (ex: servidor caiu mid-stream)
+        if (!receivedDone) {
+          setState("done");
+          onDone();
         }
       } catch (err) {
         if ((err as Error).name === "AbortError") return;
