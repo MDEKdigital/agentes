@@ -57,7 +57,7 @@ export default async function adminRoutes(app: FastifyInstance) {
       const db = getAdminClient();
       try {
         const sub = await createManualSubscription(db, orgId, planId, interval as BillingInterval);
-        fireAudit(
+        void fireAudit(
           db,
           {
             organization_id: orgId,
@@ -114,7 +114,7 @@ export default async function adminRoutes(app: FastifyInstance) {
           subId,
           fields as Parameters<typeof updateSubscriptionAdmin>[2]
         );
-        fireAudit(
+        void fireAudit(
           db,
           {
             organization_id: sub.organization_id,
@@ -142,7 +142,7 @@ export default async function adminRoutes(app: FastifyInstance) {
       const db = getAdminClient();
       try {
         const sub = await cancelSubscriptionAdmin(db, subId);
-        fireAudit(
+        void fireAudit(
           db,
           {
             organization_id: sub.organization_id,
@@ -187,7 +187,7 @@ export default async function adminRoutes(app: FastifyInstance) {
         request.log.error({ err }, "admin: resend invitation email failed (non-fatal)");
       }
 
-      fireAudit(
+      void fireAudit(
         db,
         {
           organization_id: orgId,
@@ -256,13 +256,14 @@ export default async function adminRoutes(app: FastifyInstance) {
         return reply.status(400).send({ error: "Provider inválido." });
       }
       const db = getAdminClient();
-      const { error, count } = await db
+      const { data: deleted, error } = await db
         .from("organization_secrets")
-        .delete({ count: "exact" })
+        .delete()
         .eq("organization_id", orgId)
-        .eq("provider", provider);
+        .eq("provider", provider)
+        .select("provider");
       if (error) return reply.status(500).send({ error: "Erro ao remover chave." });
-      if (!count) return reply.status(404).send({ error: "Chave não encontrada para este provider." });
+      if (!deleted?.length) return reply.status(404).send({ error: "Chave não encontrada para este provider." });
       await fireAudit(db, {
         organization_id: orgId,
         user_id: request.user.id,
@@ -284,7 +285,7 @@ export default async function adminRoutes(app: FastifyInstance) {
       try {
         const { error } = await db.from("organizations").delete().eq("id", orgId);
         if (error) throw error;
-        fireAudit(
+        void fireAudit(
           db,
           {
             organization_id: null,

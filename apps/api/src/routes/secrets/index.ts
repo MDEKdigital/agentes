@@ -76,41 +76,4 @@ export default async function secretsRoutes(app: FastifyInstance) {
     }
   );
 
-  app.delete<{ Params: { organizationId: string; provider: string } }>(
-    "/organizations/:organizationId/secrets/:provider",
-    async (request, reply) => {
-      const { organizationId, provider } = request.params;
-
-      const membership = request.user.memberships.find(
-        (m) => m.organization_id === organizationId
-      );
-      if (!membership || !["owner", "admin"].includes(membership.role)) {
-        return reply.status(403).send({ error: "Acesso negado" });
-      }
-
-      const db = getAdminClient();
-      const { data: deleted, error } = await db
-        .from("organization_secrets")
-        .delete()
-        .eq("organization_id", organizationId)
-        .eq("provider", provider)
-        .select("provider");
-
-      if (error) return reply.status(500).send({ error: "Erro interno ao processar chave" });
-
-      // R8: only audit when a row was actually deleted
-      if (deleted && deleted.length > 0) {
-        fireAudit(db, {
-          organization_id: organizationId,
-          user_id: request.user.id,
-          action: "secret.deleted",
-          entity_type: "secret",
-          entity_id: `${organizationId}:${provider}`,
-          metadata: { provider },
-        }, request.log);
-      }
-
-      return reply.status(204).send();
-    }
-  );
 }

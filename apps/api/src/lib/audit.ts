@@ -19,14 +19,15 @@ export function fireAudit(
   params: AuditParams,
   logger?: { error: (obj: unknown, msg: string) => void }
 ): Promise<void> {
-  return createAuditLog(client, params)
-    .then(() => {})
-    .catch((err) => {
+  return createAuditLog(client, params).then(
+    () => {},
+    (err) => {
       _auditFailureCount++;
       if (logger) {
         logger.error({ err }, `audit: ${params.action} failed`);
       } else {
         console.error(`[audit] ${params.action} failed:`, err);
       }
-    });
+    }
+  );
 }

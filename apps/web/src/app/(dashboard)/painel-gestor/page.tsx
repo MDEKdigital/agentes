@@ -155,6 +155,8 @@ function SecretsModal({ orgId, orgName, onClose }: { orgId: string; orgName: str
       await apiFetch(`/admin/organizations/${orgId}/secrets/${provider}`, { method: "DELETE" });
       setConfigured((p) => ({ ...p, [provider]: false }));
       setKeys((p) => ({ ...p, [provider]: "" }));
+      setShowKey((p) => ({ ...p, [provider]: false }));
+      setConfirmDelete(null);
     } catch (e) {
       setSaveError((e as Error).message);
     } finally {
@@ -186,8 +188,8 @@ function SecretsModal({ orgId, orgName, onClose }: { orgId: string; orgName: str
                       confirmDelete === p.id ? (
                         <div className="flex items-center gap-1">
                           <button
-                            onClick={() => { remove(p.id); setConfirmDelete(null); }}
-                            disabled={deleting === p.id}
+                            onClick={() => remove(p.id)}
+                            disabled={anyBusy}
                             className="rounded px-1.5 py-0.5 text-[10px] font-medium text-destructive border border-destructive/40 hover:bg-destructive/10 disabled:opacity-50 transition-colors"
                           >
                             {deleting === p.id ? <Loader2 className="h-3 w-3 animate-spin" /> : "Confirmar"}

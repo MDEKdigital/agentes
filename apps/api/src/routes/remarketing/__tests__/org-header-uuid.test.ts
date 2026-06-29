@@ -17,7 +17,7 @@ vi.mock("@aula-agente/database", () => ({
   getAdminClient: mockGetAdminClient,
   createAuditLog: vi.fn().mockResolvedValue({}),
 }));
-vi.mock("../../../lib/audit", () => ({ fireAudit: vi.fn() }));
+vi.mock("../../../lib/audit", () => ({ fireAudit: vi.fn().mockResolvedValue(undefined) }));
 
 import flowRoutes from "../flows";
 import stepRoutes from "../steps";
