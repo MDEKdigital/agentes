@@ -20,7 +20,7 @@ const navigation = [
   { name: "Leads", href: "/leads", icon: UserCheck },
   { name: "Produtos", href: "/products", icon: Package },
   { name: "Agentes", href: "/agents", icon: Bot },
-  { name: "Biblioteca de Prompts", href: "/prompt-library", icon: BookOpen },
+  { name: "Biblioteca de Agentes", href: "/prompt-library", icon: BookOpen },
   { name: "Remarketing", href: "/remarketing", icon: RefreshCw },
   { name: "Instâncias", href: "/instances", icon: Radio },
   { name: "Equipe", href: "/team", icon: Users },

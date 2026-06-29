@@ -1,17 +1,16 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { BookOpen, Search, Copy, Check, Plus, Mic, MicOff, Send, Loader2, Sparkles, Save, Trash2, Edit2, X } from "lucide-react";
+import { BookOpen, Search, Copy, Check, Loader2, Sparkles, Trash2, Edit2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useOrganization } from "@/providers/organization-provider";
-import { usePromptStudio, type ChatMessage, type SavedPrompt } from "@/hooks/use-prompt-studio";
+import { usePromptStudio, type SavedPrompt } from "@/hooks/use-prompt-studio";
 
 // ─── built-in templates ───────────────────────────────────────────────────────
 interface PromptTemplate {
@@ -166,215 +165,6 @@ Tom: ágil, preciso e resolutivo.` },
 
 const NICHES = ["Todos", ...Array.from(new Set(TEMPLATES.map((t) => t.niche)))];
 
-// ─── Salomão Studio ───────────────────────────────────────────────────────────
-function SalomaoStudio({ onClose, onSaved }: { onClose: () => void; onSaved: (p: SavedPrompt) => void }) {
-  const { currentOrg } = useOrganization();
-  const { sendMessage, transcribeAudio, savePrompt } = usePromptStudio(currentOrg?.id);
-
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [input, setInput] = useState("");
-  const [sending, setSending] = useState(false);
-  const [recording, setRecording] = useState(false);
-  const [generatedPrompt, setGeneratedPrompt] = useState("");
-  const [editedPrompt, setEditedPrompt] = useState("");
-  const [saveName, setSaveName] = useState("");
-  const [saveNiche, setSaveNiche] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
-  const chatEndRef = useRef<HTMLDivElement>(null);
-  const initialized = useRef(false);
-
-  // Extract prompt from <prompt>...</prompt> tags
-  function extractPrompt(text: string): string | null {
-    const match = text.match(/<prompt>([\s\S]*?)<\/prompt>/i);
-    return match ? match[1].trim() : null;
-  }
-
-  // Auto-scroll
-  useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, sending]);
-
-  // Salomão presents himself on open
-  useEffect(() => {
-    if (initialized.current || !currentOrg) return;
-    initialized.current = true;
-    setSending(true);
-    sendMessage([]).then((reply) => {
-      setMessages([{ role: "assistant", content: reply }]);
-      setSending(false);
-    }).catch(() => setSending(false));
-  }, [currentOrg]);
-
-  async function handleSend(text?: string) {
-    const msg = (text ?? input).trim();
-    if (!msg || sending) return;
-    setInput("");
-    const newMessages: ChatMessage[] = [...messages, { role: "user", content: msg }];
-    setMessages(newMessages);
-    setSending(true);
-    try {
-      const reply = await sendMessage(newMessages);
-      const extracted = extractPrompt(reply);
-      if (extracted) {
-        setGeneratedPrompt(extracted);
-        setEditedPrompt(extracted);
-      }
-      setMessages((prev) => [...prev, { role: "assistant", content: reply }]);
-    } finally {
-      setSending(false);
-    }
-  }
-
-  async function startRecording() {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mr = new MediaRecorder(stream);
-      mediaRecorderRef.current = mr;
-      chunksRef.current = [];
-      mr.ondataavailable = (e) => chunksRef.current.push(e.data);
-      mr.onstop = async () => {
-        stream.getTracks().forEach((t) => t.stop());
-        const blob = new Blob(chunksRef.current, { type: "audio/webm" });
-        const reader = new FileReader();
-        reader.onload = async () => {
-          const base64 = (reader.result as string).split(",")[1];
-          setSending(true);
-          try {
-            const text = await transcribeAudio(base64, "audio/webm");
-            if (text.trim()) handleSend(text);
-          } finally { setSending(false); }
-        };
-        reader.readAsDataURL(blob);
-      };
-      mr.start();
-      setRecording(true);
-    } catch { /* mic not available */ }
-  }
-
-  function stopRecording() {
-    mediaRecorderRef.current?.stop();
-    setRecording(false);
-  }
-
-  async function handleSave() {
-    if (!saveName.trim() || !editedPrompt.trim()) return;
-    setSaving(true);
-    try {
-      const saved = await savePrompt(saveName.trim(), saveNiche.trim(), editedPrompt.trim());
-      setSaved(true);
-      onSaved(saved);
-      setTimeout(() => setSaved(false), 2500);
-    } finally { setSaving(false); }
-  }
-
-  return (
-    <div className="flex h-full gap-0 overflow-hidden rounded-lg border bg-card">
-      {/* Chat panel */}
-      <div className="flex flex-col flex-1 min-w-0 border-r">
-        {/* Header */}
-        <div className="flex items-center gap-3 px-4 py-3 border-b bg-muted/30">
-          <div className="flex items-center justify-center h-9 w-9 rounded-full bg-primary/10 text-primary font-bold text-sm shrink-0">S</div>
-          <div>
-            <p className="font-semibold text-sm">Salomão</p>
-            <p className="text-[11px] text-muted-foreground">Consultor Oficial de Prompts</p>
-          </div>
-          <Button variant="ghost" size="icon" className="ml-auto h-8 w-8" onClick={onClose}>
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
-
-        {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3">
-          {messages.map((m, i) => (
-            <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-              <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap ${
-                m.role === "user"
-                  ? "bg-primary text-primary-foreground rounded-br-sm"
-                  : "bg-muted text-foreground rounded-bl-sm"
-              }`}>
-                {/* Hide <prompt>...</prompt> block from chat — it shows in the side panel */}
-                {m.content.replace(/<prompt>[\s\S]*?<\/prompt>/gi, "✅ Prompt gerado! Veja ao lado →").trim()}
-              </div>
-            </div>
-          ))}
-          {sending && (
-            <div className="flex justify-start">
-              <div className="bg-muted rounded-2xl rounded-bl-sm px-4 py-3 flex gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-muted-foreground/50 animate-bounce [animation-delay:0ms]" />
-                <span className="h-2 w-2 rounded-full bg-muted-foreground/50 animate-bounce [animation-delay:150ms]" />
-                <span className="h-2 w-2 rounded-full bg-muted-foreground/50 animate-bounce [animation-delay:300ms]" />
-              </div>
-            </div>
-          )}
-          <div ref={chatEndRef} />
-        </div>
-
-        {/* Input */}
-        <div className="p-3 border-t flex gap-2">
-          <button
-            onMouseDown={startRecording}
-            onMouseUp={stopRecording}
-            onTouchStart={startRecording}
-            onTouchEnd={stopRecording}
-            className={`shrink-0 h-9 w-9 rounded-full flex items-center justify-center transition-colors ${
-              recording ? "bg-red-500 text-white animate-pulse" : "bg-muted hover:bg-muted/80 text-muted-foreground"
-            }`}
-            title="Segurar para gravar áudio"
-          >
-            {recording ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-          </button>
-          <Input
-            placeholder="Responda Salomão..."
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-            disabled={sending}
-            className="flex-1"
-          />
-          <Button size="icon" className="shrink-0 h-9 w-9" onClick={() => handleSend()} disabled={!input.trim() || sending}>
-            <Send className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
-
-      {/* Prompt panel */}
-      <div className="w-[45%] shrink-0 flex flex-col">
-        <div className="flex items-center gap-2 px-4 py-3 border-b bg-muted/30">
-          <Sparkles className="h-4 w-4 text-primary" />
-          <p className="font-semibold text-sm">Prompt gerado</p>
-        </div>
-
-        {generatedPrompt ? (
-          <div className="flex flex-col flex-1 overflow-hidden p-4 gap-3">
-            <Textarea
-              value={editedPrompt}
-              onChange={(e) => setEditedPrompt(e.target.value)}
-              className="flex-1 text-xs font-mono resize-none"
-              placeholder="O prompt aparece aqui quando Salomão terminar..."
-            />
-            <div className="flex flex-col gap-2">
-              <Input placeholder="Nome do prompt" value={saveName} onChange={(e) => setSaveName(e.target.value)} className="text-sm" />
-              <Input placeholder="Nicho (ex: Fitness, E-commerce...)" value={saveNiche} onChange={(e) => setSaveNiche(e.target.value)} className="text-sm" />
-              <Button onClick={handleSave} disabled={!saveName.trim() || !editedPrompt.trim() || saving} className="w-full">
-                {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : saved ? <Check className="h-4 w-4 mr-2 text-green-400" /> : <Save className="h-4 w-4 mr-2" />}
-                {saved ? "Salvo!" : "Salvar prompt"}
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <div className="flex-1 flex flex-col items-center justify-center gap-3 p-6 text-center">
-            <Sparkles className="h-10 w-10 text-muted-foreground/30" />
-            <p className="text-sm text-muted-foreground">
-              Responda as perguntas do Salomão e o prompt do seu agente aparecerá aqui automaticamente.
-            </p>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function PromptLibraryPage() {
   const router = useRouter();
@@ -386,12 +176,8 @@ export default function PromptLibraryPage() {
   const [niche, setNiche] = useState("Todos");
   const [selected, setSelected] = useState<PromptTemplate | null>(null);
   const [copied, setCopied] = useState(false);
-  const [studioOpen, setStudioOpen] = useState(false);
-  const [localSaved, setLocalSaved] = useState<SavedPrompt[]>([]);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [editPrompt, setEditPrompt] = useState<SavedPrompt | null>(null);
-
-  const allSaved = [...localSaved, ...savedPrompts.filter((p) => !localSaved.find((l) => l.id === p.id))];
 
   const filtered = TEMPLATES.filter((t) => {
     const matchNiche = niche === "Todos" || t.niche === niche;
@@ -409,21 +195,17 @@ export default function PromptLibraryPage() {
     <div className="flex flex-col gap-6 p-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Biblioteca de Prompts</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Biblioteca de Agentes</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Templates prontos por nicho ou crie um prompt personalizado com Salomão.
+            Templates prontos por nicho para usar como base no seu agente.
           </p>
         </div>
-        <Button onClick={() => setStudioOpen(true)}>
-          <Sparkles className="h-4 w-4 mr-2" />
-          Crie seu Prompt
-        </Button>
       </div>
 
       <Tabs defaultValue="templates">
         <TabsList>
           <TabsTrigger value="templates">Templates ({TEMPLATES.length})</TabsTrigger>
-          <TabsTrigger value="saved">Meus Prompts {allSaved.length > 0 && `(${allSaved.length})`}</TabsTrigger>
+          <TabsTrigger value="saved">Meus Prompts {savedPrompts.length > 0 && `(${savedPrompts.length})`}</TabsTrigger>
         </TabsList>
 
         {/* ── Templates tab ── */}
@@ -472,15 +254,14 @@ export default function PromptLibraryPage() {
         <TabsContent value="saved" className="mt-4">
           {loading ? (
             <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
-          ) : allSaved.length === 0 ? (
+          ) : savedPrompts.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
               <Sparkles className="h-10 w-10 text-muted-foreground/40" />
               <p className="text-sm text-muted-foreground">Nenhum prompt salvo ainda.</p>
-              <Button variant="outline" onClick={() => setStudioOpen(true)}><Plus className="h-4 w-4 mr-2" />Criar com Salomão</Button>
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {allSaved.map((p) => (
+              {savedPrompts.map((p) => (
                 <div key={p.id} className="flex flex-col gap-3 rounded-lg border bg-card p-4 hover:shadow-sm transition-all">
                   <div className="flex items-start justify-between gap-2">
                     <div>
@@ -509,18 +290,6 @@ export default function PromptLibraryPage() {
           )}
         </TabsContent>
       </Tabs>
-
-      {/* Salomão Studio */}
-      {studioOpen && (
-        <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-5xl h-[85vh]">
-            <SalomaoStudio
-              onClose={() => setStudioOpen(false)}
-              onSaved={(p) => { setLocalSaved((prev) => [p, ...prev]); }}
-            />
-          </div>
-        </div>
-      )}
 
       {/* Template detail dialog */}
       <Dialog open={!!selected} onOpenChange={(o) => !o && setSelected(null)}>
@@ -572,7 +341,7 @@ export default function PromptLibraryPage() {
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteConfirm(null)}>Cancelar</Button>
-            <Button variant="destructive" onClick={async () => { if (deleteConfirm) { await deletePrompt(deleteConfirm); setLocalSaved((prev) => prev.filter((p) => p.id !== deleteConfirm)); } setDeleteConfirm(null); }}>Excluir</Button>
+            <Button variant="destructive" onClick={async () => { if (deleteConfirm) { await deletePrompt(deleteConfirm); } setDeleteConfirm(null); }}>Excluir</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
