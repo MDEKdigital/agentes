@@ -256,12 +256,13 @@ export default async function adminRoutes(app: FastifyInstance) {
         return reply.status(400).send({ error: "Provider inválido." });
       }
       const db = getAdminClient();
-      const { error } = await db
+      const { error, count } = await db
         .from("organization_secrets")
-        .delete()
+        .delete({ count: "exact" })
         .eq("organization_id", orgId)
         .eq("provider", provider);
       if (error) return reply.status(500).send({ error: "Erro ao remover chave." });
+      if (!count) return reply.status(404).send({ error: "Chave não encontrada para este provider." });
       await fireAudit(db, {
         organization_id: orgId,
         user_id: request.user.id,

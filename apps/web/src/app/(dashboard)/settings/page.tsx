@@ -103,20 +103,6 @@ export default function SettingsPage() {
     }
   };
 
-  const handleRemoveApiKey = async (provider: LLMProvider) => {
-    if (!currentOrg || !confirm(`Remover chave de API do ${provider}?`)) return;
-    setSavingKey(provider);
-    try {
-      await apiFetch(`/organizations/${currentOrg.id}/secrets/${provider}`, { method: "DELETE" });
-      setConfiguredProviders((prev) => ({ ...prev, [provider]: false }));
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "Erro ao remover chave");
-    } finally {
-      setSavingKey(null);
-      fetchApiKeys().catch(() => {});
-    }
-  };
-
   if (orgLoading) {
     return (
       <div className="mx-auto max-w-2xl space-y-6">

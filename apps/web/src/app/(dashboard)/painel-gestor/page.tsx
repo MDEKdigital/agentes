@@ -109,9 +109,12 @@ function SecretsModal({ orgId, orgName, onClose }: { orgId: string; orgName: str
   const [showKey, setShowKey] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+
+  const anyBusy = saving !== null || deleting !== null;
 
   useEffect(() => {
     apiFetch(`/admin/organizations/${orgId}/secrets`)
@@ -126,7 +129,7 @@ function SecretsModal({ orgId, orgName, onClose }: { orgId: string; orgName: str
 
   const save = async (provider: string) => {
     const key = keys[provider]?.trim();
-    if (!key) return;
+    if (!key || anyBusy) return;
     setSaving(provider);
     setSaveError(null);
     try {
@@ -136,6 +139,7 @@ function SecretsModal({ orgId, orgName, onClose }: { orgId: string; orgName: str
       });
       setConfigured((p) => ({ ...p, [provider]: true }));
       setKeys((p) => ({ ...p, [provider]: "" }));
+      setShowKey((p) => ({ ...p, [provider]: false }));
     } catch (e) {
       setSaveError((e as Error).message);
     } finally {
@@ -144,11 +148,13 @@ function SecretsModal({ orgId, orgName, onClose }: { orgId: string; orgName: str
   };
 
   const remove = async (provider: string) => {
+    if (anyBusy) return;
     setDeleting(provider);
     setSaveError(null);
     try {
       await apiFetch(`/admin/organizations/${orgId}/secrets/${provider}`, { method: "DELETE" });
       setConfigured((p) => ({ ...p, [provider]: false }));
+      setKeys((p) => ({ ...p, [provider]: "" }));
     } catch (e) {
       setSaveError((e as Error).message);
     } finally {
@@ -177,14 +183,32 @@ function SecretsModal({ orgId, orgName, onClose }: { orgId: string; orgName: str
                       : <span className="text-[10px] text-muted-foreground">Não configurada</span>
                     }
                     {configured[p.id] && (
-                      <button
-                        onClick={() => remove(p.id)}
-                        disabled={deleting === p.id}
-                        className="flex items-center justify-center h-5 w-5 rounded text-destructive/70 hover:text-destructive hover:bg-destructive/10 disabled:opacity-50 transition-colors"
-                        title="Remover chave"
-                      >
-                        {deleting === p.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
-                      </button>
+                      confirmDelete === p.id ? (
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => { remove(p.id); setConfirmDelete(null); }}
+                            disabled={deleting === p.id}
+                            className="rounded px-1.5 py-0.5 text-[10px] font-medium text-destructive border border-destructive/40 hover:bg-destructive/10 disabled:opacity-50 transition-colors"
+                          >
+                            {deleting === p.id ? <Loader2 className="h-3 w-3 animate-spin" /> : "Confirmar"}
+                          </button>
+                          <button
+                            onClick={() => setConfirmDelete(null)}
+                            className="rounded px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground border border-border hover:bg-accent transition-colors"
+                          >
+                            Cancelar
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setConfirmDelete(p.id)}
+                          disabled={anyBusy}
+                          className="flex items-center justify-center h-5 w-5 rounded text-destructive/70 hover:text-destructive hover:bg-destructive/10 disabled:opacity-50 transition-colors"
+                          title="Remover chave"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      )
                     )}
                   </div>
                 </div>
@@ -193,7 +217,7 @@ function SecretsModal({ orgId, orgName, onClose }: { orgId: string; orgName: str
                     <input
                       type={showKey[p.id] ? "text" : "password"}
                       value={keys[p.id] ?? ""}
-                      onChange={(e) => setKeys((prev) => ({ ...prev, [p.id]: e.target.value }))}
+                      onChange={(e) => { setKeys((prev) => ({ ...prev, [p.id]: e.target.value })); setSaveError(null); }}
                       placeholder={configured[p.id] ? "Nova chave para substituir..." : p.placeholder}
                       autoComplete="new-password"
                       className="w-full rounded-lg border border-border bg-muted px-3 py-1.5 pr-8 font-mono text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-border"
@@ -208,7 +232,7 @@ function SecretsModal({ orgId, orgName, onClose }: { orgId: string; orgName: str
                   </div>
                   <button
                     onClick={() => save(p.id)}
-                    disabled={saving === p.id || !keys[p.id]?.trim()}
+                    disabled={anyBusy || !keys[p.id]?.trim()}
                     className="rounded-lg border border-border bg-muted px-3 text-xs font-medium text-foreground hover:bg-accent disabled:opacity-50 transition-colors"
                   >
                     {saving === p.id ? <Loader2 className="h-3 w-3 animate-spin" /> : "Salvar"}
