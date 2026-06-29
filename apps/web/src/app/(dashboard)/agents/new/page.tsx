@@ -1,15 +1,18 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useOrganization } from "@/providers/organization-provider";
 import { apiFetch } from "@/lib/api";
 import { AgentForm } from "@/components/agents/agent-form";
 
-export default function NewAgentPage() {
+function NewAgentForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { currentOrg } = useOrganization();
   const [error, setError] = useState<string | null>(null);
+
+  const promptFromUrl = searchParams.get("prompt") ?? "";
 
   const handleSubmit = async (values: Record<string, unknown>) => {
     if (!currentOrg) return;
@@ -34,7 +37,19 @@ export default function NewAgentPage() {
           {error}
         </p>
       )}
-      <AgentForm onSubmit={handleSubmit} submitLabel="Criar Agente" />
+      <AgentForm
+        defaultValues={{ system_prompt: promptFromUrl }}
+        onSubmit={handleSubmit}
+        submitLabel="Criar Agente"
+      />
     </div>
+  );
+}
+
+export default function NewAgentPage() {
+  return (
+    <Suspense>
+      <NewAgentForm />
+    </Suspense>
   );
 }
