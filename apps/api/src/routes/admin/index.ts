@@ -13,10 +13,8 @@ import { authMiddleware } from "../../middleware/auth";
 import { superAdminMiddleware } from "../../middleware/super-admin";
 import { sendWelcomeEmailApi } from "../../lib/email";
 import { fireAudit } from "../../lib/audit";
-import { encrypt } from "../../lib/crypto";
-import type { BillingInterval, SubscriptionStatus } from "@aula-agente/shared";
-
-const ALLOWED_PROVIDERS = ["openai", "anthropic", "google"] as const;
+import { type BillingInterval, type SubscriptionStatus } from "@aula-agente/shared";
+import { isValidProvider, upsertOrgSecret } from "../../lib/providers";
 
 const VALID_INTERVALS = new Set<BillingInterval>(["manual", "monthly", "yearly", "lifetime"]);
 const VALID_STATUSES = new Set<SubscriptionStatus>(["active", "cancelled", "past_due", "paused", "trial"]);
@@ -226,16 +224,13 @@ export default async function adminRoutes(app: FastifyInstance) {
       const { orgId, provider } = request.params;
       const { key } = request.body;
       if (!key?.trim()) return reply.status(400).send({ error: "Chave obrigatória." });
-      if (!ALLOWED_PROVIDERS.includes(provider as (typeof ALLOWED_PROVIDERS)[number])) {
+      if (!isValidProvider(provider)) {
         return reply.status(400).send({ error: "Provider inválido." });
       }
       const db = getAdminClient();
-      const { error } = await db.from("organization_secrets").upsert(
-        { organization_id: orgId, provider, encrypted_key: encrypt(key.trim()) },
-        { onConflict: "organization_id,provider" }
-      );
+      const { error } = await upsertOrgSecret(db, orgId, provider, key);
       if (error) return reply.status(500).send({ error: "Erro ao salvar chave." });
-      await fireAudit(db, {
+      void fireAudit(db, {
         organization_id: orgId,
         user_id: request.user.id,
         action: "secret.upserted",
@@ -252,7 +247,7 @@ export default async function adminRoutes(app: FastifyInstance) {
     "/admin/organizations/:orgId/secrets/:provider",
     async (request, reply) => {
       const { orgId, provider } = request.params;
-      if (!ALLOWED_PROVIDERS.includes(provider as (typeof ALLOWED_PROVIDERS)[number])) {
+      if (!isValidProvider(provider)) {
         return reply.status(400).send({ error: "Provider inválido." });
       }
       const db = getAdminClient();
@@ -264,7 +259,7 @@ export default async function adminRoutes(app: FastifyInstance) {
         .select("provider");
       if (error) return reply.status(500).send({ error: "Erro ao remover chave." });
       if (!deleted?.length) return reply.status(404).send({ error: "Chave não encontrada para este provider." });
-      await fireAudit(db, {
+      void fireAudit(db, {
         organization_id: orgId,
         user_id: request.user.id,
         action: "secret.deleted",
@@ -275,6 +270,37 @@ export default async function adminRoutes(app: FastifyInstance) {
       return reply.status(204).send();
     }
   );
+
+  // GET /admin/salomao-config
+  app.get("/admin/salomao-config", async (request, reply) => {
+    const db = getAdminClient();
+    const { data, error } = await db
+      .from("salomao_config")
+      .select("system_prompt, updated_at")
+      .limit(1)
+      .single();
+    if (error || !data) return reply.status(404).send({ error: "Configuração não encontrada." });
+    return reply.send(data);
+  });
+
+  // PATCH /admin/salomao-config
+  app.patch("/admin/salomao-config", async (request, reply) => {
+    const body = request.body as Record<string, unknown> | null | undefined;
+    const systemPrompt = typeof body?.system_prompt === "string" ? body.system_prompt.trim() : "";
+    if (!systemPrompt) return reply.status(400).send({ error: "system_prompt obrigatório e não pode ser vazio." });
+
+    const db = getAdminClient();
+    const { data, error } = await db
+      .from("salomao_config")
+      .update({ system_prompt: systemPrompt, updated_at: new Date().toISOString(), updated_by: request.user.id })
+      .select("system_prompt, updated_at")
+      .single();
+    if (error) {
+      request.log.error({ error }, "admin: failed to update salomao_config");
+      return reply.status(500).send({ error: "Erro ao atualizar configuração." });
+    }
+    return reply.send(data);
+  });
 
   // DELETE /admin/organizations/:orgId
   app.delete<{ Params: { orgId: string } }>(

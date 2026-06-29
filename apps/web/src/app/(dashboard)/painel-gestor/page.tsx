@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, ChevronDown, ChevronRight, RefreshCw, Eye, EyeOff, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/api";
-import type { Plan } from "@aula-agente/shared";
+import { type Plan, type LLMProvider } from "@aula-agente/shared";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -97,11 +97,17 @@ function Modal({ title, onClose, onConfirm, loading, children }: {
 
 // ─── SecretsModal ─────────────────────────────────────────────────────────────
 
-const PROVIDERS = [
+function parseSecrets(d: unknown): Record<string, boolean> {
+  const cfg: Record<string, boolean> = {};
+  (d as { provider: string }[]).forEach((s) => { cfg[s.provider] = true; });
+  return cfg;
+}
+
+const PROVIDERS: ReadonlyArray<{ id: LLMProvider; name: string; placeholder: string }> = [
   { id: "openai", name: "OpenAI", placeholder: "sk-..." },
   { id: "anthropic", name: "Anthropic", placeholder: "sk-ant-..." },
   { id: "google", name: "Google AI", placeholder: "AI..." },
-] as const;
+];
 
 function SecretsModal({ orgId, orgName, onClose }: { orgId: string; orgName: string; onClose: () => void }) {
   const [configured, setConfigured] = useState<Record<string, boolean>>({});
@@ -112,17 +118,13 @@ function SecretsModal({ orgId, orgName, onClose }: { orgId: string; orgName: str
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
-  const [saveError, setSaveError] = useState<string | null>(null);
+  const [opError, setOpError] = useState<string | null>(null);
 
   const anyBusy = saving !== null || deleting !== null;
 
   useEffect(() => {
     apiFetch(`/admin/organizations/${orgId}/secrets`)
-      .then((d) => {
-        const cfg: Record<string, boolean> = {};
-        (d as { provider: string }[]).forEach((s) => { cfg[s.provider] = true; });
-        setConfigured(cfg);
-      })
+      .then((d) => setConfigured(parseSecrets(d)))
       .catch((e: Error) => setFetchError(e.message))
       .finally(() => setLoading(false));
   }, [orgId]);
@@ -131,7 +133,7 @@ function SecretsModal({ orgId, orgName, onClose }: { orgId: string; orgName: str
     const key = keys[provider]?.trim();
     if (!key || anyBusy) return;
     setSaving(provider);
-    setSaveError(null);
+    setOpError(null);
     try {
       await apiFetch(`/admin/organizations/${orgId}/secrets/${provider}`, {
         method: "PUT",
@@ -141,26 +143,33 @@ function SecretsModal({ orgId, orgName, onClose }: { orgId: string; orgName: str
       setKeys((p) => ({ ...p, [provider]: "" }));
       setShowKey((p) => ({ ...p, [provider]: false }));
     } catch (e) {
-      setSaveError((e as Error).message);
+      setOpError((e as Error).message);
     } finally {
       setSaving(null);
     }
   };
 
+  const fetchConfigured = useCallback(() => {
+    void apiFetch(`/admin/organizations/${orgId}/secrets`)
+      .then((d) => setConfigured(parseSecrets(d)))
+      .catch((e: unknown) => { console.warn("[fetchConfigured] re-sync failed", (e as Error).message); });
+  }, [orgId]);
+
   const remove = async (provider: string) => {
     if (anyBusy) return;
     setDeleting(provider);
-    setSaveError(null);
+    setOpError(null);
     try {
       await apiFetch(`/admin/organizations/${orgId}/secrets/${provider}`, { method: "DELETE" });
       setConfigured((p) => ({ ...p, [provider]: false }));
       setKeys((p) => ({ ...p, [provider]: "" }));
       setShowKey((p) => ({ ...p, [provider]: false }));
-      setConfirmDelete(null);
     } catch (e) {
-      setSaveError((e as Error).message);
+      setOpError((e as Error).message);
+      fetchConfigured();
     } finally {
       setDeleting(null);
+      setConfirmDelete(null);
     }
   };
 
@@ -219,7 +228,7 @@ function SecretsModal({ orgId, orgName, onClose }: { orgId: string; orgName: str
                     <input
                       type={showKey[p.id] ? "text" : "password"}
                       value={keys[p.id] ?? ""}
-                      onChange={(e) => { setKeys((prev) => ({ ...prev, [p.id]: e.target.value })); setSaveError(null); }}
+                      onChange={(e) => { setKeys((prev) => ({ ...prev, [p.id]: e.target.value })); setOpError(null); }}
                       placeholder={configured[p.id] ? "Nova chave para substituir..." : p.placeholder}
                       autoComplete="new-password"
                       className="w-full rounded-lg border border-border bg-muted px-3 py-1.5 pr-8 font-mono text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-border"
@@ -244,7 +253,7 @@ function SecretsModal({ orgId, orgName, onClose }: { orgId: string; orgName: str
             ))}
           </div>
         )}
-        {saveError && <p className="mt-3 text-[11px] text-destructive">{saveError}</p>}
+        {opError && <p className="mt-3 text-[11px] text-destructive">{opError}</p>}
         <div className="mt-5 flex justify-end">
           <button onClick={onClose} className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-accent transition-colors">
             Fechar
@@ -470,6 +479,11 @@ export default function AdminPage() {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [salomaoPrompt, setSalomaoPrompt] = useState("");
+  const [salomaoUpdatedAt, setSalomaoUpdatedAt] = useState("");
+  const [salomaoSaving, setSalomaoSaving] = useState(false);
+  const [salomaoSaved, setSalomaoSaved] = useState(false);
+  const [salomaoLoading, setSalomaoLoading] = useState(false);
 
   const load = () => {
     setLoading(true);
@@ -495,6 +509,42 @@ export default function AdminPage() {
   };
 
   useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadSalomaoConfig() {
+      setSalomaoLoading(true);
+      try {
+        const data = await apiFetch("/admin/salomao-config");
+        if (!cancelled) {
+          setSalomaoPrompt((data as { system_prompt: string }).system_prompt ?? "");
+          setSalomaoUpdatedAt((data as { updated_at: string }).updated_at ?? "");
+        }
+      } catch {
+        // silencioso — não quebra o painel se config não existir ainda
+      } finally {
+        if (!cancelled) setSalomaoLoading(false);
+      }
+    }
+    loadSalomaoConfig();
+    return () => { cancelled = true; };
+  }, []);
+
+  async function saveSalomaoConfig() {
+    if (!salomaoPrompt.trim()) return;
+    setSalomaoSaving(true);
+    try {
+      const data = await apiFetch("/admin/salomao-config", {
+        method: "PATCH",
+        body: JSON.stringify({ system_prompt: salomaoPrompt.trim() }),
+      });
+      setSalomaoUpdatedAt((data as { updated_at: string }).updated_at ?? "");
+      setSalomaoSaved(true);
+      setTimeout(() => setSalomaoSaved(false), 2500);
+    } finally {
+      setSalomaoSaving(false);
+    }
+  }
 
   if (loading) {
     return (
@@ -548,6 +598,39 @@ export default function AdminPage() {
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* ── Seção Salomão ── */}
+      <div className="rounded-xl border border-border bg-card p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-base font-semibold">Configuração do Salomão</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              System prompt global do Salomão. Afeta todas as organizações imediatamente.
+              {salomaoUpdatedAt && (
+                <span className="ml-2">Última atualização: {new Date(salomaoUpdatedAt).toLocaleString("pt-BR")}</span>
+              )}
+            </p>
+          </div>
+          <button
+            onClick={saveSalomaoConfig}
+            disabled={salomaoSaving || !salomaoPrompt.trim()}
+            className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
+          >
+            {salomaoSaving ? "Salvando..." : salomaoSaved ? "✓ Salvo!" : "Salvar alterações"}
+          </button>
+        </div>
+        {salomaoLoading ? (
+          <div className="h-48 animate-pulse rounded-lg bg-muted" />
+        ) : (
+          <textarea
+            value={salomaoPrompt}
+            onChange={(e) => setSalomaoPrompt(e.target.value)}
+            className="w-full rounded-lg border border-border bg-muted/40 p-3 text-xs font-mono text-foreground resize-none focus:outline-none focus:ring-1 focus:ring-ring"
+            style={{ minHeight: "300px" }}
+            placeholder="System prompt do Salomão..."
+          />
+        )}
       </div>
     </div>
   );
