@@ -81,7 +81,7 @@ export default async function invitationRoutes(app: FastifyInstance) {
         });
       }
 
-      fireAudit(db, {
+      void fireAudit(db, {
         organization_id: organizationId,
         user_id: request.user.id,
         action: "invitation.sent",

@@ -5,6 +5,21 @@ import { fireAudit } from "../../lib/audit";
 
 const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
+// Workers that create enrollments must check flow.status === 'active' before inserting
+// to close the race window between the flow update and this cancellation.
+function cancelActiveEnrollments(
+  db: ReturnType<typeof getAdminClient>,
+  orgId: string,
+  flowId: string
+) {
+  return db
+    .from("remarketing_enrollments")
+    .update({ status: "cancelled", cancel_reason: "flow_deactivated" })
+    .eq("flow_id", flowId)
+    .eq("organization_id", orgId)
+    .eq("status", "active");
+}
+
 export default async function remarketingFlowRoutes(app: FastifyInstance) {
   app.addHook("preHandler", authMiddleware);
 
@@ -59,22 +74,20 @@ export default async function remarketingFlowRoutes(app: FastifyInstance) {
             cancel_on_reply = true, cancel_on_resolved = true, cancel_on_opt_out = true,
             system_prompt = "" } = request.body;
 
+    if (!UUID_RE.test(agent_id)) {
+      return reply.status(400).send({ error: "agent_id inválido" });
+    }
+    if (!UUID_RE.test(instance_id)) {
+      return reply.status(400).send({ error: "instance_id inválido" });
+    }
+
     const db = getAdminClient();
 
-    const { data: agent } = await db
-      .from("agents")
-      .select("id")
-      .eq("id", agent_id)
-      .eq("organization_id", orgId)
-      .maybeSingle();
+    const [{ data: agent }, { data: instance }] = await Promise.all([
+      db.from("agents").select("id").eq("id", agent_id).eq("organization_id", orgId).maybeSingle(),
+      db.from("evolution_instances").select("id").eq("id", instance_id).eq("organization_id", orgId).maybeSingle(),
+    ]);
     if (!agent) return reply.status(403).send({ error: "Agente não pertence a esta organização" });
-
-    const { data: instance } = await db
-      .from("evolution_instances")
-      .select("id")
-      .eq("id", instance_id)
-      .eq("organization_id", orgId)
-      .maybeSingle();
     if (!instance) return reply.status(403).send({ error: "Instância não pertence a esta organização" });
 
     const { data, error } = await db
@@ -87,7 +100,7 @@ export default async function remarketingFlowRoutes(app: FastifyInstance) {
 
     if (error) return reply.status(500).send({ error: "Erro ao criar fluxo" });
 
-    fireAudit(db, {
+    void fireAudit(db, {
       organization_id: orgId,
       user_id: request.user.id,
       action: "remarketing_flow.created",
@@ -122,7 +135,7 @@ export default async function remarketingFlowRoutes(app: FastifyInstance) {
     const db = getAdminClient();
     const { data: flow } = await db
       .from("remarketing_flows")
-      .select("id")
+      .select("id, status")
       .eq("id", request.params.id)
       .eq("organization_id", orgId)
       .maybeSingle();
@@ -134,30 +147,38 @@ export default async function remarketingFlowRoutes(app: FastifyInstance) {
       entry_silence_minutes?: number; cancel_on_reply?: boolean; cancel_on_resolved?: boolean;
       cancel_on_opt_out?: boolean; system_prompt?: string; status?: "active" | "inactive";
     };
+
+    if (status !== undefined && !["active", "inactive"].includes(status)) {
+      return reply.status(400).send({ error: "Status inválido" });
+    }
+
     const updates = Object.fromEntries(
       Object.entries({ name, product_campaign, agent_id, instance_id, entry_silence_minutes,
                        cancel_on_reply, cancel_on_resolved, cancel_on_opt_out, system_prompt, status })
-        .filter(([, v]) => v !== undefined)
+        .filter(([, v]) => v !== undefined && v !== null)
     );
 
-    if (updates.status === "inactive") {
-      await db
-        .from("remarketing_enrollments")
-        .update({ status: "cancelled", cancel_reason: "flow_deactivated" })
-        .eq("flow_id", request.params.id)
-        .eq("status", "active");
+    if (Object.keys(updates).length === 0) {
+      return reply.status(400).send({ error: "Nenhum campo fornecido para atualização" });
     }
 
-    if (updates.agent_id) {
-      const { data: agent } = await db.from("agents").select("id")
-        .eq("id", updates.agent_id).eq("organization_id", orgId).maybeSingle();
-      if (!agent) return reply.status(403).send({ error: "Agente não pertence a esta organização" });
+    if ("agent_id" in updates && !UUID_RE.test(updates.agent_id as string)) {
+      return reply.status(400).send({ error: "agent_id inválido" });
     }
-    if (updates.instance_id) {
-      const { data: instance } = await db.from("evolution_instances").select("id")
-        .eq("id", updates.instance_id).eq("organization_id", orgId).maybeSingle();
-      if (!instance) return reply.status(403).send({ error: "Instância não pertence a esta organização" });
+    if ("instance_id" in updates && !UUID_RE.test(updates.instance_id as string)) {
+      return reply.status(400).send({ error: "instance_id inválido" });
     }
+
+    const [agentResult, instanceResult] = await Promise.all([
+      "agent_id" in updates
+        ? db.from("agents").select("id").eq("id", updates.agent_id).eq("organization_id", orgId).maybeSingle()
+        : Promise.resolve({ data: true }),
+      "instance_id" in updates
+        ? db.from("evolution_instances").select("id").eq("id", updates.instance_id).eq("organization_id", orgId).maybeSingle()
+        : Promise.resolve({ data: true }),
+    ]);
+    if ("agent_id" in updates && !agentResult.data) return reply.status(403).send({ error: "Agente não pertence a esta organização" });
+    if ("instance_id" in updates && !instanceResult.data) return reply.status(403).send({ error: "Instância não pertence a esta organização" });
 
     const { data, error } = await db
       .from("remarketing_flows")
@@ -169,13 +190,32 @@ export default async function remarketingFlowRoutes(app: FastifyInstance) {
 
     if (error) return reply.status(500).send({ error: "Erro ao atualizar fluxo" });
 
-    fireAudit(db, {
-      organization_id: orgId,
-      user_id: request.user.id,
-      action: "remarketing_flow.updated",
-      entity_type: "remarketing_flow",
-      entity_id: request.params.id,
-    }, request.log);
+    const statusActuallyChanged = "status" in updates && updates.status !== flow.status;
+    const otherFieldsChanged = Object.keys(updates).some((k) => k !== "status");
+
+    if (statusActuallyChanged && updates.status === "inactive") {
+      const { error: cancelErr } = await cancelActiveEnrollments(db, orgId, request.params.id);
+      if (cancelErr) request.log.error({ err: cancelErr, flowId: request.params.id }, "cancelActiveEnrollments failed");
+    }
+
+    if (statusActuallyChanged) {
+      void fireAudit(db, {
+        organization_id: orgId,
+        user_id: request.user.id,
+        action: "remarketing_flow.status_changed",
+        entity_type: "remarketing_flow",
+        entity_id: request.params.id,
+        metadata: { status: updates.status },
+      }, request.log);
+    } else if (otherFieldsChanged) {
+      void fireAudit(db, {
+        organization_id: orgId,
+        user_id: request.user.id,
+        action: "remarketing_flow.updated",
+        entity_type: "remarketing_flow",
+        entity_id: request.params.id,
+      }, request.log);
+    }
 
     return reply.send(data);
   });
@@ -196,11 +236,14 @@ export default async function remarketingFlowRoutes(app: FastifyInstance) {
       .maybeSingle();
     if (!flow) return reply.status(404).send({ error: "Fluxo não encontrado" });
 
-    const { count } = await db
+    const { count, error: countErr } = await db
       .from("remarketing_enrollments")
       .select("*", { count: "exact", head: true })
       .eq("flow_id", request.params.id)
+      .eq("organization_id", orgId)
       .eq("status", "active");
+
+    if (countErr) return reply.status(500).send({ error: "Erro ao verificar enrollments ativos" });
 
     if (count && count > 0) {
       return reply.status(409).send({
@@ -216,7 +259,7 @@ export default async function remarketingFlowRoutes(app: FastifyInstance) {
 
     if (error) return reply.status(500).send({ error: "Erro ao deletar fluxo" });
 
-    fireAudit(db, {
+    void fireAudit(db, {
       organization_id: orgId,
       user_id: request.user.id,
       action: "remarketing_flow.deleted",
@@ -237,13 +280,14 @@ export default async function remarketingFlowRoutes(app: FastifyInstance) {
       if (!membership) return reply.status(403).send({ error: "Acesso negado" });
 
       const db = getAdminClient();
-      const { data: original } = await db
+      const { data: original, error: originalErr } = await db
         .from("remarketing_flows")
         .select("*, remarketing_steps(*)")
         .eq("id", request.params.id)
         .eq("organization_id", orgId)
-        .single();
+        .maybeSingle();
 
+      if (originalErr) return reply.status(500).send({ error: "Erro ao buscar fluxo" });
       if (!original) return reply.status(404).send({ error: "Fluxo não encontrado" });
 
       const { id, created_at, updated_at, last_executed_at, remarketing_steps, ...flowData } = original;
@@ -262,10 +306,14 @@ export default async function remarketingFlowRoutes(app: FastifyInstance) {
           flow_id: newFlow.id,
         }));
         const { error: stepsErr } = await db.from("remarketing_steps").insert(steps);
-        if (stepsErr) return reply.status(500).send({ error: "Erro ao duplicar etapas" });
+        if (stepsErr) {
+          const { error: delErr } = await db.from("remarketing_flows").delete().eq("id", newFlow.id);
+          if (delErr) request.log.error({ err: delErr, orphanFlowId: newFlow.id }, "compensating delete failed");
+          return reply.status(500).send({ error: "Erro ao duplicar etapas" });
+        }
       }
 
-      fireAudit(db, {
+      void fireAudit(db, {
         organization_id: orgId,
         user_id: request.user.id,
         action: "remarketing_flow.duplicated",
@@ -295,19 +343,13 @@ export default async function remarketingFlowRoutes(app: FastifyInstance) {
       const db = getAdminClient();
       const { data: flow } = await db
         .from("remarketing_flows")
-        .select("id")
+        .select("id, status")
         .eq("id", request.params.id)
         .eq("organization_id", orgId)
         .maybeSingle();
       if (!flow) return reply.status(404).send({ error: "Fluxo não encontrado" });
 
-      if (status === "inactive") {
-        await db
-          .from("remarketing_enrollments")
-          .update({ status: "cancelled", cancel_reason: "flow_deactivated" })
-          .eq("flow_id", request.params.id)
-          .eq("status", "active");
-      }
+      const statusActuallyChanged = status !== flow.status;
 
       const { data, error } = await db
         .from("remarketing_flows")
@@ -319,14 +361,21 @@ export default async function remarketingFlowRoutes(app: FastifyInstance) {
 
       if (error) return reply.status(500).send({ error: "Erro ao atualizar status" });
 
-      fireAudit(db, {
-        organization_id: orgId,
-        user_id: request.user.id,
-        action: "remarketing_flow.status_changed",
-        entity_type: "remarketing_flow",
-        entity_id: request.params.id,
-        metadata: { status },
-      }, request.log);
+      if (statusActuallyChanged && status === "inactive") {
+        const { error: cancelErr } = await cancelActiveEnrollments(db, orgId, request.params.id);
+        if (cancelErr) request.log.error({ err: cancelErr, flowId: request.params.id }, "cancelActiveEnrollments failed");
+      }
+
+      if (statusActuallyChanged) {
+        void fireAudit(db, {
+          organization_id: orgId,
+          user_id: request.user.id,
+          action: "remarketing_flow.status_changed",
+          entity_type: "remarketing_flow",
+          entity_id: request.params.id,
+          metadata: { status },
+        }, request.log);
+      }
 
       return reply.send(data);
     }

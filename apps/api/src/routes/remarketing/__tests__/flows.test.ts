@@ -103,12 +103,16 @@ function makeDb(flowExists = true, agentExists = true, instanceExists = true, ac
         return {
           select: vi.fn().mockReturnValue({
             eq: vi.fn().mockReturnValue({
-              eq: vi.fn().mockResolvedValue({ count: activeEnrollments, error: null }),
+              eq: vi.fn().mockReturnValue({
+                eq: vi.fn().mockResolvedValue({ count: activeEnrollments, error: null }),
+              }),
             }),
           }),
           update: vi.fn().mockReturnValue({
             eq: vi.fn().mockReturnValue({
-              eq: vi.fn().mockResolvedValue({ error: null }),
+              eq: vi.fn().mockReturnValue({
+                eq: vi.fn().mockResolvedValue({ error: null }),
+              }),
             }),
           }),
         };

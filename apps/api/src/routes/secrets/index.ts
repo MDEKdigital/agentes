@@ -1,10 +1,9 @@
 import type { FastifyInstance } from "fastify";
 import { getAdminClient } from "@aula-agente/database";
+import { LLM_PROVIDERS } from "@aula-agente/shared";
 import { authMiddleware } from "../../middleware/auth";
 import { fireAudit } from "../../lib/audit";
-import { encrypt } from "../../lib/crypto";
-
-const ALLOWED_PROVIDERS = ["openai", "anthropic", "google"] as const;
+import { isValidProvider, upsertOrgSecret } from "../../lib/providers";
 
 export default async function secretsRoutes(app: FastifyInstance) {
   app.addHook("preHandler", authMiddleware);
@@ -40,14 +39,6 @@ export default async function secretsRoutes(app: FastifyInstance) {
       const { organizationId, provider } = request.params;
       const { key } = request.body;
 
-      if (!key || typeof key !== "string" || !key.trim()) {
-        return reply.status(400).send({ error: "A chave é obrigatória" });
-      }
-
-      if (!ALLOWED_PROVIDERS.includes(provider as (typeof ALLOWED_PROVIDERS)[number])) {
-        return reply.status(400).send({ error: `Provider inválido. Permitidos: ${ALLOWED_PROVIDERS.join(", ")}` });
-      }
-
       const membership = request.user.memberships.find(
         (m) => m.organization_id === organizationId
       );
@@ -55,15 +46,20 @@ export default async function secretsRoutes(app: FastifyInstance) {
         return reply.status(403).send({ error: "Acesso negado" });
       }
 
+      if (!key || typeof key !== "string" || !key.trim()) {
+        return reply.status(400).send({ error: "A chave é obrigatória" });
+      }
+
+      if (!isValidProvider(provider)) {
+        return reply.status(400).send({ error: `Provider inválido. Permitidos: ${LLM_PROVIDERS.join(", ")}` });
+      }
+
       const db = getAdminClient();
-      const { error } = await db.from("organization_secrets").upsert(
-        { organization_id: organizationId, provider, encrypted_key: encrypt(key.trim()) },
-        { onConflict: "organization_id,provider" }
-      );
+      const { error } = await upsertOrgSecret(db, organizationId, provider, key.trim());
 
       if (error) return reply.status(500).send({ error: "Erro interno ao processar chave" });
 
-      fireAudit(db, {
+      void fireAudit(db, {
         organization_id: organizationId,
         user_id: request.user.id,
         action: "secret.upserted",

@@ -89,7 +89,7 @@ export default async function remarketingStepRoutes(app: FastifyInstance) {
 
     if (error) return reply.status(500).send({ error: "Erro ao criar etapa" });
 
-    fireAudit(db, {
+    void fireAudit(db, {
       organization_id: orgId,
       user_id: request.user.id,
       action: "remarketing_step.created",
@@ -133,7 +133,7 @@ export default async function remarketingStepRoutes(app: FastifyInstance) {
 
     if (error) return reply.status(500).send({ error: "Erro ao atualizar etapa" });
 
-    fireAudit(db, {
+    void fireAudit(db, {
       organization_id: orgId,
       user_id: request.user.id,
       action: "remarketing_step.updated",
@@ -169,7 +169,7 @@ export default async function remarketingStepRoutes(app: FastifyInstance) {
 
       if (error) return reply.status(500).send({ error: "Erro ao deletar etapa" });
 
-      fireAudit(db, {
+      void fireAudit(db, {
         organization_id: orgId,
         user_id: request.user.id,
         action: "remarketing_step.deleted",
@@ -208,7 +208,7 @@ export default async function remarketingStepRoutes(app: FastifyInstance) {
 
       if (error) return reply.status(500).send({ error: "Erro ao atualizar etapa" });
 
-      fireAudit(db, {
+      void fireAudit(db, {
         organization_id: orgId,
         user_id: request.user.id,
         action: "remarketing_step.status_changed",

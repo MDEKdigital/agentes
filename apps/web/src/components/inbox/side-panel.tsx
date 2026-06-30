@@ -165,7 +165,7 @@ export function SidePanel({ conversation, onUpdate, onDelete }: SidePanelProps) 
           onClick={handleTogglePromptCreation}
           className={`flex w-full items-center justify-center gap-2 rounded-md border px-3 py-2 text-xs font-medium transition-colors ${
             conversation.prompt_creation_mode
-              ? "border-violet-500/30 text-violet-400 hover:bg-violet-500/10"
+              ? "border-violet-500 bg-violet-500/10 text-violet-400 hover:bg-violet-500/20"
               : "border-violet-500/30 text-violet-400 hover:bg-violet-500/10"
           }`}
         >
