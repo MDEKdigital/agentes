@@ -217,7 +217,7 @@ export default async function promptStudioRoutes(app: FastifyInstance) {
       const membership = request.user.memberships.find(
         (m) => m.organization_id === organizationId
       );
-      if (!membership || membership.role === "agent") return reply.status(403).send({ error: "Acesso negado" });
+      if (!membership) return reply.status(403).send({ error: "Acesso negado" });
 
       const { messages } = request.body as { messages: { role: string; content: string }[] };
       if (!Array.isArray(messages)) return reply.status(400).send({ error: "Mensagens obrigatórias" });
