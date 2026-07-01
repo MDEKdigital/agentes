@@ -9,7 +9,8 @@ import { Plus, Bot } from "lucide-react";
 import type { Agent } from "@aula-agente/shared";
 
 export default function AgentsPage() {
-  const { currentOrg, loading: orgLoading } = useOrganization();
+  const { currentOrg, currentRole, loading: orgLoading } = useOrganization();
+  const canCreate = currentRole !== "agent";
   const [agents, setAgents] = useState<Agent[]>([]);
   const [agentsLoading, setAgentsLoading] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -63,13 +64,15 @@ export default function AgentsPage() {
             {agents.length} {agents.length === 1 ? "agente configurado" : "agentes configurados"}
           </p>
         </div>
-        <button
-          onClick={() => setDrawerOpen(true)}
-          className="flex items-center gap-2 rounded-lg bg-amber-fire-500 px-4 py-2 text-sm font-semibold text-[#0F1219] transition-colors hover:bg-amber-fire-400"
-        >
-          <Plus className="h-4 w-4" />
-          Criar Agente
-        </button>
+        {canCreate && (
+          <button
+            onClick={() => setDrawerOpen(true)}
+            className="flex items-center gap-2 rounded-lg bg-amber-fire-500 px-4 py-2 text-sm font-semibold text-[#0F1219] transition-colors hover:bg-amber-fire-400"
+          >
+            <Plus className="h-4 w-4" />
+            Criar Agente
+          </button>
+        )}
       </div>
 
       {/* Grid */}
@@ -84,32 +87,35 @@ export default function AgentsPage() {
               Crie seu primeiro agente para começar a atender
             </p>
           </div>
-          <button
-            onClick={() => setDrawerOpen(true)}
-            className="flex items-center gap-2 rounded-lg bg-amber-fire-500 px-4 py-2 text-sm font-semibold text-[#0F1219] transition-colors hover:bg-amber-fire-400"
-          >
-            <Plus className="h-4 w-4" />
-            Criar Agente
-          </button>
+          {canCreate && (
+            <button
+              onClick={() => setDrawerOpen(true)}
+              className="flex items-center gap-2 rounded-lg bg-amber-fire-500 px-4 py-2 text-sm font-semibold text-[#0F1219] transition-colors hover:bg-amber-fire-400"
+            >
+              <Plus className="h-4 w-4" />
+              Criar Agente
+            </button>
+          )}
         </div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {agents.map((agent) => (
             <AgentCard key={agent.id} agent={agent} />
           ))}
-          {/* Card de novo agente */}
-          <div
-            onClick={() => setDrawerOpen(true)}
-            className="flex h-full min-h-[160px] flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border transition-all hover:border-primary/40 hover:bg-primary/5 cursor-pointer"
-          >
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-dashed border-border">
-              <Plus className="h-4 w-4 text-muted-foreground" />
+          {canCreate && (
+            <div
+              onClick={() => setDrawerOpen(true)}
+              className="flex h-full min-h-[160px] flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border transition-all hover:border-primary/40 hover:bg-primary/5 cursor-pointer"
+            >
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-dashed border-border">
+                <Plus className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <p className="text-sm font-medium text-muted-foreground">Criar Agente</p>
             </div>
-            <p className="text-sm font-medium text-muted-foreground">Criar Agente</p>
-          </div>
+          )}
         </div>
       )}
-      <SalomaoDrawer isOpen={drawerOpen} onClose={() => setDrawerOpen(false)} />
+      {canCreate && <SalomaoDrawer isOpen={drawerOpen} onClose={() => setDrawerOpen(false)} />}
     </div>
   );
 }
