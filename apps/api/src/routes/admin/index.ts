@@ -223,12 +223,12 @@ export default async function adminRoutes(app: FastifyInstance) {
     async (request, reply) => {
       const { orgId, provider } = request.params;
       const { key } = request.body;
-      if (!key?.trim()) return reply.status(400).send({ error: "Chave obrigatória." });
+      if (!key || typeof key !== "string" || !key.trim()) return reply.status(400).send({ error: "Chave obrigatória." });
       if (!isValidProvider(provider)) {
         return reply.status(400).send({ error: "Provider inválido." });
       }
       const db = getAdminClient();
-      const { error } = await upsertOrgSecret(db, orgId, provider, key);
+      const { error } = await upsertOrgSecret(db, orgId, provider, key.trim());
       if (error) return reply.status(500).send({ error: "Erro ao salvar chave." });
       void fireAudit(db, {
         organization_id: orgId,
