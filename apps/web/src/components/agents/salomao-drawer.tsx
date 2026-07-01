@@ -162,7 +162,7 @@ export function SalomaoDrawer({ isOpen, onClose }: SalomaoDrawerProps) {
       />
 
       {/* Drawer */}
-      <div className="fixed inset-y-0 right-0 z-50 flex w-full max-w-3xl flex-col bg-card shadow-2xl border-l border-border">
+      <div className="fixed inset-0 z-50 flex flex-col bg-card shadow-2xl">
         {/* Header */}
         <div className="flex items-center gap-3 border-b border-border px-4 py-3 bg-muted/30 shrink-0">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-sm">
