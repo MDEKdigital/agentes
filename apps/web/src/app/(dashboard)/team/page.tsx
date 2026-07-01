@@ -102,9 +102,7 @@ export default function TeamPage() {
             {members.length} {members.length === 1 ? "membro" : "membros"}
           </p>
         </div>
-        {(currentUserRole === "owner" || currentUserRole === "admin") && (
-          <InviteDialog onInvited={fetchData} />
-        )}
+        <InviteDialog onInvited={fetchData} />
       </div>
 
       {/* Membros */}
