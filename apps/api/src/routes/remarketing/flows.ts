@@ -183,14 +183,6 @@ export default async function remarketingFlowRoutes(app: FastifyInstance) {
     const statusActuallyChanged = "status" in updates && updates.status !== flow.status;
     const otherFieldsChanged = Object.keys(updates).some((k) => k !== "status");
 
-    if (statusActuallyChanged && updates.status === "inactive") {
-      const { error: cancelErr } = await cancelActiveEnrollments(db, orgId, request.params.id);
-      if (cancelErr) {
-        request.log.error({ err: cancelErr, flowId: request.params.id }, "cancelActiveEnrollments failed");
-        return reply.status(500).send({ error: "Erro ao cancelar enrollments ativos" });
-      }
-    }
-
     const { data, error } = await db
       .from("remarketing_flows")
       .update(updates)
@@ -200,6 +192,14 @@ export default async function remarketingFlowRoutes(app: FastifyInstance) {
       .single();
 
     if (error) return reply.status(500).send({ error: "Erro ao atualizar fluxo" });
+
+    if (statusActuallyChanged && updates.status === "inactive") {
+      const { error: cancelErr } = await cancelActiveEnrollments(db, orgId, request.params.id);
+      if (cancelErr) {
+        request.log.error({ err: cancelErr, flowId: request.params.id }, "cancelActiveEnrollments failed");
+        return reply.status(500).send({ error: "Erro ao cancelar enrollments ativos" });
+      }
+    }
 
     if (statusActuallyChanged) {
       void fireAudit(db, {
@@ -354,14 +354,6 @@ export default async function remarketingFlowRoutes(app: FastifyInstance) {
 
       const statusActuallyChanged = status !== flow.status;
 
-      if (statusActuallyChanged && status === "inactive") {
-        const { error: cancelErr } = await cancelActiveEnrollments(db, orgId, request.params.id);
-        if (cancelErr) {
-          request.log.error({ err: cancelErr, flowId: request.params.id }, "cancelActiveEnrollments failed");
-          return reply.status(500).send({ error: "Erro ao cancelar enrollments ativos" });
-        }
-      }
-
       const { data, error } = await db
         .from("remarketing_flows")
         .update({ status })
@@ -371,6 +363,14 @@ export default async function remarketingFlowRoutes(app: FastifyInstance) {
         .single();
 
       if (error) return reply.status(500).send({ error: "Erro ao atualizar status" });
+
+      if (statusActuallyChanged && status === "inactive") {
+        const { error: cancelErr } = await cancelActiveEnrollments(db, orgId, request.params.id);
+        if (cancelErr) {
+          request.log.error({ err: cancelErr, flowId: request.params.id }, "cancelActiveEnrollments failed");
+          return reply.status(500).send({ error: "Erro ao cancelar enrollments ativos" });
+        }
+      }
 
       if (statusActuallyChanged) {
         void fireAudit(db, {

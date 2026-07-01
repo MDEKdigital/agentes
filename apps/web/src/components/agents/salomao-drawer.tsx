@@ -113,6 +113,11 @@ export function SalomaoDrawer({ isOpen, onClose }: SalomaoDrawerProps) {
       inputRef.current.style.height = "auto";
     }
 
+    if (!currentOrg?.id) {
+      onError("Nenhuma organização selecionada. Selecione uma organização e tente novamente.");
+      return;
+    }
+
     const newMessages: ChatMessage[] = [...messages, { role: "user", content: msg }];
     setMessages(newMessages);
     setStreamingContent("");

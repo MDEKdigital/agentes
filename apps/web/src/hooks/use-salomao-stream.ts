@@ -103,6 +103,7 @@ export function useSalomaoStream({
                 receivedDone = true;
                 setState("error");
                 onError(event.message ?? "Erro desconhecido");
+                break;
               }
             } catch {
               // Ignora linhas malformadas
@@ -110,10 +111,10 @@ export function useSalomaoStream({
           }
         }
 
-        // Conexão fechou sem evento done (ex: servidor caiu mid-stream)
+        // Conexão fechou sem evento done: stream foi truncada, tratar como erro
         if (!receivedDone) {
-          setState("done");
-          onDone();
+          setState("error");
+          onError("Conexão interrompida antes de concluir");
         }
       } catch (err) {
         if ((err as Error).name === "AbortError") return;

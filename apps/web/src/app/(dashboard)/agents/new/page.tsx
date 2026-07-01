@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useOrganization } from "@/providers/organization-provider";
 import { apiFetch } from "@/lib/api";
@@ -14,12 +14,17 @@ function NewAgentForm() {
   const [salomaoPrompt] = useState<string>(() => {
     if (typeof window === "undefined") return "";
     if (searchParams.get("from") !== "salomao") return "";
-    const draft = sessionStorage.getItem("salomao_prompt_draft") ?? "";
-    sessionStorage.removeItem("salomao_prompt_draft");
-    return draft;
+    return sessionStorage.getItem("salomao_prompt_draft") ?? "";
   });
 
-  const promptFromUrl = searchParams.get("prompt") ?? salomaoPrompt;
+  useEffect(() => {
+    if (searchParams.get("from") === "salomao") {
+      sessionStorage.removeItem("salomao_prompt_draft");
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const promptFromUrl = searchParams.get("prompt") || salomaoPrompt;
 
   const handleSubmit = async (values: Record<string, unknown>) => {
     if (!currentOrg) return;
