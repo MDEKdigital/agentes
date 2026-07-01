@@ -136,8 +136,9 @@ export function SalomaoDrawer({ isOpen, onClose }: SalomaoDrawerProps) {
 
   function useAsPrompt() {
     if (!generatedPrompt) return;
+    sessionStorage.setItem("salomao_prompt_draft", generatedPrompt);
     onClose();
-    router.push(`/agents/new?prompt=${encodeURIComponent(generatedPrompt)}`);
+    router.push("/agents/new?from=salomao");
   }
 
   const displayStreamingContent =

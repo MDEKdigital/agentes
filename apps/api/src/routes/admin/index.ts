@@ -290,9 +290,17 @@ export default async function adminRoutes(app: FastifyInstance) {
     if (!systemPrompt) return reply.status(400).send({ error: "system_prompt obrigatório e não pode ser vazio." });
 
     const db = getAdminClient();
+    const { data: existing, error: fetchErr } = await db
+      .from("salomao_config")
+      .select("id")
+      .limit(1)
+      .single();
+    if (fetchErr || !existing) return reply.status(404).send({ error: "Configuração não encontrada." });
+
     const { data, error } = await db
       .from("salomao_config")
       .update({ system_prompt: systemPrompt, updated_at: new Date().toISOString(), updated_by: request.user.id })
+      .eq("id", existing.id)
       .select("system_prompt, updated_at")
       .single();
     if (error) {

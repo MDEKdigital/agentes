@@ -11,8 +11,15 @@ function NewAgentForm() {
   const searchParams = useSearchParams();
   const { currentOrg } = useOrganization();
   const [error, setError] = useState<string | null>(null);
+  const [salomaoPrompt] = useState<string>(() => {
+    if (typeof window === "undefined") return "";
+    if (searchParams.get("from") !== "salomao") return "";
+    const draft = sessionStorage.getItem("salomao_prompt_draft") ?? "";
+    sessionStorage.removeItem("salomao_prompt_draft");
+    return draft;
+  });
 
-  const promptFromUrl = searchParams.get("prompt") ?? "";
+  const promptFromUrl = searchParams.get("prompt") ?? salomaoPrompt;
 
   const handleSubmit = async (values: Record<string, unknown>) => {
     if (!currentOrg) return;

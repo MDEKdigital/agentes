@@ -68,7 +68,7 @@ export default async function remarketingFlowRoutes(app: FastifyInstance) {
     const membership = request.user.memberships.find(
       (m) => m.organization_id === orgId
     );
-    if (!membership) return reply.status(403).send({ error: "Acesso negado" });
+    if (!membership || membership.role === "agent") return reply.status(403).send({ error: "Acesso negado" });
 
     const { name, product_campaign, agent_id, instance_id, entry_silence_minutes,
             cancel_on_reply = true, cancel_on_resolved = true, cancel_on_opt_out = true,
@@ -130,7 +130,7 @@ export default async function remarketingFlowRoutes(app: FastifyInstance) {
     const membership = request.user.memberships.find(
       (m) => m.organization_id === orgId
     );
-    if (!membership) return reply.status(403).send({ error: "Acesso negado" });
+    if (!membership || membership.role === "agent") return reply.status(403).send({ error: "Acesso negado" });
 
     const db = getAdminClient();
     const { data: flow } = await db
@@ -180,6 +180,17 @@ export default async function remarketingFlowRoutes(app: FastifyInstance) {
     if ("agent_id" in updates && !agentResult.data) return reply.status(403).send({ error: "Agente não pertence a esta organização" });
     if ("instance_id" in updates && !instanceResult.data) return reply.status(403).send({ error: "Instância não pertence a esta organização" });
 
+    const statusActuallyChanged = "status" in updates && updates.status !== flow.status;
+    const otherFieldsChanged = Object.keys(updates).some((k) => k !== "status");
+
+    if (statusActuallyChanged && updates.status === "inactive") {
+      const { error: cancelErr } = await cancelActiveEnrollments(db, orgId, request.params.id);
+      if (cancelErr) {
+        request.log.error({ err: cancelErr, flowId: request.params.id }, "cancelActiveEnrollments failed");
+        return reply.status(500).send({ error: "Erro ao cancelar enrollments ativos" });
+      }
+    }
+
     const { data, error } = await db
       .from("remarketing_flows")
       .update(updates)
@@ -189,14 +200,6 @@ export default async function remarketingFlowRoutes(app: FastifyInstance) {
       .single();
 
     if (error) return reply.status(500).send({ error: "Erro ao atualizar fluxo" });
-
-    const statusActuallyChanged = "status" in updates && updates.status !== flow.status;
-    const otherFieldsChanged = Object.keys(updates).some((k) => k !== "status");
-
-    if (statusActuallyChanged && updates.status === "inactive") {
-      const { error: cancelErr } = await cancelActiveEnrollments(db, orgId, request.params.id);
-      if (cancelErr) request.log.error({ err: cancelErr, flowId: request.params.id }, "cancelActiveEnrollments failed");
-    }
 
     if (statusActuallyChanged) {
       void fireAudit(db, {
@@ -225,7 +228,7 @@ export default async function remarketingFlowRoutes(app: FastifyInstance) {
     const membership = request.user.memberships.find(
       (m) => m.organization_id === orgId
     );
-    if (!membership) return reply.status(403).send({ error: "Acesso negado" });
+    if (!membership || membership.role === "agent") return reply.status(403).send({ error: "Acesso negado" });
 
     const db = getAdminClient();
     const { data: flow } = await db
@@ -333,7 +336,7 @@ export default async function remarketingFlowRoutes(app: FastifyInstance) {
       const membership = request.user.memberships.find(
         (m) => m.organization_id === orgId
       );
-      if (!membership) return reply.status(403).send({ error: "Acesso negado" });
+      if (!membership || membership.role === "agent") return reply.status(403).send({ error: "Acesso negado" });
 
       const { status } = request.body;
       if (!["active", "inactive"].includes(status)) {
@@ -351,6 +354,14 @@ export default async function remarketingFlowRoutes(app: FastifyInstance) {
 
       const statusActuallyChanged = status !== flow.status;
 
+      if (statusActuallyChanged && status === "inactive") {
+        const { error: cancelErr } = await cancelActiveEnrollments(db, orgId, request.params.id);
+        if (cancelErr) {
+          request.log.error({ err: cancelErr, flowId: request.params.id }, "cancelActiveEnrollments failed");
+          return reply.status(500).send({ error: "Erro ao cancelar enrollments ativos" });
+        }
+      }
+
       const { data, error } = await db
         .from("remarketing_flows")
         .update({ status })
@@ -360,11 +371,6 @@ export default async function remarketingFlowRoutes(app: FastifyInstance) {
         .single();
 
       if (error) return reply.status(500).send({ error: "Erro ao atualizar status" });
-
-      if (statusActuallyChanged && status === "inactive") {
-        const { error: cancelErr } = await cancelActiveEnrollments(db, orgId, request.params.id);
-        if (cancelErr) request.log.error({ err: cancelErr, flowId: request.params.id }, "cancelActiveEnrollments failed");
-      }
 
       if (statusActuallyChanged) {
         void fireAudit(db, {

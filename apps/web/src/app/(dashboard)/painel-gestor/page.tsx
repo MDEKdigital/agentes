@@ -484,6 +484,7 @@ export default function AdminPage() {
   const [salomaoSaving, setSalomaoSaving] = useState(false);
   const [salomaoSaved, setSalomaoSaved] = useState(false);
   const [salomaoLoading, setSalomaoLoading] = useState(false);
+  const [salomaoSaveError, setSalomaoSaveError] = useState<string | null>(null);
 
   const load = () => {
     setLoading(true);
@@ -533,6 +534,7 @@ export default function AdminPage() {
   async function saveSalomaoConfig() {
     if (!salomaoPrompt.trim()) return;
     setSalomaoSaving(true);
+    setSalomaoSaveError(null);
     try {
       const data = await apiFetch("/admin/salomao-config", {
         method: "PATCH",
@@ -541,6 +543,8 @@ export default function AdminPage() {
       setSalomaoUpdatedAt((data as { updated_at: string }).updated_at ?? "");
       setSalomaoSaved(true);
       setTimeout(() => setSalomaoSaved(false), 2500);
+    } catch (err) {
+      setSalomaoSaveError(err instanceof Error ? err.message : "Erro ao salvar configuração do Salomão");
     } finally {
       setSalomaoSaving(false);
     }
@@ -620,6 +624,9 @@ export default function AdminPage() {
             {salomaoSaving ? "Salvando..." : salomaoSaved ? "✓ Salvo!" : "Salvar alterações"}
           </button>
         </div>
+        {salomaoSaveError && (
+          <p className="text-xs text-destructive mt-1">{salomaoSaveError}</p>
+        )}
         {salomaoLoading ? (
           <div className="h-48 animate-pulse rounded-lg bg-muted" />
         ) : (

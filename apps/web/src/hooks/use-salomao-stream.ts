@@ -100,6 +100,7 @@ export function useSalomaoStream({
                 setState("done");
                 onDone();
               } else if (event.type === "error") {
+                receivedDone = true;
                 setState("error");
                 onError(event.message ?? "Erro desconhecido");
               }

@@ -74,7 +74,8 @@ describe("PATCH /admin/salomao-config", () => {
     const updatedRow = { system_prompt: "novo prompt", updated_at: "2026-06-28" };
     mockGetAdminClient.mockReturnValue({
       from: () => ({
-        update: () => ({ select: () => ({ single: async () => ({ data: updatedRow, error: null }) }) }),
+        select: () => ({ limit: () => ({ single: async () => ({ data: { id: "cfg-1" }, error: null }) }) }),
+        update: () => ({ eq: () => ({ select: () => ({ single: async () => ({ data: updatedRow, error: null }) }) }) }),
       }),
     });
 
