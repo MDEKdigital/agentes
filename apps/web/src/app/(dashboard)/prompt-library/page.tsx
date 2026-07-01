@@ -11,6 +11,7 @@ import { BookOpen, Search, Copy, Check, Loader2, Sparkles, Trash2, Edit2 } from 
 import { useRouter } from "next/navigation";
 import { useOrganization } from "@/providers/organization-provider";
 import { usePromptStudio, type SavedPrompt } from "@/hooks/use-prompt-studio";
+import { SalomaoDrawer } from "@/components/agents/salomao-drawer";
 
 // ─── built-in templates ───────────────────────────────────────────────────────
 interface PromptTemplate {
@@ -172,6 +173,8 @@ export default function PromptLibraryPage() {
   const isAdmin = currentRole === "owner" || currentRole === "admin";
   const { savedPrompts, loading, deletePrompt, updatePrompt } = usePromptStudio(currentOrg?.id);
 
+  const canCreate = currentRole !== "agent";
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [niche, setNiche] = useState("Todos");
   const [selected, setSelected] = useState<PromptTemplate | null>(null);
@@ -200,6 +203,15 @@ export default function PromptLibraryPage() {
             Templates prontos por nicho para usar como base no seu agente.
           </p>
         </div>
+        {canCreate && (
+          <button
+            onClick={() => setDrawerOpen(true)}
+            className="flex items-center gap-2 rounded-lg bg-amber-fire-500 px-4 py-2 text-sm font-semibold text-[#0F1219] transition-colors hover:bg-amber-fire-400"
+          >
+            <Sparkles className="h-4 w-4" />
+            Criar com Salomão
+          </button>
+        )}
       </div>
 
       <Tabs defaultValue="templates">
@@ -345,6 +357,8 @@ export default function PromptLibraryPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {canCreate && <SalomaoDrawer isOpen={drawerOpen} onClose={() => setDrawerOpen(false)} />}
     </div>
   );
 }

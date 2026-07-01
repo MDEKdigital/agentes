@@ -1,19 +1,19 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useOrganization } from "@/providers/organization-provider";
 import { apiFetch } from "@/lib/api";
 import { AgentCard } from "@/components/agents/agent-card";
-import { SalomaoDrawer } from "@/components/agents/salomao-drawer";
 import { Plus, Bot } from "lucide-react";
 import type { Agent } from "@aula-agente/shared";
 
 export default function AgentsPage() {
+  const router = useRouter();
   const { currentOrg, currentRole, loading: orgLoading } = useOrganization();
   const canCreate = currentRole !== "agent";
   const [agents, setAgents] = useState<Agent[]>([]);
   const [agentsLoading, setAgentsLoading] = useState(false);
-  const [drawerOpen, setDrawerOpen] = useState(false);
 
   useEffect(() => {
     if (!currentOrg) return;
@@ -66,7 +66,7 @@ export default function AgentsPage() {
         </div>
         {canCreate && (
           <button
-            onClick={() => setDrawerOpen(true)}
+            onClick={() => router.push("/agents/new")}
             className="flex items-center gap-2 rounded-lg bg-amber-fire-500 px-4 py-2 text-sm font-semibold text-[#0F1219] transition-colors hover:bg-amber-fire-400"
           >
             <Plus className="h-4 w-4" />
@@ -89,7 +89,7 @@ export default function AgentsPage() {
           </div>
           {canCreate && (
             <button
-              onClick={() => setDrawerOpen(true)}
+              onClick={() => router.push("/agents/new")}
               className="flex items-center gap-2 rounded-lg bg-amber-fire-500 px-4 py-2 text-sm font-semibold text-[#0F1219] transition-colors hover:bg-amber-fire-400"
             >
               <Plus className="h-4 w-4" />
@@ -104,7 +104,7 @@ export default function AgentsPage() {
           ))}
           {canCreate && (
             <div
-              onClick={() => setDrawerOpen(true)}
+              onClick={() => router.push("/agents/new")}
               className="flex h-full min-h-[160px] flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border transition-all hover:border-primary/40 hover:bg-primary/5 cursor-pointer"
             >
               <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-dashed border-border">
@@ -115,7 +115,6 @@ export default function AgentsPage() {
           )}
         </div>
       )}
-      {canCreate && <SalomaoDrawer isOpen={drawerOpen} onClose={() => setDrawerOpen(false)} />}
     </div>
   );
 }
