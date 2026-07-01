@@ -193,7 +193,7 @@ export default async function remarketingFlowRoutes(app: FastifyInstance) {
 
     if (error) return reply.status(500).send({ error: "Erro ao atualizar fluxo" });
 
-    if (statusActuallyChanged && updates.status === "inactive") {
+    if ("status" in updates && updates.status === "inactive") {
       const { error: cancelErr } = await cancelActiveEnrollments(db, orgId, request.params.id);
       if (cancelErr) {
         request.log.error({ err: cancelErr, flowId: request.params.id }, "cancelActiveEnrollments failed");
@@ -364,7 +364,7 @@ export default async function remarketingFlowRoutes(app: FastifyInstance) {
 
       if (error) return reply.status(500).send({ error: "Erro ao atualizar status" });
 
-      if (statusActuallyChanged && status === "inactive") {
+      if (status === "inactive") {
         const { error: cancelErr } = await cancelActiveEnrollments(db, orgId, request.params.id);
         if (cancelErr) {
           request.log.error({ err: cancelErr, flowId: request.params.id }, "cancelActiveEnrollments failed");

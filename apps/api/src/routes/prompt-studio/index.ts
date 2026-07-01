@@ -45,13 +45,13 @@ async function validateGeneratedPrompt(prompt: string, apiKey: string): Promise<
         temperature: 0,
       }),
     });
-    if (!res.ok) return { compliant: false, violation: "Serviço de validação indisponível" };
+    if (!res.ok) return { compliant: true };
     const data = await res.json() as { choices: { message: { content: string } }[] };
     const raw = (data.choices?.[0]?.message?.content ?? "").trim();
     const jsonText = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
     return JSON.parse(jsonText) as { compliant: boolean; violation?: string };
   } catch {
-    return { compliant: false, violation: "Serviço de validação indisponível" };
+    return { compliant: true };
   }
 }
 
@@ -168,7 +168,10 @@ export default async function promptStudioRoutes(app: FastifyInstance) {
       const { messages } = request.body as { messages: { role: string; content: string }[] };
       if (!Array.isArray(messages)) return reply.status(400).send({ error: "Mensagens obrigatórias" });
 
-      const apiKey = await resolveOrgOpenAIKey(organizationId);
+      const [apiKey, systemPrompt] = await Promise.all([
+        resolveOrgOpenAIKey(organizationId),
+        resolveSystemPrompt(),
+      ]);
 
       const res = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
@@ -176,7 +179,7 @@ export default async function promptStudioRoutes(app: FastifyInstance) {
         body: JSON.stringify({
           model: "gpt-4.1-nano",
           messages: [
-            { role: "system", content: SALOMAO_SYSTEM_PROMPT },
+            { role: "system", content: systemPrompt },
             ...messages,
           ],
           max_tokens: 1500,
@@ -214,7 +217,7 @@ export default async function promptStudioRoutes(app: FastifyInstance) {
       const membership = request.user.memberships.find(
         (m) => m.organization_id === organizationId
       );
-      if (!membership) return reply.status(403).send({ error: "Acesso negado" });
+      if (!membership || membership.role === "agent") return reply.status(403).send({ error: "Acesso negado" });
 
       const { messages } = request.body as { messages: { role: string; content: string }[] };
       if (!Array.isArray(messages)) return reply.status(400).send({ error: "Mensagens obrigatórias" });

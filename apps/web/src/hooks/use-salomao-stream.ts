@@ -50,6 +50,12 @@ export function useSalomaoStream({
           data: { session },
         } = await supabase.auth.getSession();
 
+        if (!session) {
+          setState("error");
+          onError("Sessão expirada. Faça login novamente.");
+          return;
+        }
+
         const res = await fetch(
           `${apiBase}/organizations/${organizationId}/prompt-studio/chat/stream`,
           {

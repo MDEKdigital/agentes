@@ -108,14 +108,14 @@ export function SalomaoDrawer({ isOpen, onClose }: SalomaoDrawerProps) {
     const msg = (text ?? input).trim();
     if (!msg || isStreaming) return;
 
-    setInput("");
-    if (inputRef.current) {
-      inputRef.current.style.height = "auto";
-    }
-
     if (!currentOrg?.id) {
       onError("Nenhuma organização selecionada. Selecione uma organização e tente novamente.");
       return;
+    }
+
+    setInput("");
+    if (inputRef.current) {
+      inputRef.current.style.height = "auto";
     }
 
     const newMessages: ChatMessage[] = [...messages, { role: "user", content: msg }];
@@ -206,7 +206,7 @@ export function SalomaoDrawer({ isOpen, onClose }: SalomaoDrawerProps) {
 
               {isStreaming && !displayStreamingContent && <TypingIndicator />}
 
-              {state === "error" && messages.length === 0 && (
+              {state === "error" && !messages.some((m) => m.role === "user") && (
                 <div className="flex flex-col items-center gap-3 py-8 text-center">
                   <AlertCircle className="h-8 w-8 text-destructive" />
                   <p className="text-sm text-muted-foreground">Erro ao conectar. Tente novamente.</p>
