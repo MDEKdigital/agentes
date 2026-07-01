@@ -6,6 +6,7 @@ import { getAdminClient } from "@aula-agente/database";
 const streamAgent = new Agent({ headersTimeout: 15_000, bodyTimeout: 0 });
 import { authMiddleware } from "../../middleware/auth";
 import { decrypt } from "../../lib/crypto";
+import { parseAllowedOrigins, isOriginAllowed } from "../../lib/cors";
 
 // Salomão Auditor — valida o prompt gerado antes de entregar ao usuário
 // Texto canônico mantido em sync com SALOMAO_AUDITOR_IDENTITY em apps/worker/src/agents/salomao-decisor.ts
@@ -230,6 +231,12 @@ export default async function promptStudioRoutes(app: FastifyInstance) {
       // Hijack response — Fastify não deve finalizar
       reply.hijack();
       const raw = reply.raw;
+      // reply.hijack() bypassa o plugin CORS; adicionar header manualmente
+      const requestOrigin = request.headers.origin;
+      if (requestOrigin && isOriginAllowed(requestOrigin, parseAllowedOrigins(process.env.ALLOWED_ORIGINS))) {
+        raw.setHeader("Access-Control-Allow-Origin", requestOrigin);
+        raw.setHeader("Vary", "Origin");
+      }
       raw.setHeader("Content-Type", "text/event-stream");
       raw.setHeader("Cache-Control", "no-cache");
       raw.setHeader("Connection", "keep-alive");
