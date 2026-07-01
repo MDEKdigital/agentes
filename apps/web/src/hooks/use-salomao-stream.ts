@@ -76,7 +76,7 @@ export function useSalomaoStream({
         let buffer = "";
         let receivedDone = false;
 
-        while (true) {
+        outer: while (true) {
           const { done, value } = await reader.read();
           if (done) break;
 
@@ -99,11 +99,12 @@ export function useSalomaoStream({
                 receivedDone = true;
                 setState("done");
                 onDone();
+                break outer;
               } else if (event.type === "error") {
                 receivedDone = true;
                 setState("error");
                 onError(event.message ?? "Erro desconhecido");
-                break;
+                break outer;
               }
             } catch {
               // Ignora linhas malformadas
